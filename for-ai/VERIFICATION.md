@@ -38,16 +38,33 @@ Before implementation, name:
 
 ## Gate 2: focused change
 
-Run the narrowest real check for the change. Add the exact commands here when
-the project selects its stack. A syntax check proves syntax; a unit test proves
-its tested logic; neither proves UI, deployment, hardware, performance, safety,
-or scientific validity unless it directly observes that surface.
+Run the narrowest real check for the change. A syntax check proves syntax; a
+unit test proves its tested logic; neither proves UI, deployment, hardware,
+performance, safety, or scientific validity unless it directly observes that
+surface.
+
+```powershell
+cargo fmt --all -- --check
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+node --check apps/polar-stream-mini/ui/app.js
+node --check apps/vernier-stream-mini/ui/app.js
+npm run validate:minis
+npm run validate:docs
+cargo run -p polar-h10-metrics --example export_catalog -- docs/metric-catalog.js --check
+```
 
 ## Gate 3: integrated readiness
 
 Run proportionate build, test, lint, type, runtime, visual, device, security,
 and compatibility checks for every affected boundary. Do not run an expensive
 or irrelevant full matrix for a documentation-only edit.
+
+For a release or package change, build each affected app's own Tauri package,
+verify bundled resources, and launch the installed copy without replacing the
+other product. Report physical H10/Vernier and non-Windows checks separately.
+For Pages changes, verify the generated catalog, browser layout/filter behavior,
+and the live deployed URL at the published commit.
 
 ## Gate 4: publication
 

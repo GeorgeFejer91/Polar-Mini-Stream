@@ -12,3 +12,11 @@ Thumbs.db
 *.swp
 *.tmp
 *.log
+
+# Build and local test output
+target/
+node_modules/
+artifacts/
+apps/*/gen/
+__pycache__/
+*.pyc

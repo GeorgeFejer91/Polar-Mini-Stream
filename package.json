@@ -1,0 +1,15 @@
+{
+  "name": "polar-mini-stream",
+  "private": true,
+  "version": "0.6.0",
+  "description": "UI validation and Tauri packaging for Polar and Vernier mini streamers",
+  "type": "module",
+  "scripts": {
+    "validate:minis": "node scripts/validate_mini_apps.mjs",
+    "validate:docs": "node scripts/validate_docs.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4",
+    "playwright": "1.63.0"
+  }
+}

@@ -1,0 +1,56 @@
+use std::{env, fs, path::PathBuf};
+
+use polar_h10_metrics::{
+    METRIC_CATALOG, MetricCitation, MetricDefinition, MetricSelectionTier, metric_citations,
+    metric_formula_definition, metric_selection_tier,
+};
+use serde::Serialize;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BrowserMetric {
+    #[serde(flatten)]
+    metric: MetricDefinition,
+    formula: &'static str,
+    formula_template: Option<&'static str>,
+    formula_source: &'static str,
+    selection_tier: MetricSelectionTier,
+    sources: Vec<MetricCitation>,
+}
+
+fn main() {
+    let mut args = env::args_os().skip(1);
+    let output = args
+        .next()
+        .map(PathBuf::from)
+        .expect("usage: export_catalog <output.js> [--check]");
+    let check = args.next().is_some_and(|arg| arg == "--check");
+    let catalog: Vec<_> = METRIC_CATALOG
+        .iter()
+        .copied()
+        .map(|metric| {
+            let formula = metric_formula_definition(metric.id);
+            BrowserMetric {
+                metric,
+                formula: formula.formula,
+                formula_template: formula.formula_template,
+                formula_source: formula.formula_source,
+                selection_tier: metric_selection_tier(metric.id),
+                sources: metric_citations(metric),
+            }
+        })
+        .collect();
+    let json = serde_json::to_string(&catalog).expect("serialize metric catalog");
+    let rendered = format!(
+        "// Generated from polar-h10-metrics; do not edit by hand.\nwindow.PolarMetricCatalog = Object.freeze({json});\n"
+    );
+    if check {
+        assert_eq!(
+            fs::read_to_string(&output).expect("read checked-in metric catalog"),
+            rendered,
+            "metric catalog is stale; run cargo run -p polar-h10-metrics --example export_catalog -- docs/metric-catalog.js"
+        );
+    } else {
+        fs::write(output, rendered).expect("write browser metric catalog");
+    }
+}

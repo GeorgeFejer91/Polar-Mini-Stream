@@ -24,9 +24,10 @@ Higher-priority instructions and the current user request always win.
 
 ## Project-specific routes
 
-None yet. Add exact identifiers only after the project selects a stack or
-domain that genuinely needs them. Record required vs conditional status,
-nesting order, fallback behavior, and source revision for vendored skills.
+| Work | Skill | Policy |
+| --- | --- | --- |
+| Repository task involving Tauri/Rust or packaging | `tauri-rust-developer` | Required when installed. If unavailable, say so and use `for-ai/PROJECT.md` plus `for-ai/VERIFICATION.md` as the fallback. |
+| Polar H10 BLE/ECG integration | `polar-h10-vr` | Conditional for the H10 device path; apply only the non-VR guidance relevant to BLE/raw ECG. |
 
 ## Supply-chain rule
 
