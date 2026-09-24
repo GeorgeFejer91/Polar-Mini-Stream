@@ -16,6 +16,7 @@
     <nav aria-label="Main navigation">
       <a href="#signal-flow">Signal flow</a>
       <a href="#methods">Methods</a>
+      <a href="#vernier-guide">Vernier guide</a>
       <a href="#catalog">Metric catalog</a>
       <a href="https://github.com/GeorgeFejer91/Polar-Mini-Stream/releases/latest">Downloads ↗</a>
     </nav>
@@ -25,7 +26,7 @@
     <section class="intro content-width">
       <p class="eyebrow">Two small apps · one measurement path each</p>
       <h1>Signals in.<br><em>Streams out.</em></h1>
-      <p class="lead">A compact reference for every included Polar metric and the Vernier breathing output. Definitions and formulas below are generated from the Rust catalog used by the apps.</p>
+      <p class="lead">A reference for Polar metrics and every Vernier Respiration Belt stream and channel, including its built-in pedometer outputs.</p>
       <div class="intro-actions">
         <a class="button button-primary" href="#catalog">Explore metrics <span aria-hidden="true">↗</span></a>
         <a class="button button-secondary" href="https://github.com/GeorgeFejer91/Polar-Mini-Stream">View source <span aria-hidden="true">↗</span></a>
@@ -44,7 +45,7 @@
         </div>
         <div class="lane vernier-lane">
           <div class="lane-label"><span class="lane-dot vernier-dot"></span><div><strong>Vernier Stream Mini</strong><small>Go Direct · one BLE session</small></div></div>
-          <div class="flow-row"><div class="flow-node source"><small>INPUT</small><strong>Device-defined<br>numeric channels</strong></div><span class="flow-arrow" aria-hidden="true">→</span><div class="flow-node"><small>RUST</small><strong>BLE decode<br>Channel metadata</strong></div><span class="flow-arrow" aria-hidden="true">→</span><div class="flow-node output"><small>RAW FIRST</small><strong>rawVernier<br>LSL outlet</strong></div></div>
+          <div class="flow-row"><div class="flow-node source"><small>INPUT</small><strong>Force · rate<br>Steps · cadence</strong></div><span class="flow-arrow" aria-hidden="true">→</span><div class="flow-node"><small>RUST</small><strong>BLE decode<br>Channel metadata</strong></div><span class="flow-arrow" aria-hidden="true">→</span><div class="flow-node output"><small>RAW FIRST</small><strong>rawVernier<br>optional step outlets</strong></div></div>
           <div class="branch" aria-hidden="true">↓ force channel, when available</div>
           <div class="method-row"><div class="method-node vernier-method"><strong>30 s force range</strong><span>5th–95th percentile bounds</span></div><div class="method-node output"><strong>vernierBreathing</strong><span>separate 0–1 LSL waveform</span></div></div>
         </div>
@@ -63,8 +64,33 @@
       <p class="method-caveat">These algorithms are different implementations. The cited papers and source projects explain their origins or related methods; they do not validate Polar Mini's H10 adaptations. Phan's linked origin is source code; the Viscereality controller source requires repository access, while its design paper is public. For exact controller-to-H10 differences, read <a href="https://github.com/GeorgeFejer91/Polar-Mini-Stream/blob/main/docs/acc-breathing-methods.md">the method comparison</a>.</p>
     </section>
 
+    <section class="section content-width" id="vernier-guide" aria-labelledby="vernier-guide-title">
+      <div class="section-heading"><div><p class="eyebrow">03 / Vernier reference</p><h2 id="vernier-guide-title">Respiration Belt variables</h2></div><p>These are the four measurement channels verified on a live GDX-RB running firmware 5.3. The belt does not advertise raw X, Y, or Z acceleration channels.</p></div>
+      <p class="vernier-guide-note">In separate mode, <code>&lt;name&gt;_rawVernier</code> always contains every device measurement plus the diagnostic fields below. <code>&lt;name&gt;_rawForce</code> and <code>&lt;name&gt;_vernierBreathing</code> are also always present. Use the app's <strong>Streams</strong> checkboxes to add <code>&lt;name&gt;_steps</code> and <code>&lt;name&gt;_stepRate</code>. Single mode uses one sparse <code>&lt;name&gt;</code> outlet with all measurement channels and breathing; the optional checkboxes apply when separate mode is selected.</p>
+      <div class="vernier-table-wrap"><table class="vernier-table"><thead><tr><th scope="col">Variable / LSL name</th><th scope="col">Unit</th><th scope="col">What it measures</th></tr></thead><tbody>
+        <tr><th scope="row"><code>Force</code> · <code>rawForce</code></th><td>N</td><td>Strap tension from chest expansion. The raw force channel is also in <code>rawVernier</code>.</td></tr>
+        <tr><th scope="row"><code>Respiration Rate</code></th><td>bpm</td><td>Belt-calculated breaths per minute, using a 30 s window and 10 s updates. Available in <code>rawVernier</code>.</td></tr>
+        <tr><th scope="row"><code>Steps</code> · <code>steps</code></th><td>steps</td><td>Built-in pedometer's cumulative step count since its last zero or reset; this app does not zero it.</td></tr>
+        <tr><th scope="row"><code>Step Rate</code> · <code>stepRate</code></th><td>spm</td><td>Device-calculated steps per minute, using a 10 s window and 10 s updates.</td></tr>
+        <tr><th scope="row"><code>vernier_breathing_01</code> · <code>vernierBreathing</code></th><td>0–1</td><td>App-derived normalized force waveform; increasing force denotes inhalation. It is relative effort, not lung volume.</td></tr>
+        <tr><th scope="row"><code>signal_state</code> · <code>signalStatus</code></th><td>code</td><td>Continuity marker: 1 means Bluetooth signal lost; 2 means restored. Separate mode uses a marker outlet; single mode includes this sparse channel.</td></tr>
+      </tbody></table></div>
+      <h3 class="vernier-subheading">Raw recording fields</h3>
+      <p class="vernier-guide-note">The <code>rawVernier</code> outlet labels the first four channels with device metadata. In single mode those labels have the form <code>sensor_1_Force</code>, <code>sensor_2_Respiration Rate</code>, <code>sensor_4_Steps</code>, and <code>sensor_5_Step Rate</code>. Missing values in a sparse update are NaN, not a repeated prior reading.</p>
+      <div class="vernier-table-wrap"><table class="vernier-table"><thead><tr><th scope="col">Field name</th><th scope="col">Meaning</th></tr></thead><tbody>
+        <tr><th scope="row"><code>sequence</code></th><td>Monotonic raw row sequence.</td></tr>
+        <tr><th scope="row"><code>dropped_rows_before</code></th><td>Input queue rows dropped before this row.</td></tr>
+        <tr><th scope="row"><code>device_drop_reports_before</code></th><td>Device dropped-packet reports observed before this row.</td></tr>
+        <tr><th scope="row"><code>sample_period_us</code></th><td>Configured periodic backfill interval in microseconds.</td></tr>
+        <tr><th scope="row"><code>decode_latency_ns</code></th><td>Host notification-to-decode latency in nanoseconds.</td></tr>
+        <tr><th scope="row"><code>host_receive_timestamp_ns</code></th><td>Monotonic nanoseconds since the native measurement-session origin.</td></tr>
+        <tr><th scope="row"><code>encoding_code</code></th><td>Device frame format: 0 for Float32, 1 for Int32.</td></tr>
+      </tbody></table></div>
+      <p class="vernier-guide-note">The device reports Steps and Step Rate, but its channel metadata, official library, and firmware channel map do not expose the pedometer's internal motion samples. <a href="https://www.vernier.com/manuals/GDX-RB">Vernier GDX-RB manual ↗</a></p>
+    </section>
+
     <section class="section catalog-section" id="catalog" aria-labelledby="catalog-title"><div class="content-width">
-      <div class="section-heading"><div><p class="eyebrow">03 / Reference</p><h2 id="catalog-title">Metric catalog</h2></div><p>One card per Rust catalog entry: LSL suffix, units, transformation, evidence status, and original or related sources.</p></div>
+      <div class="section-heading"><div><p class="eyebrow">04 / Reference</p><h2 id="catalog-title">Metric catalog</h2></div><p>One card per Rust catalog entry: LSL suffix, units, transformation, evidence status, and original or related sources.</p></div>
       <div class="catalog-controls"><label class="search-label" for="search">Search metric, ID, or method<input id="search" type="search" placeholder="Try RMSSD, phase, Phan…" autocomplete="off"></label><label class="filter-label" for="category">Category<select id="category"><option value="all">All categories</option></select></label></div>
       <p class="result-count" id="result-count" role="status" aria-live="polite"></p>
       <div class="metric-list" id="metric-list"></div>

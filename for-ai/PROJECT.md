@@ -57,6 +57,11 @@ are retained to preserve installed-user continuity.
   metadata queries of all 32 slots found no X/Y/Z acceleration channels.
   Whether the belt contains a three-axis accelerometer or exposes one through
   an undocumented interface remains unverified.
+- Vernier Mini offers optional separate `steps` and `stepRate` LSL outlets,
+  saved and reconfigured live, while `rawVernier` retains all device channels.
+  Synthetic outlet-to-inlet checks received both pedometer values; the Pages
+  guide names every GDX-RB measurement and raw diagnostic field. Physical
+  pedometer outlet streaming with a moving belt remains unverified.
 
 Git and runnable checks are the authority for branch, revision, and behavior.
 Do not turn this section into a second status ledger.

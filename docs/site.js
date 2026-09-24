@@ -39,7 +39,9 @@
       formula.append(element('code', '', metric.formula));
       card.append(formula);
       const provenance = metric.id === 'raw_force'
-        ? 'Vernier Mini · N · force channel in device-defined _rawVernier outlet'
+        ? 'Vernier Mini · N · _rawForce outlet and device-defined _rawVernier channel'
+        : metric.category === 'Pedometer'
+          ? `Vernier Mini · ${metric.unit} · optional separate LSL: _${metric.streamSuffix} · also in _rawVernier`
         : `Polar Mini · ${metric.unit} · ${metric.channels} channel${metric.channels === 1 ? '' : 's'} · ${metric.raw ? 'raw' : 'derived'} · input: ${metric.formulaSource} · LSL: _${metric.streamSuffix}`;
       card.append(element('p', 'metric-meta', provenance));
       card.append(element('p', 'metric-explainer', metric.explainer));

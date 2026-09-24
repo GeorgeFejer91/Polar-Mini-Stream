@@ -60,9 +60,9 @@
                 <input id="auto-connect" type="checkbox" />
                 <span>Reconnect</span>
               </label>
-              <div class="metric-row polar-only" data-tauri-drag-region>
-                <button id="metrics-button" type="button">Metrics</button>
-                <span id="metric-count" data-tauri-drag-region>Direct</span>
+              <div class="metric-row" data-tauri-drag-region>
+                <button id="metrics-button" type="button">Streams</button>
+                <span id="metric-count" data-tauri-drag-region>0 optional</span>
               </div>
             </div>
 
@@ -92,8 +92,8 @@
       <form method="dialog">
         <header>
           <div>
-            <strong>Polar outputs</strong>
-            <span>Release metrics</span>
+            <strong id="output-dialog-title">Vernier streams</strong>
+            <span id="output-dialog-detail">Optional pedometer outlets in separate mode</span>
           </div>
           <button id="metrics-close" value="cancel" type="submit" aria-label="Close">x</button>
         </header>

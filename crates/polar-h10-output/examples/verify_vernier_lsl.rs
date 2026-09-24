@@ -1,9 +1,10 @@
-//! Synthetic producer for exact consumer-side verification of the two
-//! metadata-driven Vernier LSL outlets.
+//! Synthetic producer for consumer-side verification of Vernier LSL outlets.
 
 use std::{env, path::PathBuf, thread, time::Duration};
 
-use polar_h10_output::{OutputConfig, OutputRouter};
+use polar_h10_output::{
+    OutputConfig, OutputRouter, VERNIER_STEP_RATE_OUTPUT, VERNIER_STEPS_OUTPUT,
+};
 use vernier_gdx_core::{
     NumericMeasurementType, SampleEncoding, SamplingMode, SensorInfo, SensorSamples,
 };
@@ -47,6 +48,11 @@ async fn main() -> Result<(), String> {
         .configure(OutputConfig {
             stream_name: STREAM_BASE.into(),
             lsl_enabled: true,
+            outputs: vec![
+                "raw_force".into(),
+                VERNIER_STEPS_OUTPUT.into(),
+                VERNIER_STEP_RATE_OUTPUT.into(),
+            ],
             ..OutputConfig::default()
         })
         .await?;
@@ -56,7 +62,7 @@ async fn main() -> Result<(), String> {
         &[
             sensor(
                 1,
-                101,
+                448,
                 "Force",
                 "N",
                 NumericMeasurementType::Real,
@@ -64,25 +70,25 @@ async fn main() -> Result<(), String> {
             ),
             sensor(
                 2,
-                102,
+                449,
                 "Respiration Rate",
-                "breaths/min",
+                "bpm",
                 NumericMeasurementType::Real,
                 SamplingMode::Aperiodic,
             ),
             sensor(
-                3,
-                103,
+                4,
+                450,
                 "Steps",
-                "count",
+                "steps",
                 NumericMeasurementType::Integer,
                 SamplingMode::Aperiodic,
             ),
             sensor(
-                4,
-                104,
+                5,
+                456,
                 "Step Rate",
-                "steps/min",
+                "spm",
                 NumericMeasurementType::Real,
                 SamplingMode::Aperiodic,
             ),
@@ -137,8 +143,22 @@ async fn main() -> Result<(), String> {
                 600,
                 SampleEncoding::Integer32,
                 &[SensorSamples {
-                    sensor_number: 3,
-                    values: vec![2_000_000_001.0],
+                    sensor_number: 4,
+                    values: vec![12.0],
+                }],
+            );
+            sequence = sequence.saturating_add(1);
+            router.publish_vernier_raw(
+                timestamp_ns.saturating_add(2),
+                100_000,
+                sequence,
+                0,
+                0,
+                600,
+                SampleEncoding::Float32,
+                &[SensorSamples {
+                    sensor_number: 5,
+                    values: vec![72.0],
                 }],
             );
             sequence = sequence.saturating_add(1);

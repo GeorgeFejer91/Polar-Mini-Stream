@@ -50,6 +50,8 @@ const VERNIER_BREATHING_OUTLET_KEY: &str = "__vernier_breathing";
 pub const VERNIER_RAW_STREAM_SUFFIX: &str = "rawVernier";
 pub const VERNIER_BREATHING_STREAM_SUFFIX: &str = "vernierBreathing";
 pub const VERNIER_BREATHING_RECORDING_ID: &str = "vernier_breathing";
+pub const VERNIER_STEPS_OUTPUT: &str = "vernier_steps";
+pub const VERNIER_STEP_RATE_OUTPUT: &str = "vernier_step_rate";
 pub const VERNIER_RAW_DIAGNOSTIC_CHANNELS: usize = 7;
 
 #[derive(Default)]
@@ -150,6 +152,21 @@ impl VernierStreamSchema {
         self.channels
             .iter()
             .find(|sensor| sensor.is_respiration_force())
+            .map(|sensor| sensor.number)
+    }
+
+    pub fn pedometer_sensor_number(&self, output_id: &str) -> Option<u8> {
+        let (description, unit) = match output_id {
+            VERNIER_STEPS_OUTPUT => ("Steps", "steps"),
+            VERNIER_STEP_RATE_OUTPUT => ("Step Rate", "spm"),
+            _ => return None,
+        };
+        self.channels
+            .iter()
+            .find(|sensor| {
+                sensor.description.trim().eq_ignore_ascii_case(description)
+                    && sensor.unit.trim().eq_ignore_ascii_case(unit)
+            })
             .map(|sensor| sensor.number)
     }
 
@@ -856,6 +873,7 @@ impl OutputRouter {
             let RouterInner {
                 lsl,
                 vernier_schema,
+                config,
                 ..
             } = &mut *inner;
             let schema = vernier_schema
@@ -872,6 +890,22 @@ impl OutputRouter {
                 encoding,
                 sensors,
             );
+            for id in [VERNIER_STEPS_OUTPUT, VERNIER_STEP_RATE_OUTPUT] {
+                if !config.outputs.iter().any(|selected| selected == id) {
+                    continue;
+                }
+                if let Some(number) = schema.pedometer_sensor_number(id)
+                    && let Some(samples) =
+                        sensors.iter().find(|sample| sample.sensor_number == number)
+                {
+                    lsl.push_scalar_series_period_at(
+                        id,
+                        samples.values.iter().map(|value| *value as f32),
+                        host_receive_timestamp_ns,
+                        sample_period_us,
+                    );
+                }
+            }
         }
         #[cfg(feature = "rusty-lsl-backend")]
         let _ = (

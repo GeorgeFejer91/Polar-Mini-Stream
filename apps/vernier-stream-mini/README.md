@@ -6,6 +6,11 @@ settings, and process.
 
 - Default outputs: metadata-defined raw Go Direct channels and the derived
   Vernier breathing waveform.
+- The **Streams** dialog can add separate `steps` and `stepRate` LSL outlets for
+  the GDX-RB's built-in pedometer. Both measurements remain in `rawVernier`
+  regardless of this choice. Single mode already includes all device channels;
+  the checkboxes take effect in separate mode. The selection is saved and can
+  be changed while connected without restarting the BLE session.
 - Modes: canonical separate LSL streams or one sparse fixed-channel LSL stream.
 - For exact force/breathing sample timing, use separate streams. The single
   sparse mode preserves acquisition order and clamps overlapping channel
@@ -20,7 +25,8 @@ settings, and process.
   Vernier device.
 - Multi-device use: launch multiple app instances.
 - Mocking: **Mock** launches an independent, automatically streaming applet
-  with deterministic 20 Hz force/breathing data and real LSL publication. Its
+  with deterministic 20 Hz force/breathing and 10 s pedometer updates, plus
+  real LSL publication. Its
   PID-suffixed stream name and settings are session-only.
 - Without a connected Go Direct sensor, the regular app does not publish
   invented measurements; use the clearly labeled Mock window for synthetic data.

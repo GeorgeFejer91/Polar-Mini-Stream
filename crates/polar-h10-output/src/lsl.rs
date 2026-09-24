@@ -1447,11 +1447,12 @@ fn append_stream_metadata(
     if description.is_null() {
         return !processing_required;
     }
-    let (manufacturer, model) = if spec.id == "raw_force" {
-        ("Vernier", "Go Direct")
-    } else {
-        ("Polar", "H10")
-    };
+    let (manufacturer, model) =
+        if matches!(spec.id, "raw_force" | "vernier_steps" | "vernier_step_rate") {
+            ("Vernier", "Go Direct")
+        } else {
+            ("Polar", "H10")
+        };
     append_value(
         append_child_value,
         description,

@@ -19,6 +19,7 @@
       outputMode: "separateStreams",
       autoConnect: true,
       polarOutputs: [...directPolarOutputs],
+      vernierOutputs: [],
       lastDevice: null,
     },
     metrics: [],
@@ -33,6 +34,7 @@
     samples: null,
     lastSampleAt: 0,
   };
+  let pendingVernierOutputs = null;
 
   const elements = {};
 
@@ -69,6 +71,8 @@
       "metrics-dialog",
       "metrics-close",
       "metric-options",
+      "output-dialog-title",
+      "output-dialog-detail",
       "apply-metrics",
     ]) {
       elements[id] = document.getElementById(id);
@@ -111,6 +115,7 @@
       outputMode: elements["stream-mode-toggle"].checked ? "singleStream" : "separateStreams",
       autoConnect: elements["auto-connect"].checked,
       polarOutputs: [...new Set(state.preferences.polarOutputs || directPolarOutputs)],
+      vernierOutputs: [...new Set(state.preferences.vernierOutputs || [])],
     };
   }
 
@@ -208,8 +213,14 @@
       elements["metric-count"].textContent = extraCount ? `${extraCount} extra` : "Direct only";
     } else if (state.preferences.outputMode === "singleStream") {
       chips.push("single sparse LSL", "raw channels", "breathing");
+      elements["metric-count"].textContent = "raw included";
     } else {
       chips.push("rawVernier", "vernierBreathing", "rawForce");
+      const selected = new Set(state.preferences.vernierOutputs || []);
+      for (const metric of state.metrics) {
+        if (selected.has(metric.id)) chips.push(metric.streamSuffix);
+      }
+      elements["metric-count"].textContent = `${selected.size} optional`;
     }
     for (const chip of chips) {
       const span = document.createElement("span");
@@ -268,8 +279,14 @@
   function renderMetricDialog() {
     const options = elements["metric-options"];
     options.replaceChildren();
-    if (state.kind !== "polar") return;
-    const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
+    const polar = state.kind === "polar";
+    elements["output-dialog-title"].textContent = polar ? "Polar outputs" : "Vernier streams";
+    elements["output-dialog-detail"].textContent = polar
+      ? "Release metrics"
+      : "Optional pedometer outlets in separate mode; single mode already includes these channels";
+    const selected = new Set(polar
+      ? state.preferences.polarOutputs || directPolarOutputs
+      : pendingVernierOutputs ?? state.preferences.vernierOutputs ?? []);
     for (const metric of state.metrics.filter((candidate) => !candidate.direct)) {
       const label = document.createElement("label");
       const checkbox = document.createElement("input");
@@ -277,7 +294,8 @@
       checkbox.value = metric.id;
       checkbox.checked = selected.has(metric.id);
       checkbox.addEventListener("change", () => {
-        updateMetricSelection(metric.id, checkbox.checked);
+        if (polar) updateMetricSelection(metric.id, checkbox.checked);
+        else updateVernierSelection(metric.id, checkbox.checked);
         renderMetricDialog();
         renderSignals();
       });
@@ -308,6 +326,13 @@
     state.preferences.polarOutputs = [...selected];
   }
 
+  function updateVernierSelection(id, checked) {
+    const selected = new Set(pendingVernierOutputs ?? state.preferences.vernierOutputs ?? []);
+    if (checked) selected.add(id);
+    else selected.delete(id);
+    pendingVernierOutputs = [...selected];
+  }
+
   let saveTimer = 0;
   let saveQueue = Promise.resolve();
   let saveRevision = 0;
@@ -333,6 +358,7 @@
         if (revision === saveRevision) {
           renderMode();
           renderSignals();
+          renderMetricDialog();
           if (!quiet || result.reconnectRequired || result.applied) {
             setStatus(result.message || "Saved", "Config", result.reconnectRequired);
           }
@@ -341,6 +367,7 @@
         if (revision === saveRevision) {
           renderMode();
           renderSignals();
+          renderMetricDialog();
           reportError(error);
         }
       }
@@ -622,11 +649,20 @@
     elements["connect-button"].addEventListener("click", connectSelected);
     elements["disconnect-button"].addEventListener("click", disconnect);
     elements["metrics-button"].addEventListener("click", () => {
+      pendingVernierOutputs = [...(state.preferences.vernierOutputs || [])];
       renderMetricDialog();
       elements["metrics-dialog"].showModal();
     });
+    elements["metrics-dialog"].addEventListener("close", () => {
+      pendingVernierOutputs = null;
+      renderMetricDialog();
+    });
     elements["apply-metrics"].addEventListener("click", (event) => {
       event.preventDefault();
+      if (pendingVernierOutputs !== null) {
+        state.preferences.vernierOutputs = pendingVernierOutputs;
+      }
+      pendingVernierOutputs = null;
       elements["metrics-dialog"].close();
       savePreferences(false);
     });

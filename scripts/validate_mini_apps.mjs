@@ -106,6 +106,33 @@ async function validateNormalWindow(app) {
     assert.equal(await resetReopened.locator('#metric-options input[value="phan_breath_event"]').isChecked(), false);
     await resetReopened.close();
     await page.locator("#metrics-close").click();
+  } else {
+    await page.locator("#metrics-button").click();
+    await page.locator('#metric-options input[value="vernier_steps"]').check();
+    await page.locator("#metrics-close").click();
+    await page.locator("#metrics-button").click();
+    assert.equal(await page.locator('#metric-options input[value="vernier_steps"]').isChecked(), false);
+    for (const id of ["vernier_steps", "vernier_step_rate"]) {
+      await page.locator(`#metric-options input[value="${id}"]`).check();
+    }
+    await page.setViewportSize({ width: 320, height: 560 });
+    await assertNoOverflow(page);
+    await page.screenshot({
+      path: path.join(outputDirectory, "vernier-mini-stream-selection.png"),
+      omitBackground: true,
+    });
+    await page.locator("#apply-metrics").click();
+    await page.waitForFunction(() => window.__miniSaves.some((save) =>
+      ["vernier_steps", "vernier_step_rate"].every((id) => save.vernierOutputs?.includes(id))));
+    assert.match(await page.locator("#signal-list").textContent(), /steps.*stepRate/);
+    const savedPreferences = await page.evaluate(() => window.__miniSaves.at(-1));
+    const reopened = await createPage(app, { mockMode: false, lslHealthy: true, savedPreferences });
+    await reopened.goto(appUrl(app));
+    await reopened.locator("#metrics-button").click();
+    for (const id of ["vernier_steps", "vernier_step_rate"]) {
+      assert.equal(await reopened.locator(`#metric-options input[value="${id}"]`).isChecked(), true);
+    }
+    await reopened.close();
   }
 
   await page.locator("#stream-mode-toggle").check();
@@ -230,7 +257,10 @@ async function createPage(app, options) {
               { id: "phan_breath_rate", streamSuffix: "phanBreathRate", label: "Phan ACC breath count rate", detail: "Rolling count", category: "Breathing", direct: false },
               { id: "flowborne_phase", streamSuffix: "flowbornePhase", label: "Flowborne ACC phase", detail: "Four-state classifier", category: "Breathing", direct: false },
               { id: "flowborne_motion_score", streamSuffix: "flowborneMotionScore", label: "Flowborne ACC motion score", detail: "Signed contrast", category: "Breathing", direct: false },
-            ] : [],
+            ] : [
+              { id: "vernier_steps", streamSuffix: "steps", label: "Steps", category: "Pedometer", unit: "steps", direct: false },
+              { id: "vernier_step_rate", streamSuffix: "stepRate", label: "Step rate", category: "Pedometer", unit: "spm", direct: false },
+            ],
             session: null,
             mockMode: options.mockMode,
             lslResourcePresent: true,
