@@ -11,6 +11,9 @@ apps and the Rust crates they share; the larger controller and browser demo
 remain in the original repository. Existing bundle IDs and preference paths
 are retained so installed applets can be upgraded without changing identity.
 
+[Metrics and signal-flow guide](https://georgefejer91.github.io/Polar-Mini-Stream/) ·
+[Windows installers](https://github.com/GeorgeFejer91/Polar-Mini-Stream/releases/latest)
+
 ## Apps
 
 - [Polar Stream Mini](apps/polar-stream-mini/README.md) publishes raw ECG,
@@ -39,6 +42,8 @@ cargo fmt --all -- --check
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
 npm run validate:minis
+npm run validate:docs
+cargo run -p polar-h10-metrics --example export_catalog -- docs/metric-catalog.js --check
 ```
 
 Build each app from its own directory, for example:
@@ -48,6 +53,13 @@ cd apps/polar-stream-mini
 npm exec -- tauri build --bundles nsis --ci
 ```
 
-Use `apps/vernier-stream-mini` for the Vernier package. No GitHub Pages or
-main-controller build is part of this repository. Agent context starts at
+Use `apps/vernier-stream-mini` for the Vernier package. After catalog changes,
+regenerate the Pages data with:
+
+```powershell
+cargo run -p polar-h10-metrics --example export_catalog -- docs/metric-catalog.js
+```
+
+The site is published from `docs/` on `main`; installer binaries are GitHub
+Release assets, not Git blobs. Agent context starts at
 [for-ai/README.md](for-ai/README.md).

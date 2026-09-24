@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f7f4">
+  <meta name="description" content="Polar Stream Mini and Vernier Stream Mini: signal flow, LSL outputs, exact metric definitions, and source references.">
+  <title>Metrics &amp; signal flow · Polar Mini Stream</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="metric-catalog.js"></script>
+  <script defer src="site.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="Polar Mini Stream home"><span class="brand-mark" aria-hidden="true">P<span>•</span>V</span><span>Polar Mini Stream</span></a>
+    <nav aria-label="Main navigation">
+      <a href="#signal-flow">Signal flow</a>
+      <a href="#methods">Methods</a>
+      <a href="#catalog">Metric catalog</a>
+      <a href="https://github.com/GeorgeFejer91/Polar-Mini-Stream/releases/latest">Downloads ↗</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="intro content-width">
+      <p class="eyebrow">Two small apps · one measurement path each</p>
+      <h1>Signals in.<br><em>Streams out.</em></h1>
+      <p class="lead">A compact reference for every included Polar metric and the Vernier breathing output. Definitions and formulas below are generated from the Rust catalog used by the apps.</p>
+      <div class="intro-actions">
+        <a class="button button-primary" href="#catalog">Explore metrics <span aria-hidden="true">↗</span></a>
+        <a class="button button-secondary" href="https://github.com/GeorgeFejer91/Polar-Mini-Stream">View source <span aria-hidden="true">↗</span></a>
+      </div>
+      <div class="fact-row" aria-label="Project summary"><span><strong id="metric-total">54</strong> catalog entries</span><span><strong>2</strong> independent applets</span><span><strong>LSL</strong> output</span></div>
+    </section>
+
+    <section class="section content-width" id="signal-flow" aria-labelledby="flow-title">
+      <div class="section-heading"><div><p class="eyebrow">01 / Architecture</p><h2 id="flow-title">From sensor to LSL</h2></div><p>Raw samples are forwarded first. Optional analysis runs in Rust on the same source timeline; the WebView controls settings and shows status.</p></div>
+      <div class="diagram" role="img" aria-label="Polar H10 ECG, ACC and heart rate with RR pass through BLE decoding and source timing. Raw values publish to LSL first. ECG features, RR metrics, and three ACC breathing methods publish as selected derived LSL streams. Vernier Go Direct force and other channels pass through BLE decoding to a raw LSL stream. Force also passes through robust normalization to a separate breathing waveform stream. Each app owns its own session and outlets.">
+        <div class="lane polar-lane">
+          <div class="lane-label"><span class="lane-dot polar-dot"></span><div><strong>Polar Stream Mini</strong><small>H10 · one BLE session</small></div></div>
+          <div class="flow-row"><div class="flow-node source"><small>INPUT</small><strong>ECG · 130 Hz<br>ACC · 200 Hz<br>HR + RR</strong></div><span class="flow-arrow" aria-hidden="true">→</span><div class="flow-node"><small>RUST</small><strong>BLE decode<br>Source timestamps</strong></div><span class="flow-arrow" aria-hidden="true">→</span><div class="flow-node output"><small>RAW FIRST</small><strong>ECG · ACC<br>HR · RR</strong></div></div>
+          <div class="branch" aria-hidden="true">↓ optional Rust analysis</div>
+          <div class="method-row"><div class="method-node"><strong>ECG features</strong><span>5 s voltage windows</span></div><div class="method-node"><strong>RR metrics</strong><span>HRV · spectra · composites</span></div><div class="method-node"><strong>ACC breathing</strong><span>PCA · Phan · Flowborne</span></div><div class="method-node output"><strong>Selected LSL outlets</strong><span>or sparse combined channels</span></div></div>
+        </div>
+        <div class="lane vernier-lane">
+          <div class="lane-label"><span class="lane-dot vernier-dot"></span><div><strong>Vernier Stream Mini</strong><small>Go Direct · one BLE session</small></div></div>
+          <div class="flow-row"><div class="flow-node source"><small>INPUT</small><strong>Device-defined<br>numeric channels</strong></div><span class="flow-arrow" aria-hidden="true">→</span><div class="flow-node"><small>RUST</small><strong>BLE decode<br>Channel metadata</strong></div><span class="flow-arrow" aria-hidden="true">→</span><div class="flow-node output"><small>RAW FIRST</small><strong>rawVernier<br>LSL outlet</strong></div></div>
+          <div class="branch" aria-hidden="true">↓ force channel, when available</div>
+          <div class="method-row"><div class="method-node vernier-method"><strong>30 s force range</strong><span>5th–95th percentile bounds</span></div><div class="method-node output"><strong>vernierBreathing</strong><span>separate 0–1 LSL waveform</span></div></div>
+        </div>
+      </div>
+      <p class="diagram-note">Separate mode keeps each outlet's sample timing. Single mode uses fixed sparse channels. Signal-loss markers report gaps; missing measurements are not filled with invented sensor values.</p>
+    </section>
+
+    <section class="section content-width" id="methods" aria-labelledby="methods-title">
+      <div class="section-heading"><div><p class="eyebrow">02 / Transformation</p><h2 id="methods-title">What each path computes</h2></div><p>The four breathing paths produce different kinds of information. A normalized waveform is not lung volume; a motion event is not a verified breath.</p></div>
+      <div class="method-grid">
+        <article class="method-card"><span class="method-index">A / ACC</span><h3>PCA waveform</h3><p>Selected H10 axes are smoothed, projected onto a calibrated principal motion axis, then scaled using robust bounds. Its derivative with hysteresis gives phase; like-polarity extrema give cycle rate and dynamics.</p><p class="method-output"><code>breathing_volume</code> · <code>breathing_phase</code> · rate · quality · dynamics</p><a href="https://pubmed.ncbi.nlm.nih.gov/33739305/">Related chest-ACC PCA research ↗</a></article>
+        <article class="method-card"><span class="method-index">B / ACC</span><h3>Phan adaptation</h3><p>For each H10 axis, compare 0.2 s and 200 s means. Sum the absolute differences, apply an adaptive threshold, and count rising onsets after quiet and refractory gates. Count accepted events over 60 s.</p><p class="method-output"><code>phan_breath_event</code> · <code>phan_breath_rate</code></p><a href="https://github.com/lynphan/Mobile-Phone-Breathing-Detection/blob/main/BreathingDetection/Assets/MobilePhoneBreathingDetection.cs">Original phone algorithm ↗</a></article>
+        <article class="method-card"><span class="method-index">C / ACC</span><h3>Flowborne adaptation</h3><p>Compare 0.267 s and 2 s means of the signed PCA projection, divided by its calibrated span. Threshold the contrast into inhale (+1), exhale (−1), hold (0), or bad signal (−2).</p><p class="method-output"><code>flowborne_motion_score</code> · <code>flowborne_phase</code></p><a href="https://www.hsbi.de/publikationsserver/download/6574/6575/muc-2025-mci-174.pdf">Viscereality design publication ↗</a></article>
+        <article class="method-card"><span class="method-index">D / FORCE</span><h3>Vernier normalization</h3><p>Forward Go Direct numeric channels unchanged. For the respiration belt's force channel, map each sample into [0, 1] using recent 30 s 5th–95th percentile bounds. Increasing force denotes inhalation.</p><p class="method-output"><code>rawVernier</code> · <code>vernierBreathing</code></p><a href="https://www.vernier.com/manuals/GDX-RB">Vernier belt manual ↗</a></article>
+      </div>
+      <p class="method-caveat">These algorithms are different implementations. The cited papers and source projects explain their origins or related methods; they do not validate Polar Mini's H10 adaptations. Phan's linked origin is source code; the Viscereality controller source requires repository access, while its design paper is public. For exact controller-to-H10 differences, read <a href="https://github.com/GeorgeFejer91/Polar-Mini-Stream/blob/main/docs/acc-breathing-methods.md">the method comparison</a>.</p>
+    </section>
+
+    <section class="section catalog-section" id="catalog" aria-labelledby="catalog-title"><div class="content-width">
+      <div class="section-heading"><div><p class="eyebrow">03 / Reference</p><h2 id="catalog-title">Metric catalog</h2></div><p>One card per Rust catalog entry: LSL suffix, units, transformation, evidence status, and original or related sources.</p></div>
+      <div class="catalog-controls"><label class="search-label" for="search">Search metric, ID, or method<input id="search" type="search" placeholder="Try RMSSD, phase, Phan…" autocomplete="off"></label><label class="filter-label" for="category">Category<select id="category"><option value="all">All categories</option></select></label></div>
+      <p class="result-count" id="result-count" role="status" aria-live="polite"></p>
+      <div class="metric-list" id="metric-list"></div>
+      <p class="catalog-footnote"><strong>Reading the citations:</strong> a linked publication may establish a general method rather than validate this exact app calculation. Implementation-specific formulas are identified as such. Polar HRV and coherence use H10-reported RR intervals, not peaks redetected from the exported raw ECG. <code>raw_force</code> is a shared catalog definition; Vernier Mini's live raw stream uses device metadata and can contain more than one numeric channel.</p>
+    </div></section>
+  </main>
+  <footer class="footer content-width"><span>Polar Mini Stream · research software</span><div><a href="https://github.com/GeorgeFejer91/Polar-Mini-Stream">Source</a><a href="https://github.com/GeorgeFejer91/Polar-Mini-Stream/releases/latest">Installers</a><a href="https://github.com/GeorgeFejer91/Polar-Mini-Stream/blob/main/LICENSE">License</a></div></footer>
+</body>
+</html>

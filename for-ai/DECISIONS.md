@@ -32,6 +32,20 @@ to rediscover. Source and tests remain the authority for implementation facts.
   or metric rewrite during extraction; prune only with separate tests.
 - Supersedes: None
 
+## D-0003 — Publish source-derived metric docs and binary releases
+
+- Date: 2026-09-24
+- Status: Accepted
+- Context: Both applets need public installers and a concise, traceable guide
+  to their signal transformations and LSL outputs.
+- Decision: Publish Pages from `docs/` on `main`. Generate its Polar metric data
+  from the Rust catalog; document Vernier's separate output contract directly.
+  Distribute Windows installers as tagged GitHub Release assets with checksums.
+- Consequences: Catalog drift has a documented check command. Publications
+  are labeled as origins or related methods rather than validation of H10
+  adaptations.
+- Supersedes: The initial Pages non-goal in `PROJECT.md`.
+
 ## Record format
 
 For later decisions, add one compact entry with:
