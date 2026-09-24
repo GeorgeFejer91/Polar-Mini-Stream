@@ -5,6 +5,30 @@ use stream_mini_runtime::{
 };
 use tauri::{AppHandle, Manager, State, ipc::Channel};
 
+mod bluetooth_radio;
+
+#[tauri::command]
+async fn get_bluetooth_radio() -> Result<bluetooth_radio::RadioStatus, String> {
+    bluetooth_radio::status().await
+}
+
+#[tauri::command]
+async fn set_bluetooth_radio(
+    state: State<'_, MiniAppState>,
+    enabled: bool,
+) -> Result<bluetooth_radio::RadioStatus, String> {
+    if !enabled
+        && stream_mini_runtime::get_bootstrap(state)
+            .await
+            .map_err(|error| error.message)?
+            .session
+            .is_some()
+    {
+        return Err("Disconnect the belt before turning Bluetooth off.".into());
+    }
+    bluetooth_radio::set_enabled(enabled).await
+}
+
 #[tauri::command]
 async fn get_bootstrap(state: State<'_, MiniAppState>) -> CommandResult<MiniBootstrap> {
     stream_mini_runtime::get_bootstrap(state).await
@@ -129,6 +153,8 @@ pub fn run() {
             get_bootstrap,
             attach_events,
             scan_devices,
+            get_bluetooth_radio,
+            set_bluetooth_radio,
             save_preferences,
             connect_device,
             connect_remembered,

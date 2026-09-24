@@ -45,13 +45,13 @@ are retained to preserve installed-user continuity.
 
 - Fresh Git repository initialized on 2026-09-24.
 - AI control plane created and mechanically checked.
-- The extracted workspace passed Windows host `cargo test --workspace
-  --locked`, Clippy, formatting, JS syntax, and Mini Playwright validation on
-  2026-09-24. Both x64 NSIS installers built from this checkout. Mock processes
-  launched from the resulting binaries and advertised distinct Polar and
-  Vernier LSL outlets concurrently. These checks do not establish physical
-  BLE, respiratory accuracy, non-Windows runtime, or installed-package
-  behavior for this repository's artifacts.
+- Version 0.6.1 passed Windows host `cargo test --workspace --locked`, Clippy,
+  formatting, JS syntax, Mini and Docs Playwright validation, metric catalog
+  drift, and the context check on 2026-09-24. Both separate x64 NSIS installers
+  built from this checkout, installed into their distinct app folders, and
+  launched concurrently. Installed mock instances produced Polar ECG, HR, RR,
+  and ACC samples and Vernier samples over LSL. Physical BLE acquisition,
+  respiratory accuracy, and non-Windows behavior remain unverified.
 
 Git and runnable checks are the authority for branch, revision, and behavior.
 Do not turn this section into a second status ledger.

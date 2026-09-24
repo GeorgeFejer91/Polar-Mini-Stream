@@ -17,8 +17,8 @@ use polar_h10_metrics::{
     VernierBreathingProcessor, metric_selection_tier,
 };
 use polar_h10_output::{
-    MetricValue, OutputConfig, OutputRouter, VernierStreamSchema, normalize_stream_base,
-    source_palette,
+    MetricValue, OutputConfig, OutputRouter, VernierMiniSelection, VernierStreamSchema,
+    normalize_stream_base, source_palette,
 };
 #[cfg(feature = "liblsl-backend")]
 use polar_h10_output::{MiniCombinedOutput, MiniStatusOutput};
@@ -37,6 +37,8 @@ const PREFERENCE_SCHEMA: &str = "polar.stream.mini.preferences.v1";
 const LIVE_RECONFIGURED_MESSAGE: &str = "Saved and applied to the active LSL outlets.";
 const POLAR_DIRECT_OUTPUTS: &[&str] = &["raw_ecg", "raw_acc", "heart_rate", "rr_interval"];
 const VERNIER_FORCE_OUTPUT: &str = "raw_force";
+const VERNIER_OUTPUT_IDS: [&str; 4] =
+    ["rawVernier", "rawForce", "vernierBreathing", "signalStatus"];
 const VERNIER_PERIOD_US: u32 = 50_000;
 const ACC_SAMPLE_PERIOD_NS: u64 = 1_000_000_000 / 200;
 const EVENT_INTERVAL: Duration = Duration::from_millis(250);
@@ -128,7 +130,9 @@ pub struct MiniPreferencesSnapshot {
     pub output_mode: MiniOutputMode,
     pub auto_connect: bool,
     pub polar_outputs: Vec<String>,
+    pub vernier_outputs: Vec<String>,
     pub last_device: Option<SavedMiniDevice>,
+    pub recent_devices: Vec<SavedMiniDevice>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -139,6 +143,8 @@ pub struct MiniPreferencesInput {
     pub auto_connect: bool,
     #[serde(default)]
     pub polar_outputs: Vec<String>,
+    #[serde(default)]
+    pub vernier_outputs: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -148,7 +154,9 @@ struct MiniPreferencesFile {
     output_mode: Option<MiniOutputMode>,
     auto_connect: Option<bool>,
     polar_outputs: Option<Vec<String>>,
+    vernier_outputs: Option<Vec<String>>,
     last_device: Option<SavedMiniDevice>,
+    recent_devices: Option<Vec<SavedMiniDevice>>,
 }
 
 impl MiniPreferencesSnapshot {
@@ -159,12 +167,24 @@ impl MiniPreferencesSnapshot {
             output_mode: MiniOutputMode::SeparateStreams,
             auto_connect: true,
             polar_outputs: normalize_polar_outputs(None),
+            vernier_outputs: default_vernier_outputs(),
             last_device: None,
+            recent_devices: Vec::new(),
         }
     }
 
     fn from_file(kind: MiniAppKind, file: MiniPreferencesFile) -> Self {
         let fallback = Self::default_for(kind);
+        let last_device = file.last_device.filter(valid_saved_device);
+        let mut recent_devices = file.recent_devices.unwrap_or_default();
+        recent_devices.retain(valid_saved_device);
+        if let Some(last) = &last_device {
+            recent_devices.retain(|device| device.id != last.id);
+            recent_devices.insert(0, last.clone());
+        }
+        let mut seen = std::collections::HashSet::new();
+        recent_devices.retain(|device| seen.insert(device.id.clone()));
+        recent_devices.truncate(6);
         Self {
             schema: PREFERENCE_SCHEMA.into(),
             stream_name: normalize_stream_base(
@@ -176,7 +196,12 @@ impl MiniPreferencesSnapshot {
             output_mode: file.output_mode.unwrap_or_default(),
             auto_connect: file.auto_connect.unwrap_or(true),
             polar_outputs: normalize_polar_outputs(file.polar_outputs),
-            last_device: file.last_device.filter(valid_saved_device),
+            vernier_outputs: file
+                .vernier_outputs
+                .and_then(|ids| validate_vernier_outputs(ids).ok())
+                .unwrap_or_else(default_vernier_outputs),
+            last_device,
+            recent_devices,
         }
     }
 }
@@ -204,6 +229,7 @@ impl PreferencesStore {
             .unwrap_or_else(|_| format!("{}-Mock-{}", kind.default_stream_name(), process::id()));
         snapshot.auto_connect = false;
         snapshot.last_device = None;
+        snapshot.recent_devices.clear();
         Self {
             kind,
             path: None,
@@ -246,7 +272,13 @@ impl PreferencesStore {
             output_mode: input.output_mode,
             auto_connect: input.auto_connect,
             polar_outputs: normalize_polar_outputs(Some(input.polar_outputs)),
+            vernier_outputs: if kind == MiniAppKind::Vernier {
+                validate_vernier_outputs(input.vernier_outputs.unwrap_or(current.vernier_outputs))?
+            } else {
+                current.vernier_outputs
+            },
             last_device: current.last_device,
+            recent_devices: current.recent_devices,
         };
         if kind == MiniAppKind::Vernier {
             snapshot.polar_outputs = normalize_polar_outputs(None);
@@ -259,6 +291,11 @@ impl PreferencesStore {
             return Err("Saved device identity was empty or invalid.".into());
         }
         let mut snapshot = self.snapshot();
+        snapshot
+            .recent_devices
+            .retain(|saved| saved.id != device.id);
+        snapshot.recent_devices.insert(0, device.clone());
+        snapshot.recent_devices.truncate(6);
         snapshot.last_device = Some(device);
         self.replace(snapshot)
     }
@@ -340,6 +377,7 @@ struct ActiveMiniSession {
     output_mode: MiniOutputMode,
     stream_name: String,
     polar_outputs: Vec<String>,
+    vernier_outputs: Vec<String>,
     output: tokio::sync::watch::Sender<MiniOutputHandle>,
     settings: Option<tokio::sync::watch::Sender<PolarMiniSettings>>,
     mock: bool,
@@ -353,7 +391,7 @@ struct ActiveMiniSession {
 enum MiniOutputHandle {
     Separate(
         Arc<OutputRouter>,
-        #[cfg(feature = "liblsl-backend")] Arc<MiniStatusOutput>,
+        #[cfg(feature = "liblsl-backend")] Option<Arc<MiniStatusOutput>>,
     ),
     #[cfg(feature = "liblsl-backend")]
     Single(Arc<MiniCombinedOutput>),
@@ -374,7 +412,11 @@ impl MiniOutputHandle {
     fn publish_signal_state(&self, restored: bool) {
         match self {
             #[cfg(feature = "liblsl-backend")]
-            Self::Separate(_, status) => status.publish(restored),
+            Self::Separate(_, status) => {
+                if let Some(status) = status {
+                    status.publish(restored);
+                }
+            }
             #[cfg(not(feature = "liblsl-backend"))]
             Self::Separate(..) => {}
             #[cfg(feature = "liblsl-backend")]
@@ -384,7 +426,24 @@ impl MiniOutputHandle {
 
     fn health(&self) -> String {
         match self {
-            Self::Separate(output, ..) => output.health().lsl,
+            #[cfg(feature = "liblsl-backend")]
+            Self::Separate(output, status) => {
+                let health = output.health().lsl;
+                let marker = status.as_ref().map(|marker| marker.health());
+                let count = |text: &str| {
+                    text.strip_prefix("Publishing ")
+                        .and_then(|suffix| suffix.split_whitespace().next())
+                        .and_then(|number| number.parse::<usize>().ok())
+                };
+                match (count(&health), marker.as_deref().and_then(count)) {
+                    (Some(main), Some(extra)) => format!("Publishing {} stream(s)", main + extra),
+                    (Some(_), _) => health,
+                    (_, Some(_)) => marker.unwrap_or(health),
+                    _ => health,
+                }
+            }
+            #[cfg(not(feature = "liblsl-backend"))]
+            Self::Separate(output) => output.health().lsl,
             #[cfg(feature = "liblsl-backend")]
             Self::Single(output) => output.health(),
         }
@@ -814,6 +873,7 @@ async fn save_preferences_inner(
                 session.output_mode,
                 session.stream_name.clone(),
                 session.polar_outputs.clone(),
+                session.vernier_outputs.clone(),
                 session.output.clone(),
                 session.settings.clone(),
                 session.connected.load(Ordering::Acquire),
@@ -821,7 +881,9 @@ async fn save_preferences_inner(
         })
     };
 
-    let Some((mode, stream_name, polar_outputs, output, settings, connected)) = active else {
+    let Some((mode, stream_name, polar_outputs, vernier_outputs, output, settings, connected)) =
+        active
+    else {
         state
             .preferences
             .replace(snapshot.clone())
@@ -835,7 +897,8 @@ async fn save_preferences_inner(
     };
     let contract_changed = mode != snapshot.output_mode
         || stream_name != snapshot.stream_name
-        || (state.kind == MiniAppKind::Polar && polar_outputs != snapshot.polar_outputs);
+        || (state.kind == MiniAppKind::Polar && polar_outputs != snapshot.polar_outputs)
+        || (state.kind == MiniAppKind::Vernier && vernier_outputs != snapshot.vernier_outputs);
     if !contract_changed {
         state
             .preferences
@@ -890,6 +953,7 @@ async fn save_preferences_inner(
         session.output_mode = snapshot.output_mode;
         session.stream_name = snapshot.stream_name.clone();
         session.polar_outputs = snapshot.polar_outputs.clone();
+        session.vernier_outputs = snapshot.vernier_outputs.clone();
     }
     state.display.send(MiniEvent::Status {
         phase: "output".into(),
@@ -1068,9 +1132,10 @@ async fn connect_with_snapshot(
     });
 
     let target = snapshot
-        .last_device
-        .clone()
-        .filter(|saved| saved.id == device_id)
+        .recent_devices
+        .iter()
+        .find(|saved| saved.id == device_id)
+        .cloned()
         .unwrap_or_else(|| SavedMiniDevice {
             id: device_id.clone(),
             name: device_id.clone(),
@@ -1179,6 +1244,7 @@ async fn connect_with_snapshot(
         output_mode: snapshot.output_mode,
         stream_name: snapshot.stream_name.clone(),
         polar_outputs: snapshot.polar_outputs.clone(),
+        vernier_outputs: snapshot.vernier_outputs.clone(),
         output: output_tx,
         settings: settings_tx,
         mock: false,
@@ -1269,6 +1335,7 @@ async fn start_mock_with_snapshot(
         output_mode: snapshot.output_mode,
         stream_name: snapshot.stream_name.clone(),
         polar_outputs: snapshot.polar_outputs.clone(),
+        vernier_outputs: snapshot.vernier_outputs.clone(),
         output: output_tx,
         settings: settings.map(|(sender, _)| sender),
         mock: true,
@@ -1316,11 +1383,20 @@ async fn build_output(
             output.configure(mini_output_config(kind, snapshot)).await?;
             #[cfg(feature = "liblsl-backend")]
             {
-                let status = Arc::new(MiniStatusOutput::new(
-                    bundled_lsl_for_status,
-                    &snapshot.stream_name,
-                    kind == MiniAppKind::Polar,
-                )?);
+                let include_status = kind == MiniAppKind::Polar
+                    || snapshot
+                        .vernier_outputs
+                        .iter()
+                        .any(|id| id == "signalStatus");
+                let status = if include_status {
+                    Some(Arc::new(MiniStatusOutput::new(
+                        bundled_lsl_for_status,
+                        &snapshot.stream_name,
+                        kind == MiniAppKind::Polar,
+                    )?))
+                } else {
+                    None
+                };
                 Ok(MiniOutputHandle::Separate(output, status))
             }
             #[cfg(not(feature = "liblsl-backend"))]
@@ -1343,7 +1419,11 @@ fn build_single_output(
             MiniCombinedOutput::polar(bundled_lsl, &snapshot.stream_name, &snapshot.polar_outputs)?,
         ))),
         MiniAppKind::Vernier => Ok(MiniOutputHandle::Single(Arc::new(
-            MiniCombinedOutput::vernier(bundled_lsl, &snapshot.stream_name)?,
+            MiniCombinedOutput::vernier(
+                bundled_lsl,
+                &snapshot.stream_name,
+                &snapshot.vernier_outputs,
+            )?,
         ))),
     }
 }
@@ -1358,6 +1438,7 @@ fn build_single_output(
 }
 
 fn mini_output_config(kind: MiniAppKind, snapshot: &MiniPreferencesSnapshot) -> OutputConfig {
+    let vernier = VernierMiniSelection::from_ids(Some(&snapshot.vernier_outputs));
     OutputConfig {
         stream_name: snapshot.stream_name.clone(),
         lsl_enabled: true,
@@ -1367,8 +1448,15 @@ fn mini_output_config(kind: MiniAppKind, snapshot: &MiniPreferencesSnapshot) -> 
         source_palette: source_palette(kind.palette_id()),
         outputs: match kind {
             MiniAppKind::Polar => snapshot.polar_outputs.clone(),
-            MiniAppKind::Vernier => vec![VERNIER_FORCE_OUTPUT.into()],
+            MiniAppKind::Vernier => {
+                if vernier.raw_force {
+                    vec![VERNIER_FORCE_OUTPUT.into()]
+                } else {
+                    Vec::new()
+                }
+            }
         },
+        vernier_outputs: (kind == MiniAppKind::Vernier).then(|| snapshot.vernier_outputs.clone()),
         ..Default::default()
     }
 }
@@ -2354,6 +2442,30 @@ fn normalize_polar_outputs(input: Option<Vec<String>>) -> Vec<String> {
     outputs
 }
 
+fn default_vernier_outputs() -> Vec<String> {
+    VERNIER_OUTPUT_IDS.iter().map(|id| (*id).into()).collect()
+}
+
+fn validate_vernier_outputs(input: Vec<String>) -> Result<Vec<String>, String> {
+    if input.is_empty()
+        || input.len() > VERNIER_OUTPUT_IDS.len()
+        || input
+            .iter()
+            .any(|id| !VERNIER_OUTPUT_IDS.contains(&id.as_str()))
+    {
+        return Err("Select at least one known Vernier LSL output.".into());
+    }
+    let mut unique = std::collections::HashSet::new();
+    if input.iter().any(|id| !unique.insert(id)) {
+        return Err("Vernier LSL outputs cannot be duplicated.".into());
+    }
+    Ok(VERNIER_OUTPUT_IDS
+        .iter()
+        .filter(|id| input.iter().any(|selected| selected == *id))
+        .map(|id| (*id).into())
+        .collect())
+}
+
 fn valid_saved_device(device: &SavedMiniDevice) -> bool {
     !device.id.trim().is_empty()
         && !device.name.trim().is_empty()
@@ -2384,6 +2496,33 @@ fn lsl_resource_path() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recent_devices_survive_restart_and_keep_last_device_first() {
+        let path = std::env::temp_dir().join(format!("vernier-mini-recent-{}.json", process::id()));
+        let _ = fs::remove_file(&path);
+        let store = PreferencesStore::load(path.clone(), MiniAppKind::Vernier);
+        for id in ["belt-a", "belt-b", "belt-a"] {
+            store
+                .save_last_device(SavedMiniDevice {
+                    id: id.into(),
+                    name: format!("GDX-RB {id}"),
+                })
+                .unwrap();
+        }
+        let restored = PreferencesStore::load(path.clone(), MiniAppKind::Vernier).snapshot();
+        assert_eq!(restored.last_device.as_ref().unwrap().id, "belt-a");
+        assert_eq!(restored.recent_devices.len(), 2);
+        assert_eq!(restored.recent_devices[0].id, "belt-a");
+        assert_eq!(restored.recent_devices[1].id, "belt-b");
+        assert!(
+            PreferencesStore::mock_from(&path, MiniAppKind::Vernier)
+                .snapshot()
+                .recent_devices
+                .is_empty()
+        );
+        let _ = fs::remove_file(path);
+    }
 
     #[test]
     fn acc_breathing_outputs_are_mini_selectable_and_survive_preferences() {
@@ -2593,7 +2732,7 @@ mod tests {
             if kind == MiniAppKind::Polar {
                 assert_eq!(
                     session.lsl,
-                    format!("Publishing {} stream(s)", initial.polar_outputs.len())
+                    format!("Publishing {} stream(s)", initial.polar_outputs.len() + 1)
                 );
             }
             let first_samples = mock_samples(&state).await;
@@ -2604,6 +2743,7 @@ mod tests {
                 output_mode: mode,
                 auto_connect: false,
                 polar_outputs: initial.polar_outputs.clone(),
+                vernier_outputs: Some(initial.vernier_outputs.clone()),
             };
             let single = save_preferences_inner(
                 &state,
@@ -2633,6 +2773,28 @@ mod tests {
             assert!(session.lsl.starts_with("Publishing "));
             assert_ne!(session.lsl, "Publishing 1 stream(s)");
             assert!(mock_samples(&state).await > single_samples);
+            if kind == MiniAppKind::Vernier {
+                let force_only = MiniPreferencesInput {
+                    vernier_outputs: Some(vec!["rawForce".into()]),
+                    ..input(MiniOutputMode::SeparateStreams, initial.stream_name.clone())
+                };
+                let result = save_preferences_inner(&state, force_only).await.unwrap();
+                assert!(result.applied && !result.reconnect_required);
+                let active = active_snapshot(&state).await.unwrap();
+                assert!(active.connected);
+                assert_eq!(active.lsl, "Publishing 1 stream(s)");
+                assert!(mock_samples(&state).await > single_samples);
+                let marker_only = MiniPreferencesInput {
+                    vernier_outputs: Some(vec!["signalStatus".into()]),
+                    ..input(MiniOutputMode::SeparateStreams, initial.stream_name.clone())
+                };
+                let result = save_preferences_inner(&state, marker_only).await.unwrap();
+                assert!(result.applied && !result.reconnect_required);
+                assert_eq!(
+                    active_snapshot(&state).await.unwrap().lsl,
+                    "Publishing 1 stream(s)"
+                );
+            }
             let invalid = input(MiniOutputMode::SingleStream, String::new());
             assert!(save_preferences_inner(&state, invalid).await.is_err());
             assert_eq!(
@@ -2641,6 +2803,17 @@ mod tests {
             );
             disconnect_active(&state).await.unwrap();
         }
+    }
+
+    #[test]
+    fn vernier_output_selection_requires_distinct_known_ids() {
+        assert_eq!(
+            validate_vernier_outputs(vec!["rawForce".into()]).unwrap(),
+            vec!["rawForce"]
+        );
+        assert!(validate_vernier_outputs(Vec::new()).is_err());
+        assert!(validate_vernier_outputs(vec!["rawForce".into(), "rawForce".into()]).is_err());
+        assert!(validate_vernier_outputs(vec!["rawAcceleration".into()]).is_err());
     }
 
     #[test]

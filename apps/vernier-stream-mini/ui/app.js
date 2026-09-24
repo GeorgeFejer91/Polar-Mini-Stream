@@ -10,6 +10,12 @@
     "breathing_signal_confidence",
     "breathing_signal_ready",
   ]);
+  const vernierOutputs = Object.freeze([
+    { id: "rawVernier", label: "Vernier channels", detail: "Force, respiration rate, steps, step rate, and packet diagnostics as received." },
+    { id: "rawForce", label: "Force only", detail: "Belt tension in newtons, copied from the Vernier Force channel." },
+    { id: "vernierBreathing", label: "Breathing waveform", detail: "Our live 0-1 normalization of belt force, not lung volume or breath rate." },
+    { id: "signalStatus", label: "Signal status", detail: "Markers for lost and restored Bluetooth signal." },
+  ]);
   const state = {
     kind: "vernier",
     productName: "Vernier Stream Mini",
@@ -19,6 +25,7 @@
       outputMode: "separateStreams",
       autoConnect: true,
       polarOutputs: [...directPolarOutputs],
+      vernierOutputs: vernierOutputs.map((output) => output.id),
       lastDevice: null,
     },
     metrics: [],
@@ -32,9 +39,12 @@
     lsl: "Off",
     samples: null,
     lastSampleAt: 0,
+    radioStatus: "unknown",
+    radioBusy: false,
   };
 
   const elements = {};
+  let confirmedPreferences = null;
 
   function bindElements() {
     for (const id of [
@@ -53,6 +63,16 @@
       "device-row",
       "device-select",
       "scan-button",
+      "device-dialog",
+      "device-dialog-close",
+      "device-scan-status",
+      "device-results",
+      "device-rescan",
+      "device-done",
+      "bluetooth-toggle",
+      "bluetooth-state",
+      "device-error-details",
+      "device-error-code",
       "mock-button",
       "mock-source",
       "metrics-button",
@@ -61,6 +81,7 @@
       "device-status",
       "lsl-status",
       "sample-status",
+      "connection-feedback",
       "connect-button",
       "disconnect-button",
       "context-menu",
@@ -111,12 +132,14 @@
       outputMode: elements["stream-mode-toggle"].checked ? "singleStream" : "separateStreams",
       autoConnect: elements["auto-connect"].checked,
       polarOutputs: [...new Set(state.preferences.polarOutputs || directPolarOutputs)],
+      vernierOutputs: [...new Set(state.preferences.vernierOutputs || vernierOutputs.map((output) => output.id))],
     };
   }
 
   function setStatus(message, phase = null, attention = false) {
     state.status = message;
     elements["node-phase"].textContent = phase || message;
+    elements["connection-feedback"].textContent = message;
     elements["mini-node"].classList.toggle("attention", attention);
   }
 
@@ -125,6 +148,7 @@
     state.productName = bootstrap.productName || "Vernier Stream Mini";
     state.scanLabel = bootstrap.scanLabel || "Vernier Go Direct";
     state.preferences = bootstrap.preferences || state.preferences;
+    confirmedPreferences = state.preferences;
     state.metrics = bootstrap.metrics || [];
     state.mockMode = Boolean(bootstrap.mockMode);
     state.connected = Boolean(bootstrap.session?.connected);
@@ -166,23 +190,22 @@
   function renderDevices() {
     const select = elements["device-select"];
     const previous = state.selectedDeviceId || select.value || state.preferences.lastDevice?.id;
+    const remembered = state.preferences.recentDevices?.length
+      ? state.preferences.recentDevices
+      : state.preferences.lastDevice ? [state.preferences.lastDevice] : [];
     select.replaceChildren();
     const placeholder = document.createElement("option");
     placeholder.value = "";
-    placeholder.textContent = state.devices.length
-      ? `Choose ${state.scanLabel}`
-      : state.preferences.lastDevice
-        ? `Saved: ${state.preferences.lastDevice.name}`
-        : `Choose ${state.scanLabel}`;
+    placeholder.textContent = remembered.length ? "Previously connected" : "No saved devices";
     select.append(placeholder);
-    for (const device of state.devices) {
+    for (const device of remembered) {
       const option = document.createElement("option");
       option.value = device.id;
-      option.textContent = device.rssi == null ? device.name : `${device.name} (${device.rssi} dBm)`;
+      option.textContent = device.name;
       select.append(option);
     }
-    const preferred = state.devices.find((device) => device.id === previous)
-      || state.devices.find((device) => device.name.toLowerCase() === state.preferences.lastDevice?.name?.toLowerCase());
+    const preferred = remembered.find((device) => device.id === previous)
+      || remembered.find((device) => device.id === state.preferences.lastDevice?.id);
     if (preferred) {
       select.value = preferred.id;
       state.selectedDeviceId = preferred.id;
@@ -206,10 +229,13 @@
       }
       const extraCount = state.metrics.filter((metric) => !metric.direct && selected.has(metric.id)).length;
       elements["metric-count"].textContent = extraCount ? `${extraCount} extra` : "Direct only";
-    } else if (state.preferences.outputMode === "singleStream") {
-      chips.push("single sparse LSL", "raw channels", "breathing");
     } else {
-      chips.push("rawVernier", "vernierBreathing", "rawForce");
+      const selected = new Set(state.preferences.vernierOutputs || vernierOutputs.map((output) => output.id));
+      if (state.preferences.outputMode === "singleStream") chips.push("single sparse LSL");
+      for (const output of vernierOutputs) {
+        if (selected.has(output.id)) chips.push(output.id);
+      }
+      elements["metric-count"].textContent = `${selected.size}/4`;
     }
     for (const chip of chips) {
       const span = document.createElement("span");
@@ -226,7 +252,7 @@
     elements["mini-node"].classList.toggle("connected", state.connected);
     elements["mini-node"].classList.toggle(
       "streaming",
-      state.connected && state.streaming && isLslPublishing(state.lsl),
+      state.connected && state.streaming && isLslPublishing(state.lsl) && hasContinuousOutput(),
     );
     elements["connect-button"].disabled = state.busy || state.connected || !isNative;
     elements["connect-button"].textContent = state.mockMode ? "Start mock" : "Connect";
@@ -235,6 +261,7 @@
     elements["scan-button"].disabled = state.busy || !isNative;
     elements["mock-button"].disabled = state.busy || !isNative;
     elements["device-select"].disabled = state.busy || state.connected || !isNative;
+    elements["bluetooth-toggle"].disabled = state.busy || state.radioBusy || state.connected || !["on", "off"].includes(state.radioStatus);
     elements["metrics-button"].disabled = state.busy || !isNative;
     elements["device-status"].textContent = state.connected
       ? session?.deviceName || state.preferences.lastDevice?.name || "Connected"
@@ -260,6 +287,11 @@
     return String(status || "").startsWith("Publishing ");
   }
 
+  function hasContinuousOutput() {
+    return state.kind !== "vernier" || (state.preferences.vernierOutputs || vernierOutputs.map((output) => output.id))
+      .some((id) => id !== "signalStatus");
+  }
+
   function hasNewSamples(samples, previous) {
     return ["ecgSamples", "accSamples", "heartRatePackets", "metricSamples", "vernierRows"]
       .some((key) => Number(samples?.[key] || 0) > Number(previous?.[key] || 0));
@@ -268,7 +300,39 @@
   function renderMetricDialog() {
     const options = elements["metric-options"];
     options.replaceChildren();
-    if (state.kind !== "polar") return;
+    if (state.kind === "vernier") {
+      const selected = new Set(state.preferences.vernierOutputs || vernierOutputs.map((output) => output.id));
+      for (const output of vernierOutputs) {
+        const label = document.createElement("label");
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = output.id;
+        checkbox.checked = selected.has(output.id);
+        checkbox.addEventListener("change", () => {
+          const current = new Set(state.preferences.vernierOutputs || vernierOutputs.map((candidate) => candidate.id));
+          if (!checkbox.checked && current.size === 1) {
+            checkbox.checked = true;
+            setStatus("Keep at least one output", "Config", true);
+            return;
+          }
+          if (checkbox.checked) current.add(output.id);
+          else current.delete(output.id);
+          state.preferences.vernierOutputs = vernierOutputs
+            .filter((candidate) => current.has(candidate.id)).map((candidate) => candidate.id);
+          renderSignals();
+          savePreferences(true);
+        });
+        const copy = document.createElement("span");
+        const title = document.createElement("strong");
+        title.textContent = output.label;
+        const detail = document.createElement("span");
+        detail.textContent = output.detail;
+        copy.append(title, detail);
+        label.append(checkbox, copy);
+        options.append(label);
+      }
+      return;
+    }
     const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
     for (const metric of state.metrics.filter((candidate) => !candidate.direct)) {
       const label = document.createElement("label");
@@ -329,18 +393,26 @@
     const save = async () => {
       try {
         const result = await invoke("save_preferences", { preferences: payload });
-        state.preferences = result.preferences || state.preferences;
+        confirmedPreferences = result.preferences || state.preferences;
         if (revision === saveRevision) {
+          state.preferences = confirmedPreferences;
           renderMode();
           renderSignals();
+          if (elements["metrics-dialog"].open) renderMetricDialog();
           if (!quiet || result.reconnectRequired || result.applied) {
             setStatus(result.message || "Saved", "Config", result.reconnectRequired);
           }
         }
       } catch (error) {
         if (revision === saveRevision) {
+          if (confirmedPreferences) {
+            state.preferences = confirmedPreferences;
+            elements["stream-name"].value = confirmedPreferences.streamName || "";
+            elements["auto-connect"].checked = Boolean(confirmedPreferences.autoConnect);
+          }
           renderMode();
           renderSignals();
+          if (elements["metrics-dialog"].open) renderMetricDialog();
           reportError(error);
         }
       }
@@ -350,30 +422,137 @@
   }
 
   async function scanDevices() {
+    if (!elements["device-dialog"].open) elements["device-dialog"].showModal();
+    elements["device-results"].replaceChildren();
+    elements["device-error-details"].hidden = true;
+    elements["device-scan-status"].textContent = "Checking Bluetooth...";
+    elements["device-rescan"].disabled = true;
     withBusy(async () => {
-      setStatus(`Scanning for ${state.scanLabel}`, "Scan");
-      state.devices = await invoke("scan_devices");
-      renderDevices();
-      setStatus(state.devices.length ? `Found ${state.devices.length}` : "No devices found", "Scan", !state.devices.length);
+      try {
+        const radio = await refreshRadio();
+        if (radio?.state === "off") {
+          const message = "Bluetooth is off. Switch it on to search for the belt.";
+          elements["device-scan-status"].textContent = message;
+          setStatus(message, "Bluetooth", true);
+          return;
+        }
+        if (radio?.state === "disabled") {
+          const message = "Bluetooth is blocked by hardware or Windows policy.";
+          elements["device-scan-status"].textContent = message;
+          setStatus(message, "Bluetooth", true);
+          return;
+        }
+        setStatus(`Scanning for ${state.scanLabel}`, "Scan");
+        elements["device-scan-status"].textContent = "Searching for nearby Go Direct sensors...";
+        state.devices = await invoke("scan_devices");
+        renderDiscoveredDevices();
+        const message = state.devices.length
+          ? `${state.devices.length} Go Direct device${state.devices.length === 1 ? "" : "s"} found. Select one to connect.`
+          : "No Go Direct devices found. Wake the belt, keep it nearby, then rescan.";
+        elements["device-scan-status"].textContent = message;
+        setStatus(message, "Scan", !state.devices.length);
+      } catch (error) {
+        const normalized = normalizeError(error);
+        const message = /0x800710df|device is not ready/i.test(normalized.message)
+          ? "Windows Bluetooth is not ready. Check the radio, then rescan."
+          : /bluetooth|adapter|radio|powered off|disabled|access denied/i.test(normalized.message)
+            ? "Bluetooth is unavailable. Check Windows Bluetooth settings, then rescan."
+            : "Device search failed. Check the belt, then rescan.";
+        elements["device-scan-status"].textContent = message;
+        elements["device-error-code"].textContent = normalized.message;
+        elements["device-error-details"].hidden = false;
+        setStatus(message, "Scan", true);
+      } finally {
+        elements["device-rescan"].disabled = false;
+      }
     });
   }
 
-  async function connectSelected() {
+  async function refreshRadio() {
+    try {
+      const result = await invoke("get_bluetooth_radio");
+      state.radioStatus = result.state;
+    } catch (_error) {
+      state.radioStatus = "unknown";
+    }
+    const labels = {
+      on: "On", off: "Off", disabled: "Blocked", unavailable: "No radio", unsupported: "System managed", unknown: "Unavailable",
+    };
+    elements["bluetooth-state"].textContent = labels[state.radioStatus] || "Unavailable";
+    elements["bluetooth-toggle"].checked = state.radioStatus === "on";
+    renderConnection();
+    return { state: state.radioStatus };
+  }
+
+  async function changeRadio() {
+    if (state.radioBusy) return;
+    const enabled = elements["bluetooth-toggle"].checked;
+    state.radioBusy = true;
+    renderConnection();
+    elements["device-scan-status"].textContent = enabled ? "Turning Bluetooth on..." : "Turning Bluetooth off...";
+    try {
+      await invoke("set_bluetooth_radio", { enabled });
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 300));
+        await refreshRadio();
+        if (state.radioStatus === (enabled ? "on" : "off")) break;
+      }
+      if (state.radioStatus !== (enabled ? "on" : "off")) {
+        throw new RuntimeError("RADIO_NOT_READY", "Windows accepted the request, but Bluetooth has not changed state.", true);
+      }
+      const message = enabled ? "Bluetooth is on. Searching for the belt..." : "Bluetooth is off.";
+      elements["device-scan-status"].textContent = message;
+      setStatus(message, "Bluetooth");
+      if (enabled) window.setTimeout(scanDevices, 0);
+    } catch (error) {
+      const message = normalizeError(error).message;
+      elements["device-scan-status"].textContent = message;
+      setStatus(message, "Bluetooth", true);
+      await refreshRadio();
+    } finally {
+      state.radioBusy = false;
+      renderConnection();
+    }
+  }
+
+  function renderDiscoveredDevices() {
+    const list = elements["device-results"];
+    list.replaceChildren();
+    for (const device of state.devices) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "discovered-device";
+      const name = document.createElement("strong");
+      name.textContent = device.name;
+      const detail = document.createElement("span");
+      detail.textContent = [device.modelCode, device.rssi == null ? null : `${device.rssi} dBm`]
+        .filter(Boolean).join(" / ");
+      button.append(name, detail);
+      button.addEventListener("click", () => {
+        elements["device-dialog"].close();
+        connectDevice(device.id);
+      });
+      list.append(button);
+    }
+  }
+
+  function connectSelected() {
     if (state.mockMode) {
       startMockStream();
       return;
     }
+    const deviceId = elements["device-select"].value;
+    if (!deviceId) {
+      scanDevices();
+      return;
+    }
+    connectDevice(deviceId);
+  }
+
+  function connectDevice(deviceId) {
     withBusy(async () => {
-      let deviceId = elements["device-select"].value;
-      if (!deviceId) {
-        state.devices = await invoke("scan_devices");
-        renderDevices();
-        deviceId = state.devices[0]?.id || "";
-      }
-      if (!deviceId) {
-        throw new RuntimeError("NO_DEVICE_SELECTED", `No ${state.scanLabel} was selected.`, true);
-      }
-      setStatus("Connecting", "Connect");
+      state.selectedDeviceId = deviceId;
+      setStatus("Opening Bluetooth connection", "Connect");
       const session = await invoke("connect_device", {
         deviceId,
         preferences: preferencePayload(),
@@ -382,7 +561,7 @@
       state.selectedDeviceId = deviceId;
       state.lsl = session.lsl;
       renderConnection(session);
-      setStatus(state.connected ? "Streaming" : "Looking for saved sensor", state.connected ? "Live" : "Reconnect");
+      if (!state.streaming) setStatus(state.connected ? "Connected; waiting for fresh LSL samples" : "Looking for saved sensor", state.connected ? "Connected" : "Reconnect");
     });
   }
 
@@ -408,7 +587,7 @@
       state.selectedDeviceId = session.deviceId;
       state.lsl = session.lsl;
       renderConnection(session);
-      setStatus(state.connected ? "Streaming" : "Looking for saved sensor", state.connected ? "Live" : "Reconnect");
+      setStatus(state.connected ? "Connected; waiting for fresh LSL samples" : "Looking for saved sensor", state.connected ? "Connected" : "Reconnect");
     } catch (error) {
       const normalized = normalizeError(error);
       setStatus(normalized.message, "Idle", normalized.retryable);
@@ -526,23 +705,32 @@
       state.streaming = false;
       state.lastSampleAt = 0;
       state.samples = null;
-      if (!state.mockMode && event.connected && event.deviceName) {
-        state.preferences.lastDevice = { id: state.selectedDeviceId, name: event.deviceName };
+      if (!state.mockMode && event.connected && event.deviceName && (state.selectedDeviceId || state.preferences.lastDevice?.id)) {
+        const saved = { id: state.selectedDeviceId || state.preferences.lastDevice.id, name: event.deviceName };
+        state.preferences.lastDevice = saved;
+        state.preferences.recentDevices = [saved, ...(state.preferences.recentDevices || [])
+          .filter((device) => device.id !== saved.id)].slice(0, 6);
+        renderDevices();
       }
       renderConnection({
         deviceName: event.deviceName,
         lsl: state.lsl,
       });
-      setStatus(event.message || (event.connected ? "Streaming" : "Disconnected"), event.connected ? "Live" : "Idle");
+      setStatus(event.connected ? "Connected; waiting for fresh LSL samples" : (event.message || "Disconnected"), event.connected ? "Connected" : "Idle");
     } else if (event.kind === "samples") {
-      if (state.connected && isLslPublishing(event.lsl) && hasNewSamples(event, state.samples)) {
+      if (state.connected && hasContinuousOutput() && isLslPublishing(event.lsl) && hasNewSamples(event, state.samples)) {
         state.lastSampleAt = performance.now();
       }
       state.samples = event;
       state.lsl = event.lsl || state.lsl;
-      state.streaming = state.connected && isLslPublishing(state.lsl) && state.lastSampleAt > 0
+      state.streaming = state.connected && hasContinuousOutput() && isLslPublishing(state.lsl) && state.lastSampleAt > 0
         && performance.now() - state.lastSampleAt < 1200;
       renderConnection();
+      if (state.streaming) {
+        if (state.status !== "Live: sensor samples reaching LSL") setStatus("Live: sensor samples reaching LSL", "Live");
+      } else if (state.connected && !isLslPublishing(state.lsl)) {
+        setStatus(`Sensor connected; ${state.lsl || "LSL unavailable"}`, "LSL", true);
+      }
     } else if (event.kind === "error") {
       setStatus(event.message || "Warning", "Attention", true);
     }
@@ -618,6 +806,10 @@
       savePreferences(false);
     });
     elements["scan-button"].addEventListener("click", scanDevices);
+    elements["device-rescan"].addEventListener("click", scanDevices);
+    elements["bluetooth-toggle"].addEventListener("change", changeRadio);
+    elements["device-done"].addEventListener("click", () => elements["device-dialog"].close());
+    elements["device-dialog-close"].addEventListener("click", () => elements["device-dialog"].close());
     elements["mock-button"].addEventListener("click", openMockNode);
     elements["connect-button"].addEventListener("click", connectSelected);
     elements["disconnect-button"].addEventListener("click", disconnect);
@@ -628,7 +820,6 @@
     elements["apply-metrics"].addEventListener("click", (event) => {
       event.preventDefault();
       elements["metrics-dialog"].close();
-      savePreferences(false);
     });
   }
 
@@ -639,6 +830,7 @@
       if (state.streaming && performance.now() - state.lastSampleAt >= 1200) {
         state.streaming = false;
         renderConnection();
+        setStatus("No fresh samples; waiting for sensor", "Waiting", true);
       }
     }, 400);
     initNative().catch(reportError);

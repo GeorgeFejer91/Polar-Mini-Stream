@@ -9,7 +9,7 @@ use polar_h10_core::AccSample;
 
 use crate::{
     CustomFormulaConfig, MetricSpec, SourcePalette, VERNIER_BREATHING_OUTLET_KEY,
-    VERNIER_RAW_OUTLET_KEY, VernierStreamSchema, custom_output_stream_name,
+    VERNIER_RAW_OUTLET_KEY, VernierMiniSelection, VernierStreamSchema, custom_output_stream_name,
     encode_vernier_raw_rows, output_stream_name,
     provenance::{PolarRespirationProvenance, VernierBreathingProvenance},
     vernier_breathing_stream_name, vernier_raw_stream_name,
@@ -360,12 +360,18 @@ impl LslPublisher {
         base_name: &str,
         schema: &VernierStreamSchema,
         palette: Option<&SourcePalette>,
+        raw: bool,
+        breathing: bool,
     ) {
-        self.add_vernier_raw_outlet(base_name, schema, palette);
-        let raw_ready = self.outlets.contains_key(VERNIER_RAW_OUTLET_KEY);
+        if raw {
+            self.add_vernier_raw_outlet(base_name, schema, palette);
+        }
+        let raw_ready = !raw || self.outlets.contains_key(VERNIER_RAW_OUTLET_KEY);
         let raw_status = self.status.clone();
-        self.add_vernier_breathing_outlet(base_name, schema, palette);
-        let breathing_ready = self.outlets.contains_key(VERNIER_BREATHING_OUTLET_KEY);
+        if breathing {
+            self.add_vernier_breathing_outlet(base_name, schema, palette);
+        }
+        let breathing_ready = !breathing || self.outlets.contains_key(VERNIER_BREATHING_OUTLET_KEY);
         let breathing_status = self.status.clone();
         if raw_ready && breathing_ready {
             return;
@@ -830,6 +836,13 @@ pub struct MiniStatusOutput {
 }
 
 impl MiniStatusOutput {
+    pub fn health(&self) -> String {
+        self.inner
+            .lock()
+            .map(|lsl| lsl.status().to_string())
+            .unwrap_or_else(|_| "Signal-status output lock failed".into())
+    }
+
     pub fn new(
         bundled_library: Option<PathBuf>,
         stream_name: &str,
@@ -886,6 +899,7 @@ struct MiniCombinedInner {
     stream_name: String,
     polar_metric_ids: Vec<String>,
     vernier_schema: Option<VernierStreamSchema>,
+    vernier_selection: Option<VernierMiniSelection>,
 }
 
 impl MiniCombinedOutput {
@@ -894,10 +908,19 @@ impl MiniCombinedOutput {
             return;
         };
         if inner.vernier_schema.is_some() {
+            if !inner
+                .vernier_selection
+                .is_some_and(|selection| selection.signal_status)
+            {
+                return;
+            }
             let Some(schema) = inner.vernier_schema.as_ref() else {
                 return;
             };
-            let mut row = vec![f64::NAN; schema.raw_channel_count() + 2];
+            let selection = inner
+                .vernier_selection
+                .expect("Vernier selection exists with schema");
+            let mut row = vec![f64::NAN; vernier_combined_channel_count(schema, selection)];
             *row.last_mut().expect("signal state channel exists") =
                 if restored { 2.0 } else { 1.0 };
             let channels = row.len();
@@ -954,11 +977,16 @@ impl MiniCombinedOutput {
                 stream_name,
                 polar_metric_ids,
                 vernier_schema: None,
+                vernier_selection: None,
             }),
         })
     }
 
-    pub fn vernier(bundled_library: Option<PathBuf>, stream_name: &str) -> Result<Self, String> {
+    pub fn vernier(
+        bundled_library: Option<PathBuf>,
+        stream_name: &str,
+        selected_outputs: &[String],
+    ) -> Result<Self, String> {
         let stream_name = crate::normalize_stream_base(stream_name)?;
         Ok(Self {
             inner: std::sync::Mutex::new(MiniCombinedInner {
@@ -966,6 +994,7 @@ impl MiniCombinedOutput {
                 stream_name,
                 polar_metric_ids: Vec::new(),
                 vernier_schema: None,
+                vernier_selection: Some(VernierMiniSelection::from_ids(Some(selected_outputs))),
             }),
         })
     }
@@ -985,7 +1014,10 @@ impl MiniCombinedOutput {
             return Ok(schema);
         }
         let mut lsl = inner.lsl.fresh();
-        let channels = vernier_combined_channels(&schema);
+        let channels = vernier_combined_channels(
+            &schema,
+            inner.vernier_selection.expect("Vernier selection exists"),
+        );
         lsl.add_combined_outlet(
             MiniCombinedOutletDescriptor {
                 key: MINI_VERNIER_COMBINED_KEY,
@@ -1147,28 +1179,63 @@ impl MiniCombinedOutput {
         let Some(schema) = inner.vernier_schema.clone() else {
             return;
         };
-        let raw_channels = schema.raw_channel_count();
-        let row_count = encode_vernier_raw_rows(
-            &mut inner.lsl.scratch_double,
-            &schema,
-            host_receive_timestamp_ns,
-            sample_period_us,
-            sequence,
-            dropped_before,
-            device_drop_reports_before,
-            decode_latency_ns,
-            encoding,
-            sensors,
-        );
-        if row_count == 0 || inner.lsl.scratch_double.len() != row_count * raw_channels {
+        let selection = inner
+            .vernier_selection
+            .expect("Vernier selection exists with schema");
+        if !selection.raw_vernier && !selection.raw_force {
             return;
         }
-        let channels = raw_channels + 2;
+        let raw_channels = if selection.raw_vernier {
+            schema.raw_channel_count()
+        } else {
+            0
+        };
+        let force = schema
+            .force_sensor_number()
+            .and_then(|number| sensors.iter().find(|sensor| sensor.sensor_number == number));
+        let row_count = if selection.raw_vernier {
+            encode_vernier_raw_rows(
+                &mut inner.lsl.scratch_double,
+                &schema,
+                host_receive_timestamp_ns,
+                sample_period_us,
+                sequence,
+                dropped_before,
+                device_drop_reports_before,
+                decode_latency_ns,
+                encoding,
+                sensors,
+            )
+        } else {
+            force.map_or(0, |samples| samples.values.len())
+        };
+        if row_count == 0
+            || (selection.raw_vernier && inner.lsl.scratch_double.len() != row_count * raw_channels)
+        {
+            return;
+        }
+        let channels = vernier_combined_channel_count(&schema, selection);
         let mut rows = Vec::with_capacity(row_count.saturating_mul(channels));
-        for raw in inner.lsl.scratch_double.chunks_exact(raw_channels) {
-            rows.extend(raw);
-            rows.push(f64::NAN);
-            rows.push(f64::NAN);
+        for row in 0..row_count {
+            if selection.raw_vernier {
+                rows.extend_from_slice(
+                    &inner.lsl.scratch_double[row * raw_channels..(row + 1) * raw_channels],
+                );
+            }
+            if selection.raw_force {
+                rows.push(
+                    force
+                        .and_then(|samples| samples.values.get(row))
+                        .copied()
+                        .unwrap_or(f64::NAN),
+                );
+            }
+            if selection.breathing {
+                rows.push(f64::NAN);
+            }
+            if selection.signal_status {
+                rows.push(f64::NAN);
+            }
         }
         inner.lsl.push_double_rows_at_key(
             MINI_VERNIER_COMBINED_KEY,
@@ -1191,13 +1258,23 @@ impl MiniCombinedOutput {
         let Some(schema) = inner.vernier_schema.as_ref() else {
             return;
         };
-        let raw_channels = schema.raw_channel_count();
-        let channels = raw_channels + 2;
+        let selection = inner
+            .vernier_selection
+            .expect("Vernier selection exists with schema");
+        if !selection.breathing {
+            return;
+        }
+        let breathing_index = if selection.raw_vernier {
+            schema.raw_channel_count()
+        } else {
+            0
+        } + usize::from(selection.raw_force);
+        let channels = vernier_combined_channel_count(schema, selection);
         let mut rows = Vec::with_capacity(values_01.len().saturating_mul(channels));
         for value in values_01 {
-            rows.extend(std::iter::repeat_n(f64::NAN, raw_channels));
-            rows.push(f64::from(*value));
-            rows.push(f64::NAN);
+            let mut row = vec![f64::NAN; channels];
+            row[breathing_index] = f64::from(*value);
+            rows.extend(row);
         }
         inner.lsl.push_double_rows_at_key(
             MINI_VERNIER_COMBINED_KEY,
@@ -1279,65 +1356,93 @@ fn polar_combined_channels(metric_ids: &[String]) -> Vec<MiniCombinedChannel> {
     channels
 }
 
-fn vernier_combined_channels(schema: &VernierStreamSchema) -> Vec<MiniCombinedChannel> {
-    let mut channels = Vec::with_capacity(schema.raw_channel_count() + 1);
-    for sensor in schema.channels() {
+fn vernier_combined_channel_count(
+    schema: &VernierStreamSchema,
+    selection: VernierMiniSelection,
+) -> usize {
+    (if selection.raw_vernier {
+        schema.raw_channel_count()
+    } else {
+        0
+    }) + usize::from(selection.raw_force)
+        + usize::from(selection.breathing)
+        + usize::from(selection.signal_status)
+}
+
+fn vernier_combined_channels(
+    schema: &VernierStreamSchema,
+    selection: VernierMiniSelection,
+) -> Vec<MiniCombinedChannel> {
+    let mut channels = Vec::with_capacity(schema.raw_channel_count() + 3);
+    if selection.raw_vernier {
+        for sensor in schema.channels() {
+            channels.push(MiniCombinedChannel::new(
+                &format!("sensor_{}_{}", sensor.number, sensor.description),
+                &sensor.unit,
+                "RawMeasurement",
+                "Vernier Go Direct metadata-exposed device channel",
+            ));
+        }
+        for (label, unit, detail) in [
+            ("sequence", "count", "Monotonic raw row sequence"),
+            (
+                "dropped_rows_before",
+                "count",
+                "Rows dropped at the bounded input queue before this row",
+            ),
+            (
+                "device_drop_reports_before",
+                "count",
+                "Device-level dropped-packet reports observed before this row",
+            ),
+            (
+                "sample_period_us",
+                "microseconds",
+                "Configured periodic backfill interval; zero denotes no interval",
+            ),
+            (
+                "decode_latency_ns",
+                "nanoseconds",
+                "Host notification-to-decode latency",
+            ),
+            (
+                "host_receive_timestamp_ns",
+                "nanoseconds",
+                "Monotonic time since the native measurement-session origin",
+            ),
+            (
+                "encoding_code",
+                "code",
+                "0 = device Float32 frame; 1 = device Int32 frame",
+            ),
+        ] {
+            channels.push(MiniCombinedChannel::new(
+                label,
+                unit,
+                "RecordingDiagnostics",
+                detail,
+            ));
+        }
+    }
+    if selection.raw_force {
         channels.push(MiniCombinedChannel::new(
-            &format!("sensor_{}_{}", sensor.number, sensor.description),
-            &sensor.unit,
-            "RawMeasurement",
-            "Vernier Go Direct metadata-exposed device channel",
+            "raw_force",
+            "N",
+            "RespirationForce",
+            "Force channel compatibility copy",
         ));
     }
-    for (label, unit, detail) in [
-        ("sequence", "count", "Monotonic raw row sequence"),
-        (
-            "dropped_rows_before",
-            "count",
-            "Rows dropped at the bounded input queue before this row",
-        ),
-        (
-            "device_drop_reports_before",
-            "count",
-            "Device-level dropped-packet reports observed before this row",
-        ),
-        (
-            "sample_period_us",
-            "microseconds",
-            "Configured periodic backfill interval; zero denotes no interval",
-        ),
-        (
-            "decode_latency_ns",
-            "nanoseconds",
-            "Host notification-to-decode latency",
-        ),
-        (
-            "host_receive_timestamp_ns",
-            "nanoseconds",
-            "Monotonic time since the native measurement-session origin",
-        ),
-        (
-            "encoding_code",
-            "code",
-            "0 = device Float32 frame; 1 = device Int32 frame",
-        ),
-    ] {
+    if selection.breathing {
         channels.push(MiniCombinedChannel::new(
-            label,
-            unit,
-            "RecordingDiagnostics",
-            detail,
+            "vernier_breathing_01",
+            "0-1",
+            "Respiration",
+            "Explicitly derived Vernier breathing waveform",
         ));
     }
-    channels.push(MiniCombinedChannel::new(
-        "vernier_breathing_01",
-        "0-1",
-        "Respiration",
-        "Explicitly derived Vernier breathing waveform",
-    ));
-    channels.push(MiniCombinedChannel::new(
-        "signal_state", "code", "Marker", "1=Bluetooth signal lost; 2=Bluetooth signal restored. All other channels are NaN on marker rows.",
-    ));
+    if selection.signal_status {
+        channels.push(MiniCombinedChannel::new("signal_state", "code", "Marker", "1=Bluetooth signal lost; 2=Bluetooth signal restored. All other channels are NaN on marker rows."));
+    }
     channels
 }
 

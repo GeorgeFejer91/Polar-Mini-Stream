@@ -23,3 +23,6 @@ SOFTWARE.
 liblsl includes pugixml (MIT), Boost (Boost Software License), Loguru (public
 domain), and Catch2 (Boost Software License). See the upstream repository for
 the complete notices.
+
+The Vernier Stream Mini UI vendors Pretext 0.0.9 for text measurement.
+Its MIT license is included at ui/vendor/pretext/LICENSE.

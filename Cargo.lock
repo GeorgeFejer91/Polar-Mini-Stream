@@ -2755,7 +2755,7 @@ dependencies = [
 
 [[package]]
 name = "polar-h10-core"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "serde",
  "thiserror 2.0.20",
@@ -2763,7 +2763,7 @@ dependencies = [
 
 [[package]]
 name = "polar-h10-input"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "btleplug",
  "futures-util",
@@ -2778,7 +2778,7 @@ dependencies = [
 
 [[package]]
 name = "polar-h10-math"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "polar-h10-core",
  "polar-h10-metrics",
@@ -2789,7 +2789,7 @@ dependencies = [
 
 [[package]]
 name = "polar-h10-metrics"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "polar-h10-core",
  "serde",
@@ -2798,7 +2798,7 @@ dependencies = [
 
 [[package]]
 name = "polar-h10-output"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "libloading 0.9.0",
  "polar-h10-core",
@@ -2814,7 +2814,7 @@ dependencies = [
 
 [[package]]
 name = "polar-stream-mini"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "stream-mini-runtime",
  "tauri",
@@ -2825,7 +2825,7 @@ dependencies = [
 
 [[package]]
 name = "polar-stream-time"
-version = "0.6.0"
+version = "0.6.1"
 
 [[package]]
 name = "polling"
@@ -3533,7 +3533,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "stream-mini-runtime"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "polar-h10-core",
  "polar-h10-input",
@@ -4489,7 +4489,7 @@ dependencies = [
 
 [[package]]
 name = "vernier-gdx-core"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "thiserror 2.0.20",
  "uuid",
@@ -4497,7 +4497,7 @@ dependencies = [
 
 [[package]]
 name = "vernier-gdx-input"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "btleplug",
  "futures-util",
@@ -4510,12 +4510,14 @@ dependencies = [
 
 [[package]]
 name = "vernier-stream-mini"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
+ "serde",
  "stream-mini-runtime",
  "tauri",
  "tauri-build",
  "tauri-plugin-autostart",
+ "windows 0.62.2",
 ]
 
 [[package]]

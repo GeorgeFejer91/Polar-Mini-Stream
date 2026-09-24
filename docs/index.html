@@ -50,6 +50,22 @@
         </div>
       </div>
       <p class="diagram-note">Separate mode keeps each outlet's sample timing. Single mode uses fixed sparse channels. Signal-loss markers report gaps; missing measurements are not filled with invented sensor values.</p>
+      <div id="vernier-outputs" class="vernier-reference">
+        <h3>Vernier Mini outputs</h3>
+        <p>The GDX-RB measures tension on its short nylon strap with a force sensor inside the box. Vernier documents four available device channels: Force, Respiration Rate, Steps, and Step Rate. It does not document an exposed raw X/Y/Z accelerometer channel. <a href="https://www.vernier.com/manuals/GDX-RB">GDX-RB manual</a></p>
+        <div class="reference-table-scroll">
+          <table>
+            <thead><tr><th scope="col">Output</th><th scope="col">What it contains</th><th scope="col">Origin</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">rawVernier</th><td>All numeric channels advertised by the connected belt, plus host receipt, sequence, drop, and decode diagnostics. A missing value in a packet is NaN.</td><td>Device values and app diagnostics.</td></tr>
+              <tr><th scope="row">rawForce</th><td>Force in newtons, copied without filtering from the belt's Force channel. It reflects belt tension, not pressure or lung volume.</td><td>Device Force value.</td></tr>
+              <tr><th scope="row">vernierBreathing</th><td>A relative 0-1 force waveform. The app uses a causal 30-second force history, initial observed min/max bounds, then 5th/95th percentile bounds after 20 valid samples, refreshed every five samples.</td><td>App-derived; not respiration rate.</td></tr>
+              <tr><th scope="row">signalStatus</th><td>Event code 1 for lost Bluetooth signal and 2 for restored signal. Sensor samples are not fabricated during a gap.</td><td>App-derived continuity marker.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>All four are selected by default. The Outputs picker saves any nonempty subset. Separate mode creates only the selected LSL outlets; Single mode combines selected columns into one sparse outlet. Changing either setting replaces active outlets without restarting the Bluetooth session. The device's Respiration Rate uses a 30-second window and updates every 10 seconds; Step Rate uses a 10-second window and updates every 10 seconds. Neither is the app's continuous normalized waveform.</p>
+      </div>
     </section>
 
     <section class="section content-width" id="methods" aria-labelledby="methods-title">
@@ -58,7 +74,7 @@
         <article class="method-card"><span class="method-index">A / ACC</span><h3>PCA waveform</h3><p>Selected H10 axes are smoothed, projected onto a calibrated principal motion axis, then scaled using robust bounds. Its derivative with hysteresis gives phase; like-polarity extrema give cycle rate and dynamics.</p><p class="method-output"><code>breathing_volume</code> · <code>breathing_phase</code> · rate · quality · dynamics</p><a href="https://pubmed.ncbi.nlm.nih.gov/33739305/">Related chest-ACC PCA research ↗</a></article>
         <article class="method-card"><span class="method-index">B / ACC</span><h3>Phan adaptation</h3><p>For each H10 axis, compare 0.2 s and 200 s means. Sum the absolute differences, apply an adaptive threshold, and count rising onsets after quiet and refractory gates. Count accepted events over 60 s.</p><p class="method-output"><code>phan_breath_event</code> · <code>phan_breath_rate</code></p><a href="https://github.com/lynphan/Mobile-Phone-Breathing-Detection/blob/main/BreathingDetection/Assets/MobilePhoneBreathingDetection.cs">Original phone algorithm ↗</a></article>
         <article class="method-card"><span class="method-index">C / ACC</span><h3>Flowborne adaptation</h3><p>Compare 0.267 s and 2 s means of the signed PCA projection, divided by its calibrated span. Threshold the contrast into inhale (+1), exhale (−1), hold (0), or bad signal (−2).</p><p class="method-output"><code>flowborne_motion_score</code> · <code>flowborne_phase</code></p><a href="https://www.hsbi.de/publikationsserver/download/6574/6575/muc-2025-mci-174.pdf">Viscereality design publication ↗</a></article>
-        <article class="method-card"><span class="method-index">D / FORCE</span><h3>Vernier normalization</h3><p>Forward Go Direct numeric channels unchanged. For the respiration belt's force channel, map each sample into [0, 1] using recent 30 s 5th–95th percentile bounds. Increasing force denotes inhalation.</p><p class="method-output"><code>rawVernier</code> · <code>vernierBreathing</code></p><a href="https://www.vernier.com/manuals/GDX-RB">Vernier belt manual ↗</a></article>
+        <article class="method-card"><span class="method-index">D / FORCE</span><h3>Vernier normalization</h3><p>Forward Go Direct numeric channels unchanged. For the respiration belt's force channel, map each sample into [0, 1] using recent 30 s 5th–95th percentile bounds. Increasing force denotes inhalation.</p><p class="method-output"><code>rawVernier</code> · <code>rawForce</code> · <code>vernierBreathing</code> · <code>signalStatus</code></p><a href="https://www.vernier.com/manuals/GDX-RB">Vernier belt manual ↗</a></article>
       </div>
       <p class="method-caveat">These algorithms are different implementations. The cited papers and source projects explain their origins or related methods; they do not validate Polar Mini's H10 adaptations. Phan's linked origin is source code; the Viscereality controller source requires repository access, while its design paper is public. For exact controller-to-H10 differences, read <a href="https://github.com/GeorgeFejer91/Polar-Mini-Stream/blob/main/docs/acc-breathing-methods.md">the method comparison</a>.</p>
     </section>

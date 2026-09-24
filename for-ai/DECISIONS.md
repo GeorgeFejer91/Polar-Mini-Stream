@@ -46,6 +46,23 @@ to rediscover. Source and tests remain the authority for implementation facts.
   adaptations.
 - Supersedes: The initial Pages non-goal in `PROJECT.md`.
 
+## D-0004 — Vernier outputs are selected independently of acquisition
+
+- Date: 2026-09-24
+- Status: Accepted
+- Context: Users need to include any combination of the belt's full channel row,
+  Force-only compatibility signal, app-derived breathing waveform, and
+  signal-continuity markers without confusing these with separate sensors.
+- Decision: Persist any nonempty subset of `rawVernier`, `rawForce`,
+  `vernierBreathing`, and `signalStatus`. Select LSL outlets or sparse columns
+  using that subset; stage live output changes without reconnecting BLE. Keep
+  the device's documented Force, Respiration Rate, Steps, and Step Rate distinct
+  from the app-derived waveform. Do not advertise raw ACC from GDX-RB.
+- Consequences: Existing preferences default to all four outputs. Outlet
+  topology can change while the physical acquisition session stays alive;
+  clients must rediscover an outlet whose channel contract changes.
+- Supersedes: None
+
 ## Record format
 
 For later decisions, add one compact entry with:

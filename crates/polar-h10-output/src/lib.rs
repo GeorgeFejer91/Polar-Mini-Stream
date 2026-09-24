@@ -52,6 +52,34 @@ pub const VERNIER_BREATHING_STREAM_SUFFIX: &str = "vernierBreathing";
 pub const VERNIER_BREATHING_RECORDING_ID: &str = "vernier_breathing";
 pub const VERNIER_RAW_DIAGNOSTIC_CHANNELS: usize = 7;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VernierMiniSelection {
+    pub raw_vernier: bool,
+    pub raw_force: bool,
+    pub breathing: bool,
+    pub signal_status: bool,
+}
+
+impl VernierMiniSelection {
+    pub fn from_ids(ids: Option<&[String]>) -> Self {
+        let Some(ids) = ids else {
+            return Self {
+                raw_vernier: true,
+                raw_force: true,
+                breathing: true,
+                signal_status: true,
+            };
+        };
+        let has = |id| ids.iter().any(|selected| selected == id);
+        Self {
+            raw_vernier: has("rawVernier"),
+            raw_force: has("rawForce"),
+            breathing: has("vernierBreathing"),
+            signal_status: has("signalStatus"),
+        }
+    }
+}
+
 #[derive(Default)]
 struct SensorClockMap {
     mapper: SourceClockMapper,
@@ -1210,8 +1238,15 @@ impl RouterInner {
             );
         }
         #[cfg(feature = "liblsl-backend")]
+        let vernier = VernierMiniSelection::from_ids(config.vernier_outputs.as_deref());
         if let Some(schema) = vernier_schema {
-            lsl.add_vernier_outlets(&config.stream_name, schema, config.source_palette.as_ref());
+            lsl.add_vernier_outlets(
+                &config.stream_name,
+                schema,
+                config.source_palette.as_ref(),
+                vernier.raw_vernier,
+                vernier.breathing,
+            );
         }
         let expected = config.outputs.len()
             + config
@@ -1219,7 +1254,8 @@ impl RouterInner {
                 .iter()
                 .filter(|formula| formula.enabled)
                 .count()
-            + usize::from(vernier_schema.is_some()) * 2;
+            + usize::from(vernier_schema.is_some())
+                * (usize::from(vernier.raw_vernier) + usize::from(vernier.breathing));
         let actual = lsl.outlet_count();
         if fail_after_outlets.is_some_and(|outlets| actual >= outlets) {
             return Err(format!(

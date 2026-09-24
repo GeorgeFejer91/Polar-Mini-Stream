@@ -20,8 +20,11 @@ are retained so installed applets can be upgraded without changing identity.
   X/Y/Z acceleration, heart rate, RR intervals, and selected derived metrics.
   Its optional ACC breathing outputs include the PCA waveform and phase,
   Phan event/rate, and [Flowborne](docs/acc-breathing-methods.md).
-- [Vernier Stream Mini](apps/vernier-stream-mini/README.md) publishes available
-  numeric Go Direct channels and a separate derived 0–1 breathing waveform.
+- [Vernier Stream Mini](apps/vernier-stream-mini/README.md) lets you select any
+  nonempty subset of the belt's numeric channels, Force-only copy, app-derived
+  0–1 breathing waveform, and signal-status markers. The
+  [signal reference](https://georgefejer91.github.io/Polar-Mini-Stream/#vernier-outputs)
+  distinguishes device values from app processing.
 
 Both apps can publish separate LSL outlets or one sparse combined outlet.
 Their **Mock** windows publish clearly labeled synthetic data through the

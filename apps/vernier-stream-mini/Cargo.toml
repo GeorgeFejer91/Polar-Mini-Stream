@@ -21,8 +21,12 @@ name = "vernier-stream-mini"
 path = "src/main.rs"
 
 [dependencies]
+serde.workspace = true
 stream-mini-runtime = { path = "../../crates/stream-mini-runtime", default-features = false }
 tauri = { version = "2.11", features = [] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.62", features = ["Devices_Radios", "Foundation"] }
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-autostart = "2.5"

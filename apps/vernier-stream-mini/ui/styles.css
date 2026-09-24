@@ -84,7 +84,7 @@ select:focus-visible,
 body[data-mock="true"] .patch-node { --node-accent: var(--mock-accent); }
 .node-surface {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   overflow: hidden;
   border: 1px solid var(--frame-inner);
   border-radius: 16px;
@@ -404,6 +404,19 @@ body[data-mock="true"] .patch-node footer { grid-template-columns: repeat(2, min
 .patch-node footer #mock-button {
   background: color-mix(in srgb, var(--mock-accent) 14%, var(--surface-2));
 }
+.connection-feedback {
+  min-height: 27px;
+  max-height: 54px;
+  overflow-y: auto;
+  padding: 0 9px 8px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 13px;
+  overflow-wrap: break-word;
+  user-select: text;
+}
+.patch-node.attention .connection-feedback { color: var(--attention); }
+.patch-node.streaming .connection-feedback { color: var(--brand-strong); }
 
 .node-menu {
   position: fixed;
@@ -432,6 +445,64 @@ body[data-mock="true"] .patch-node footer { grid-template-columns: repeat(2, min
 }
 .node-source-dialog::backdrop { background: rgb(0 0 0 / 30%); }
 .node-source-dialog form { display: grid; max-height: inherit; }
+.device-discovery { display: grid; max-height: inherit; }
+.device-discovery-dialog {
+  width: min(350px, calc(100vw - 24px));
+  border-color: var(--line-strong);
+  border-radius: 10px;
+}
+.node-source-dialog.device-discovery-dialog header { padding: 12px 12px 6px; background: var(--surface); }
+.node-source-dialog.device-discovery-dialog footer { padding: 6px 12px 12px; border: 0; }
+.device-discovery-dialog #device-done { background: var(--primary-bg); color: var(--primary-fg); }
+.bluetooth-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 12px 0;
+  padding: 7px 9px;
+  border-radius: 5px;
+  background: var(--surface-2);
+}
+.bluetooth-row > div { display: grid; gap: 1px; }
+.bluetooth-row strong { font-size: 11px; }
+.bluetooth-row span { color: var(--muted); font-size: 10px; }
+.bluetooth-toggle { position: relative; display: block; width: 36px; height: 20px; cursor: pointer; }
+.bluetooth-toggle input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.bluetooth-track { display: block; width: 36px; height: 20px; border-radius: 10px; background: var(--line-strong); }
+.bluetooth-track span { display: block; width: 14px; height: 14px; margin: 3px; border-radius: 50%; background: var(--primary-fg); transition: transform 140ms ease; }
+.bluetooth-toggle input:checked + .bluetooth-track { background: var(--brand); }
+.bluetooth-toggle input:checked + .bluetooth-track span { transform: translateX(16px); }
+.bluetooth-toggle input:disabled + .bluetooth-track { opacity: .5; }
+.bluetooth-toggle input:focus-visible + .bluetooth-track { outline: 2px solid var(--focus); outline-offset: 2px; }
+.device-discovery > p {
+  margin: 0;
+  padding: 9px 12px 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 15px;
+  overflow-wrap: break-word;
+}
+.device-results { display: grid; min-height: 24px; max-height: 250px; overflow-y: auto; padding: 4px 12px 8px; }
+.device-discovery-dialog .discovered-device {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-height: 39px;
+  border: 0;
+  border-radius: 4px;
+  padding: 7px 8px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+.device-discovery-dialog .discovered-device:hover,
+.device-discovery-dialog .discovered-device:focus-visible { background: var(--field-hover); }
+.discovered-device strong { font-size: 11px; }
+.discovered-device span { color: var(--muted); font-size: 10px; }
+.device-discovery details { margin: 0 12px 4px; color: var(--muted); font-size: 10px; }
+.device-discovery summary { cursor: pointer; }
+.device-discovery code { display: block; max-height: 65px; overflow: auto; padding-top: 4px; overflow-wrap: anywhere; }
 .node-source-dialog header {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -490,6 +561,26 @@ body[data-mock="true"] .patch-node footer { grid-template-columns: repeat(2, min
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.vernier-output-dialog .metric-options {
+  gap: 0;
+  padding: 4px 10px;
+}
+.vernier-output-dialog .metric-options label {
+  padding: 9px 3px;
+  border-radius: 0;
+  background: transparent;
+}
+.vernier-output-dialog .metric-options label + label {
+  border-top: 1px solid var(--line);
+}
+.vernier-output-dialog .metric-options strong,
+.vernier-output-dialog .metric-options span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+.vernier-output-dialog .metric-options strong { font-size: 11px; }
+.vernier-output-dialog .metric-options span { font-size: 10px; line-height: 1.4; }
 
 button,
 input,

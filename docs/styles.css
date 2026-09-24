@@ -57,6 +57,16 @@ h2{font-size:clamp(33px,4vw,50px);letter-spacing:-.055em;line-height:1.08;margin
 .method-node.output{border-color:#d7e8dd;background:#eef6f1}
 .vernier-lane .method-row{grid-template-columns:repeat(2,minmax(0,1fr))}
 .diagram-note,.method-caveat,.catalog-footnote{font-size:13px;line-height:1.65;color:#697171;margin:16px 0 0}
+.vernier-reference{margin-top:38px;scroll-margin-top:24px}
+.vernier-reference h3{font-size:22px;margin:0 0 10px}
+.vernier-reference p{max-width:950px;color:#596463;font-size:14px;line-height:1.6;margin:0 0 16px}
+.vernier-reference a{color:#237f79;text-decoration:underline;text-underline-offset:3px}
+.reference-table-scroll{max-width:100%;overflow-x:auto;margin:18px 0}
+.vernier-reference table{width:100%;min-width:680px;border-collapse:collapse;text-align:left;font-size:13px;line-height:1.5}
+.vernier-reference th,.vernier-reference td{padding:10px 14px 10px 0;border-bottom:1px solid #d8dbd8;vertical-align:top}
+.vernier-reference thead th{font-size:11px;color:#687071}
+.vernier-reference tbody th{width:165px;font-family:'IBM Plex Mono',Consolas,monospace;white-space:nowrap}
+.vernier-reference td:last-child{width:190px}
 .method-caveat a{color:#a64c43;text-decoration:underline;text-underline-offset:3px}
 .method-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .method-card{background:#fff;border:1px solid #dfe1dd;border-radius:11px;padding:25px;display:flex;flex-direction:column;min-height:260px}

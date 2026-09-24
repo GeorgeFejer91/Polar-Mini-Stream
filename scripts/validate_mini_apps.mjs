@@ -23,16 +23,20 @@ const apps = [
     productName: "Vernier Stream Mini",
     scanLabel: "Vernier Go Direct",
     streamName: "Vernier-GDX-Mini",
-    height: 326,
+    height: 354,
     frameColors: ["rgb(255, 255, 255)", "rgb(245, 154, 47)", "rgb(0, 124, 122)"],
   },
 ];
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: true, args: ["--allow-file-access-from-files"] });
 try {
   for (const app of apps) {
     await validateNormalWindow(app);
     await validateEarlyRememberedConnection(app);
+    if (app.kind === "vernier") {
+      await validateBluetoothUnavailable(app);
+      await validateBluetoothOff(app);
+    }
     await validateMockWindow(app, true);
     await validateMockWindow(app, false);
   }
@@ -40,11 +44,37 @@ try {
   await browser.close();
 }
 
+async function validateBluetoothUnavailable(app) {
+  const page = await createPage(app, { mockMode: false, lslHealthy: false, scanError: true });
+  await page.goto(appUrl(app));
+  await page.locator("#scan-button").click();
+  await page.locator("#device-scan-status").filter({ hasText: "Bluetooth is unavailable." }).waitFor();
+  assert.match(await page.locator("#device-scan-status").textContent(), /Check Windows Bluetooth settings/);
+  assert.equal(await page.locator("#device-error-details").isVisible(), true);
+  await page.locator("#device-rescan").waitFor({ state: "visible" });
+  await assertNoOverflow(page);
+  await page.close();
+}
+
+async function validateBluetoothOff(app) {
+  const page = await createPage(app, { mockMode: false, lslHealthy: true, radioState: "off" });
+  await page.goto(appUrl(app));
+  await page.locator("#scan-button").click();
+  await page.locator("#device-scan-status").filter({ hasText: "Bluetooth is off." }).waitFor();
+  assert.equal(await page.evaluate(() => window.__miniCalls.includes("scan_devices")), false);
+  await page.locator("#bluetooth-toggle").check();
+  await page.locator("#device-results .discovered-device").waitFor();
+  assert.equal(await page.locator("#bluetooth-state").textContent(), "On");
+  assert.equal(await page.evaluate(() => window.__miniCalls.includes("set_bluetooth_radio")), true);
+  await assertNoOverflow(page);
+  await page.close();
+}
+
 async function validateEarlyRememberedConnection(app) {
   const page = await createPage(app, { mockMode: false, lslHealthy: true, remembered: true });
   await page.goto(appUrl(app));
   await page.locator("#mini-node.connected").waitFor();
-  assert.equal(await page.locator("#node-phase").textContent(), "Live");
+  assert.equal(await page.locator("#node-phase").textContent(), app.kind === "vernier" ? "Connected" : "Live");
   assert.equal(await page.evaluate(() => window.__miniCalls.includes("connect_remembered")), true);
   await page.close();
 }
@@ -64,6 +94,53 @@ async function validateNormalWindow(app) {
   assert.equal(await page.locator("#mock-source").isVisible(), false);
   assert.equal(await page.getByRole("button", { name: "Open mock" }).isVisible(), true);
   await assertNoOverflow(page);
+
+  if (app.kind === "vernier") {
+    assert.equal(await page.locator("#connection-feedback").textContent(), "Ready");
+    await page.locator('#connection-feedback[data-text-fit="fit"]').waitFor();
+    await page.locator("#metrics-button").click();
+    assert.equal(await page.locator("#metric-options input").count(), 4);
+    assert.equal(await page.locator("#metric-count").textContent(), "4/4");
+    await page.locator('#metric-options input[value="rawVernier"]').uncheck();
+    await page.waitForFunction(() => window.__miniSaves.some((save) => save.vernierOutputs?.length === 3));
+    assert.equal(await page.locator("#metric-count").textContent(), "3/4");
+    assert.doesNotMatch(await page.locator("#signal-list").textContent(), /rawVernier/);
+    assert.equal(await page.evaluate(() => window.__miniCalls.includes("disconnect_device")), false);
+    const savedPreferences = await page.evaluate(() => window.__miniSaves.at(-1));
+    const reopened = await createPage(app, { mockMode: false, lslHealthy: true, savedPreferences });
+    await reopened.goto(appUrl(app));
+    await reopened.locator("#metrics-button").click();
+    assert.equal(await reopened.locator('#metric-options input[value="rawVernier"]').isChecked(), false);
+    await reopened.setViewportSize({ width: 320, height: 560 });
+    await assertNoOverflow(reopened);
+    await reopened.screenshot({ path: path.join(outputDirectory, "vernier-mini-outputs.png"), omitBackground: true });
+    await reopened.locator('#metric-options input[value="rawForce"]').uncheck();
+    await reopened.locator('#metric-options input[value="vernierBreathing"]').uncheck();
+    await reopened.locator('#metric-options input[value="signalStatus"]').click();
+    assert.equal(await reopened.locator('#metric-options input[value="signalStatus"]').isChecked(), true);
+    assert.equal(await reopened.locator("#metric-count").textContent(), "1/4");
+    await reopened.evaluate(() => {
+      window.__emitMiniEvent({ kind: "connection", connected: true, deviceName: "Test belt" });
+      window.__emitMiniEvent({ kind: "samples", vernierRows: 20, metricSamples: 20, lsl: "Publishing 1 stream(s)" });
+    });
+    assert.equal(await reopened.locator("#mini-node").evaluate((node) => node.classList.contains("streaming")), false);
+    await reopened.close();
+    await page.locator("#metrics-close").click();
+    assert.equal(await page.locator("#device-select option").count(), 1);
+    await page.locator("#scan-button").click();
+    await page.locator("#device-results .discovered-device").waitFor();
+    assert.match(await page.locator("#device-scan-status").textContent(), /1 Go Direct device found/);
+    await page.waitForFunction(() => getComputedStyle(document.querySelector(".bluetooth-track span")).transform.endsWith("16, 0)"));
+    await page.screenshot({ path: path.join(outputDirectory, "vernier-mini-device-discovery.png"), omitBackground: true });
+    await page.locator("#device-results .discovered-device").click();
+    await page.waitForFunction(() => window.__miniCalls.includes("connect_device"));
+    assert.equal(await page.locator("#device-select option").count(), 2);
+    assert.match(await page.locator("#device-select option").nth(1).textContent(), /GDX-RB/);
+    assert.equal(await page.locator("#connection-feedback").textContent(), "Connected; waiting for fresh LSL samples");
+    await page.evaluate(() => window.__emitMiniEvent({ kind: "samples", vernierRows: 20, metricSamples: 20, lsl: "Publishing 3 LSL streams" }));
+    assert.equal(await page.locator("#connection-feedback").textContent(), "Live: sensor samples reaching LSL");
+    await page.evaluate(() => window.__emitMiniEvent({ kind: "connection", connected: false, message: "Disconnected" }));
+  }
 
   if (app.kind === "polar") {
     const accIds = [
@@ -182,6 +259,7 @@ async function createPage(app, options) {
       const calls = [];
       const saves = [];
       let eventChannel = null;
+      let radioState = options.radioState || "on";
       window.__miniCalls = calls;
       window.__miniSaves = saves;
       window.__emitMiniEvent = (event) => eventChannel?.onmessage?.(event);
@@ -196,6 +274,7 @@ async function createPage(app, options) {
         outputMode: "separateStreams",
         autoConnect: Boolean(options.remembered),
         polarOutputs: ["raw_ecg", "raw_acc", "heart_rate", "rr_interval"],
+        vernierOutputs: ["rawVernier", "rawForce", "vernierBreathing", "signalStatus"],
         lastDevice: options.remembered ? { id: "saved-device", name: `Saved ${app.scanLabel}` } : null,
         ...options.savedPreferences,
       };
@@ -237,6 +316,11 @@ async function createPage(app, options) {
           };
         }
         if (command === "get_autostart") return false;
+        if (command === "get_bluetooth_radio") return { state: radioState };
+        if (command === "set_bluetooth_radio") {
+          radioState = payload.enabled ? "on" : "off";
+          return { state: radioState };
+        }
         if (command === "connect_remembered") {
           eventChannel?.onmessage?.({
             kind: "connection", connected: true, deviceName: `Saved ${app.scanLabel}`,
@@ -278,7 +362,16 @@ async function createPage(app, options) {
           return session;
         }
         if (command === "disconnect_device") return { ...session, connected: false, lsl: "Off" };
-        if (command === "scan_devices") return [];
+        if (command === "scan_devices") {
+          if (options.scanError) throw { code: "BLUETOOTH_UNAVAILABLE", message: "No Bluetooth Low Energy adapter was found.", retryable: true };
+          return app.kind === "vernier"
+            ? [{ id: "gdx-rb-1", name: "GDX-RB 1234", modelCode: "GDX-RB", rssi: -52 }]
+            : [];
+        }
+        if (command === "connect_device") {
+          eventChannel?.onmessage?.({ kind: "connection", connected: true, deviceName: "GDX-RB 1234", message: "Publishing Vernier" });
+          return { ...session, connected: true, deviceId: payload.deviceId, deviceName: "GDX-RB 1234" };
+        }
         return null;
       }
 
