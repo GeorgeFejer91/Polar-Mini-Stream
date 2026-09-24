@@ -15,7 +15,10 @@
     { id: "rawForce", label: "Force only", detail: "Belt tension in newtons, copied from the Vernier Force channel." },
     { id: "vernierBreathing", label: "Breathing waveform", detail: "Our live 0-1 normalization of belt force, not lung volume or breath rate." },
     { id: "signalStatus", label: "Signal status", detail: "Markers for lost and restored Bluetooth signal." },
+    { id: "steps", label: "Steps", detail: "Belt pedometer's cumulative step count, as reported by the device." },
+    { id: "stepRate", label: "Step rate", detail: "Belt pedometer's estimated steps per minute over a 10-second window." },
   ]);
+  const defaultVernierOutputIds = Object.freeze(vernierOutputs.slice(0, 4).map((output) => output.id));
   const state = {
     kind: "vernier",
     productName: "Vernier Stream Mini",
@@ -25,7 +28,7 @@
       outputMode: "separateStreams",
       autoConnect: true,
       polarOutputs: [...directPolarOutputs],
-      vernierOutputs: vernierOutputs.map((output) => output.id),
+      vernierOutputs: [...defaultVernierOutputIds],
       lastDevice: null,
     },
     metrics: [],
@@ -132,7 +135,7 @@
       outputMode: elements["stream-mode-toggle"].checked ? "singleStream" : "separateStreams",
       autoConnect: elements["auto-connect"].checked,
       polarOutputs: [...new Set(state.preferences.polarOutputs || directPolarOutputs)],
-      vernierOutputs: [...new Set(state.preferences.vernierOutputs || vernierOutputs.map((output) => output.id))],
+      vernierOutputs: [...new Set(state.preferences.vernierOutputs || defaultVernierOutputIds)],
     };
   }
 
@@ -230,12 +233,12 @@
       const extraCount = state.metrics.filter((metric) => !metric.direct && selected.has(metric.id)).length;
       elements["metric-count"].textContent = extraCount ? `${extraCount} extra` : "Direct only";
     } else {
-      const selected = new Set(state.preferences.vernierOutputs || vernierOutputs.map((output) => output.id));
+      const selected = new Set(state.preferences.vernierOutputs || defaultVernierOutputIds);
       if (state.preferences.outputMode === "singleStream") chips.push("single sparse LSL");
       for (const output of vernierOutputs) {
         if (selected.has(output.id)) chips.push(output.id);
       }
-      elements["metric-count"].textContent = `${selected.size}/4`;
+      elements["metric-count"].textContent = `${selected.size}/${vernierOutputs.length}`;
     }
     for (const chip of chips) {
       const span = document.createElement("span");
@@ -288,7 +291,7 @@
   }
 
   function hasContinuousOutput() {
-    return state.kind !== "vernier" || (state.preferences.vernierOutputs || vernierOutputs.map((output) => output.id))
+    return state.kind !== "vernier" || (state.preferences.vernierOutputs || defaultVernierOutputIds)
       .some((id) => id !== "signalStatus");
   }
 
@@ -301,7 +304,7 @@
     const options = elements["metric-options"];
     options.replaceChildren();
     if (state.kind === "vernier") {
-      const selected = new Set(state.preferences.vernierOutputs || vernierOutputs.map((output) => output.id));
+      const selected = new Set(state.preferences.vernierOutputs || defaultVernierOutputIds);
       for (const output of vernierOutputs) {
         const label = document.createElement("label");
         const checkbox = document.createElement("input");
@@ -309,7 +312,7 @@
         checkbox.value = output.id;
         checkbox.checked = selected.has(output.id);
         checkbox.addEventListener("change", () => {
-          const current = new Set(state.preferences.vernierOutputs || vernierOutputs.map((candidate) => candidate.id));
+          const current = new Set(state.preferences.vernierOutputs || defaultVernierOutputIds);
           if (!checkbox.checked && current.size === 1) {
             checkbox.checked = true;
             setStatus("Keep at least one output", "Config", true);

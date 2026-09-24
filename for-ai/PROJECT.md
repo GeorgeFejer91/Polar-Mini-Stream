@@ -52,6 +52,10 @@ are retained to preserve installed-user continuity.
   launched concurrently. Installed mock instances produced Polar ECG, HR, RR,
   and ACC samples and Vernier samples over LSL. Physical BLE acquisition,
   respiratory accuracy, and non-Windows behavior remain unverified.
+- A live GDX-RB (firmware 5.3) exposed Force, Respiration Rate, Steps, and
+  Step Rate through Go Direct BLE metadata and samples. It exposed no raw
+  X/Y/Z channels across the 32 standard sensor slots. Hardware internals and
+  undocumented interfaces remain unverified.
 
 Git and runnable checks are the authority for branch, revision, and behavior.
 Do not turn this section into a second status ledger.

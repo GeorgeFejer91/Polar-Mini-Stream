@@ -50,6 +50,8 @@ const VERNIER_BREATHING_OUTLET_KEY: &str = "__vernier_breathing";
 pub const VERNIER_RAW_STREAM_SUFFIX: &str = "rawVernier";
 pub const VERNIER_BREATHING_STREAM_SUFFIX: &str = "vernierBreathing";
 pub const VERNIER_BREATHING_RECORDING_ID: &str = "vernier_breathing";
+pub const VERNIER_STEPS_OUTPUT: &str = "vernier_steps";
+pub const VERNIER_STEP_RATE_OUTPUT: &str = "vernier_step_rate";
 pub const VERNIER_RAW_DIAGNOSTIC_CHANNELS: usize = 7;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -58,6 +60,8 @@ pub struct VernierMiniSelection {
     pub raw_force: bool,
     pub breathing: bool,
     pub signal_status: bool,
+    pub steps: bool,
+    pub step_rate: bool,
 }
 
 impl VernierMiniSelection {
@@ -68,6 +72,8 @@ impl VernierMiniSelection {
                 raw_force: true,
                 breathing: true,
                 signal_status: true,
+                steps: false,
+                step_rate: false,
             };
         };
         let has = |id| ids.iter().any(|selected| selected == id);
@@ -76,6 +82,8 @@ impl VernierMiniSelection {
             raw_force: has("rawForce"),
             breathing: has("vernierBreathing"),
             signal_status: has("signalStatus"),
+            steps: has("steps"),
+            step_rate: has("stepRate"),
         }
     }
 }
@@ -178,6 +186,21 @@ impl VernierStreamSchema {
         self.channels
             .iter()
             .find(|sensor| sensor.is_respiration_force())
+            .map(|sensor| sensor.number)
+    }
+
+    pub fn pedometer_sensor_number(&self, output_id: &str) -> Option<u8> {
+        let (description, unit) = match output_id {
+            VERNIER_STEPS_OUTPUT => ("Steps", "steps"),
+            VERNIER_STEP_RATE_OUTPUT => ("Step Rate", "spm"),
+            _ => return None,
+        };
+        self.channels
+            .iter()
+            .find(|sensor| {
+                sensor.description.trim().eq_ignore_ascii_case(description)
+                    && sensor.unit.trim().eq_ignore_ascii_case(unit)
+            })
             .map(|sensor| sensor.number)
     }
 
@@ -884,6 +907,7 @@ impl OutputRouter {
             let RouterInner {
                 lsl,
                 vernier_schema,
+                config,
                 ..
             } = &mut *inner;
             let schema = vernier_schema
@@ -900,6 +924,22 @@ impl OutputRouter {
                 encoding,
                 sensors,
             );
+            for id in [VERNIER_STEPS_OUTPUT, VERNIER_STEP_RATE_OUTPUT] {
+                if !config.outputs.iter().any(|selected| selected == id) {
+                    continue;
+                }
+                if let Some(number) = schema.pedometer_sensor_number(id)
+                    && let Some(samples) =
+                        sensors.iter().find(|sample| sample.sensor_number == number)
+                {
+                    lsl.push_scalar_series_period_at(
+                        id,
+                        samples.values.iter().map(|value| *value as f32),
+                        host_receive_timestamp_ns,
+                        sample_period_us,
+                    );
+                }
+            }
         }
         #[cfg(feature = "rusty-lsl-backend")]
         let _ = (
@@ -1526,9 +1566,9 @@ mod normalization_tests {
             100_000,
             &[
                 vernier_sensor(
-                    3,
+                    4,
                     "Steps",
-                    "count",
+                    "steps",
                     vernier_gdx_core::NumericMeasurementType::Integer,
                     vernier_gdx_core::SamplingMode::Aperiodic,
                 ),
@@ -1542,14 +1582,14 @@ mod normalization_tests {
                 vernier_sensor(
                     2,
                     "Respiration Rate",
-                    "breaths/min",
+                    "bpm",
                     vernier_gdx_core::NumericMeasurementType::Real,
                     vernier_gdx_core::SamplingMode::Aperiodic,
                 ),
                 vernier_sensor(
-                    4,
+                    5,
                     "Step Rate",
-                    "steps/min",
+                    "spm",
                     vernier_gdx_core::NumericMeasurementType::Real,
                     vernier_gdx_core::SamplingMode::Aperiodic,
                 ),
@@ -1562,9 +1602,17 @@ mod normalization_tests {
                 .iter()
                 .map(|sensor| sensor.number)
                 .collect::<Vec<_>>(),
-            [1, 2, 3, 4]
+            [1, 2, 4, 5]
         );
         assert_eq!(schema.raw_channel_count(), 11);
+        assert_eq!(
+            schema.pedometer_sensor_number(VERNIER_STEPS_OUTPUT),
+            Some(4)
+        );
+        assert_eq!(
+            schema.pedometer_sensor_number(VERNIER_STEP_RATE_OUTPUT),
+            Some(5)
+        );
 
         let mut rows = Vec::new();
         let count = encode_vernier_raw_rows(

@@ -59,6 +59,7 @@ h2{font-size:clamp(33px,4vw,50px);letter-spacing:-.055em;line-height:1.08;margin
 .diagram-note,.method-caveat,.catalog-footnote{font-size:13px;line-height:1.65;color:#697171;margin:16px 0 0}
 .vernier-reference{margin-top:38px;scroll-margin-top:24px}
 .vernier-reference h3{font-size:22px;margin:0 0 10px}
+.vernier-reference h4{font-size:16px;margin:28px 0 8px}
 .vernier-reference p{max-width:950px;color:#596463;font-size:14px;line-height:1.6;margin:0 0 16px}
 .vernier-reference a{color:#237f79;text-decoration:underline;text-underline-offset:3px}
 .reference-table-scroll{max-width:100%;overflow-x:auto;margin:18px 0}

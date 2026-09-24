@@ -3,7 +3,7 @@
 
 use std::{env, path::PathBuf, thread, time::Duration};
 
-use polar_h10_output::{OutputConfig, OutputRouter};
+use polar_h10_output::{MiniCombinedOutput, OutputConfig, OutputRouter};
 use vernier_gdx_core::{
     NumericMeasurementType, SampleEncoding, SamplingMode, SensorInfo, SensorSamples,
 };
@@ -42,11 +42,15 @@ async fn main() -> Result<(), String> {
         .nth(1)
         .map(PathBuf::from)
         .ok_or_else(|| "usage: verify_vernier_lsl <path-to-liblsl>".to_string())?;
+    if env::args().any(|arg| arg == "--single") {
+        return verify_single(path);
+    }
     let router = OutputRouter::with_bundled_lsl(Some(path));
     router
         .configure(OutputConfig {
             stream_name: STREAM_BASE.into(),
             lsl_enabled: true,
+            outputs: vec!["vernier_steps".into(), "vernier_step_rate".into()],
             ..OutputConfig::default()
         })
         .await?;
@@ -71,18 +75,18 @@ async fn main() -> Result<(), String> {
                 SamplingMode::Aperiodic,
             ),
             sensor(
-                3,
+                4,
                 103,
                 "Steps",
-                "count",
+                "steps",
                 NumericMeasurementType::Integer,
                 SamplingMode::Aperiodic,
             ),
             sensor(
-                4,
+                5,
                 104,
                 "Step Rate",
-                "steps/min",
+                "spm",
                 NumericMeasurementType::Real,
                 SamplingMode::Aperiodic,
             ),
@@ -136,12 +140,98 @@ async fn main() -> Result<(), String> {
                 0,
                 600,
                 SampleEncoding::Integer32,
-                &[SensorSamples {
-                    sensor_number: 3,
-                    values: vec![2_000_000_001.0],
-                }],
+                &[
+                    SensorSamples {
+                        sensor_number: 4,
+                        values: vec![12.0],
+                    },
+                    SensorSamples {
+                        sensor_number: 5,
+                        values: vec![72.0],
+                    },
+                ],
             );
             sequence = sequence.saturating_add(1);
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    thread::sleep(Duration::from_secs(2));
+    println!("POLAR_VERNIER_LSL_COMPLETE");
+    Ok(())
+}
+
+fn verify_single(path: PathBuf) -> Result<(), String> {
+    let output = MiniCombinedOutput::vernier(
+        Some(path),
+        "polar_vernier_acceptance_single",
+        &["steps".into(), "stepRate".into()],
+    )?;
+    output.configure_vernier_streams(
+        "GDX-RB",
+        100_000,
+        &[
+            sensor(
+                1,
+                101,
+                "Force",
+                "N",
+                NumericMeasurementType::Real,
+                SamplingMode::Periodic,
+            ),
+            sensor(
+                4,
+                103,
+                "Steps",
+                "steps",
+                NumericMeasurementType::Integer,
+                SamplingMode::Aperiodic,
+            ),
+            sensor(
+                5,
+                104,
+                "Step Rate",
+                "spm",
+                NumericMeasurementType::Real,
+                SamplingMode::Aperiodic,
+            ),
+        ],
+    )?;
+    println!("POLAR_VERNIER_LSL_READY {}", output.health());
+    thread::sleep(Duration::from_secs(2));
+    for index in 0..40_u64 {
+        output.publish_vernier_raw(
+            1_000_000_000 + index * 100_000_000,
+            100_000,
+            index,
+            0,
+            0,
+            500,
+            SampleEncoding::Float32,
+            &[SensorSamples {
+                sensor_number: 1,
+                values: vec![12.0],
+            }],
+        );
+        if index == 5 {
+            output.publish_vernier_raw(
+                1_000_000_000 + index * 100_000_000,
+                100_000,
+                index,
+                0,
+                0,
+                500,
+                SampleEncoding::Integer32,
+                &[
+                    SensorSamples {
+                        sensor_number: 4,
+                        values: vec![12.0],
+                    },
+                    SensorSamples {
+                        sensor_number: 5,
+                        values: vec![72.0],
+                    },
+                ],
+            );
         }
         thread::sleep(Duration::from_millis(100));
     }

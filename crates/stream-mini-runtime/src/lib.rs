@@ -37,8 +37,14 @@ const PREFERENCE_SCHEMA: &str = "polar.stream.mini.preferences.v1";
 const LIVE_RECONFIGURED_MESSAGE: &str = "Saved and applied to the active LSL outlets.";
 const POLAR_DIRECT_OUTPUTS: &[&str] = &["raw_ecg", "raw_acc", "heart_rate", "rr_interval"];
 const VERNIER_FORCE_OUTPUT: &str = "raw_force";
-const VERNIER_OUTPUT_IDS: [&str; 4] =
-    ["rawVernier", "rawForce", "vernierBreathing", "signalStatus"];
+const VERNIER_OUTPUT_IDS: [&str; 6] = [
+    "rawVernier",
+    "rawForce",
+    "vernierBreathing",
+    "signalStatus",
+    "steps",
+    "stepRate",
+];
 const VERNIER_PERIOD_US: u32 = 50_000;
 const ACC_SAMPLE_PERIOD_NS: u64 = 1_000_000_000 / 200;
 const EVENT_INTERVAL: Duration = Duration::from_millis(250);
@@ -1449,11 +1455,17 @@ fn mini_output_config(kind: MiniAppKind, snapshot: &MiniPreferencesSnapshot) -> 
         outputs: match kind {
             MiniAppKind::Polar => snapshot.polar_outputs.clone(),
             MiniAppKind::Vernier => {
+                let mut outputs = Vec::new();
                 if vernier.raw_force {
-                    vec![VERNIER_FORCE_OUTPUT.into()]
-                } else {
-                    Vec::new()
+                    outputs.push(VERNIER_FORCE_OUTPUT.into());
                 }
+                if vernier.steps {
+                    outputs.push(polar_h10_output::VERNIER_STEPS_OUTPUT.into());
+                }
+                if vernier.step_rate {
+                    outputs.push(polar_h10_output::VERNIER_STEP_RATE_OUTPUT.into());
+                }
+                outputs
             }
         },
         vernier_outputs: (kind == MiniAppKind::Vernier).then(|| snapshot.vernier_outputs.clone()),
@@ -1555,7 +1567,7 @@ async fn disconnect_active(state: &MiniAppState) -> CommandResult<()> {
 }
 
 fn mock_vernier_sensors() -> Vec<SensorInfo> {
-    vec![SensorInfo {
+    let force = SensorInfo {
         number: 1,
         sensor_id: 1,
         numeric_type: NumericMeasurementType::Real,
@@ -1570,7 +1582,21 @@ fn mock_vernier_sensors() -> Vec<SensorInfo> {
         typical_period_us: VERNIER_PERIOD_US,
         period_granularity_us: 1_000,
         mutual_exclusion_mask: 0,
-    }]
+    };
+    let mut steps = force.clone();
+    steps.number = 4;
+    steps.sensor_id = 4;
+    steps.numeric_type = NumericMeasurementType::Integer;
+    steps.sampling_mode = SamplingMode::Aperiodic;
+    steps.description = "Steps".into();
+    steps.unit = "steps".into();
+    let mut step_rate = steps.clone();
+    step_rate.number = 5;
+    step_rate.sensor_id = 5;
+    step_rate.numeric_type = NumericMeasurementType::Real;
+    step_rate.description = "Step Rate".into();
+    step_rate.unit = "spm".into();
+    vec![force, steps, step_rate]
 }
 
 async fn run_polar_mock(
@@ -1692,10 +1718,20 @@ async fn run_vernier_mock(
         let force_values = (0..SAMPLES_PER_TICK)
             .map(|offset| mock_force_sample(sample_index.saturating_add(offset)))
             .collect::<Vec<_>>();
-        let sensors = [SensorSamples {
+        let mut sensors = vec![SensorSamples {
             sensor_number: 1,
             values: force_values.clone(),
         }];
+        if sample_index.is_multiple_of(200) {
+            sensors.push(SensorSamples {
+                sensor_number: 4,
+                values: vec![12.0 + (sample_index / 200) as f64 * 12.0],
+            });
+            sensors.push(SensorSamples {
+                sensor_number: 5,
+                values: vec![72.0],
+            });
+        }
         output.publish_vernier_raw(VernierRawBatch {
             host_receive_timestamp_ns,
             sample_period_us: VERNIER_PERIOD_US,
@@ -2399,7 +2435,7 @@ fn polar_metric_options() -> Vec<MiniMetricOption> {
     METRIC_CATALOG
         .iter()
         .copied()
-        .filter(|metric| metric.id != VERNIER_FORCE_OUTPUT)
+        .filter(|metric| metric.id != VERNIER_FORCE_OUTPUT && metric.category != "Pedometer")
         .filter(|metric| {
             POLAR_DIRECT_OUTPUTS.contains(&metric.id)
                 || metric_selection_tier(metric.id) == MetricSelectionTier::Release
@@ -2422,6 +2458,9 @@ fn normalize_polar_outputs(input: Option<Vec<String>>) -> Vec<String> {
         let Some(metric) = MetricDefinition::for_id(&id) else {
             continue;
         };
+        if metric.category == "Pedometer" {
+            continue;
+        }
         if metric_selection_tier(metric.id) == MetricSelectionTier::Release
             || POLAR_MINI_ONLY_IDS.contains(&metric.id)
             || matches!(metric.category, "Breathing" | "Breathing dynamics")
@@ -2443,7 +2482,10 @@ fn normalize_polar_outputs(input: Option<Vec<String>>) -> Vec<String> {
 }
 
 fn default_vernier_outputs() -> Vec<String> {
-    VERNIER_OUTPUT_IDS.iter().map(|id| (*id).into()).collect()
+    VERNIER_OUTPUT_IDS[..4]
+        .iter()
+        .map(|id| (*id).into())
+        .collect()
 }
 
 fn validate_vernier_outputs(input: Vec<String>) -> Result<Vec<String>, String> {
@@ -2527,6 +2569,11 @@ mod tests {
     #[test]
     fn acc_breathing_outputs_are_mini_selectable_and_survive_preferences() {
         let options = polar_metric_options();
+        assert!(!options.iter().any(|metric| metric.category == "Pedometer"));
+        assert_eq!(
+            normalize_polar_outputs(Some(vec!["vernier_steps".into()])).len(),
+            POLAR_DIRECT_OUTPUTS.len()
+        );
         let ids = METRIC_CATALOG
             .iter()
             .filter(|metric| matches!(metric.category, "Breathing" | "Breathing dynamics"))
@@ -2814,12 +2861,17 @@ mod tests {
         assert!(validate_vernier_outputs(Vec::new()).is_err());
         assert!(validate_vernier_outputs(vec!["rawForce".into(), "rawForce".into()]).is_err());
         assert!(validate_vernier_outputs(vec!["rawAcceleration".into()]).is_err());
+        assert_eq!(default_vernier_outputs().len(), 4);
+        assert_eq!(
+            validate_vernier_outputs(vec!["stepRate".into(), "steps".into()]).unwrap(),
+            vec!["steps", "stepRate"]
+        );
     }
 
     #[test]
     fn mock_vernier_contract_uses_the_fixed_fast_force_channel() {
         let sensors = mock_vernier_sensors();
-        assert_eq!(sensors.len(), 1);
+        assert_eq!(sensors.len(), 3);
         assert_eq!(sensors[0].number, 1);
         assert!(sensors[0].is_respiration_force());
         assert_eq!(sensors[0].minimum_period_us, VERNIER_PERIOD_US);

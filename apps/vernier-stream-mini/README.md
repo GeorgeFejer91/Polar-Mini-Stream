@@ -5,12 +5,16 @@ intentionally a compact transparent-shell window where the detached Polar
 Stream node card is the visible program outline, not the main controller
 workspace.
 
-- Default outputs: all four independently selectable LSL outputs, `rawVernier`
+- Default outputs: four independently selectable LSL outputs, `rawVernier`
   (every advertised numeric belt channel plus recording diagnostics),
   `rawForce` (unfiltered Force compatibility copy), `vernierBreathing` (our
   relative 0-1 force normalization), and `signalStatus` (loss/restoration
   markers). At least one output remains selected. Choices persist and replace
   active outlets without restarting Bluetooth.
+- Optional `steps` and `stepRate` checkboxes forward the belt's pedometer count
+  and cadence as their own LSL streams, or as columns in Single mode. They
+  publish only when those device channels update. The Mock source includes
+  synthetic pedometer updates every 10 seconds.
 - The documented GDX-RB device channels are Force, Respiration Rate, Steps,
   and Step Rate. Vernier does not document an exposed raw accelerometer channel
   on this belt. Its Force transducer measures tension in a short strap connected

@@ -49,7 +49,7 @@ to rediscover. Source and tests remain the authority for implementation facts.
 ## D-0004 — Vernier outputs are selected independently of acquisition
 
 - Date: 2026-09-24
-- Status: Accepted
+- Status: Superseded
 - Context: Users need to include any combination of the belt's full channel row,
   Force-only compatibility signal, app-derived breathing waveform, and
   signal-continuity markers without confusing these with separate sensors.
@@ -61,7 +61,25 @@ to rediscover. Source and tests remain the authority for implementation facts.
 - Consequences: Existing preferences default to all four outputs. Outlet
   topology can change while the physical acquisition session stays alive;
   clients must rediscover an outlet whose channel contract changes.
-- Supersedes: None
+- Supersedes: None; superseded by D-0005 for the selectable output set.
+
+## D-0005 — Expose the two device pedometer variables separately
+
+- Date: 2026-09-24
+- Status: Accepted
+- Context: The GDX-RB's Go Direct metadata and live samples expose Steps and
+  Step Rate, while raw pedometer X/Y/Z axes are not exposed. Users need to
+  select and identify these two device variables without selecting the full
+  raw channel row.
+- Decision: Add optional `steps` and `stepRate` selections to Vernier Mini.
+  Preserve the four existing default selections. Forward only metadata-matched
+  device samples; include either separate outlets or sparse Single-mode columns.
+  Document all GDX-RB channel and recording variable names on Pages.
+- Consequences: Existing preferences keep their four selected outputs.
+  Enabling either pedometer stream changes LSL outlet or column topology, so
+  clients must rediscover the new contract.
+- Supersedes: D-0004's four-output selection set; its acquisition and
+  live-reconfiguration decisions remain in force.
 
 ## Record format
 

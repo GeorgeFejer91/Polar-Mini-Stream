@@ -1,7 +1,7 @@
 {
   "name": "polar-mini-stream",
   "private": true,
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "UI validation and Tauri packaging for Polar and Vernier mini streamers",
   "type": "module",
   "scripts": {

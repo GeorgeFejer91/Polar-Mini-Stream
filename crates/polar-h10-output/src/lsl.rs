@@ -1182,7 +1182,11 @@ impl MiniCombinedOutput {
         let selection = inner
             .vernier_selection
             .expect("Vernier selection exists with schema");
-        if !selection.raw_vernier && !selection.raw_force {
+        if !selection.raw_vernier
+            && !selection.raw_force
+            && !selection.steps
+            && !selection.step_rate
+        {
             return;
         }
         let raw_channels = if selection.raw_vernier {
@@ -1190,9 +1194,27 @@ impl MiniCombinedOutput {
         } else {
             0
         };
-        let force = schema
-            .force_sensor_number()
-            .and_then(|number| sensors.iter().find(|sensor| sensor.sensor_number == number));
+        let force = selection
+            .raw_force
+            .then(|| {
+                schema
+                    .force_sensor_number()
+                    .and_then(|number| sensors.iter().find(|sensor| sensor.sensor_number == number))
+            })
+            .flatten();
+        let pedometer = |id| {
+            schema
+                .pedometer_sensor_number(id)
+                .and_then(|number| sensors.iter().find(|sensor| sensor.sensor_number == number))
+        };
+        let steps = selection
+            .steps
+            .then(|| pedometer(crate::VERNIER_STEPS_OUTPUT))
+            .flatten();
+        let step_rate = selection
+            .step_rate
+            .then(|| pedometer(crate::VERNIER_STEP_RATE_OUTPUT))
+            .flatten();
         let row_count = if selection.raw_vernier {
             encode_vernier_raw_rows(
                 &mut inner.lsl.scratch_double,
@@ -1207,7 +1229,12 @@ impl MiniCombinedOutput {
                 sensors,
             )
         } else {
-            force.map_or(0, |samples| samples.values.len())
+            [force, steps, step_rate]
+                .into_iter()
+                .flatten()
+                .map(|samples| samples.values.len())
+                .max()
+                .unwrap_or(0)
         };
         if row_count == 0
             || (selection.raw_vernier && inner.lsl.scratch_double.len() != row_count * raw_channels)
@@ -1225,6 +1252,22 @@ impl MiniCombinedOutput {
             if selection.raw_force {
                 rows.push(
                     force
+                        .and_then(|samples| samples.values.get(row))
+                        .copied()
+                        .unwrap_or(f64::NAN),
+                );
+            }
+            if selection.steps {
+                rows.push(
+                    steps
+                        .and_then(|samples| samples.values.get(row))
+                        .copied()
+                        .unwrap_or(f64::NAN),
+                );
+            }
+            if selection.step_rate {
+                rows.push(
+                    step_rate
                         .and_then(|samples| samples.values.get(row))
                         .copied()
                         .unwrap_or(f64::NAN),
@@ -1268,7 +1311,9 @@ impl MiniCombinedOutput {
             schema.raw_channel_count()
         } else {
             0
-        } + usize::from(selection.raw_force);
+        } + usize::from(selection.raw_force)
+            + usize::from(selection.steps)
+            + usize::from(selection.step_rate);
         let channels = vernier_combined_channel_count(schema, selection);
         let mut rows = Vec::with_capacity(values_01.len().saturating_mul(channels));
         for value in values_01 {
@@ -1365,6 +1410,8 @@ fn vernier_combined_channel_count(
     } else {
         0
     }) + usize::from(selection.raw_force)
+        + usize::from(selection.steps)
+        + usize::from(selection.step_rate)
         + usize::from(selection.breathing)
         + usize::from(selection.signal_status)
 }
@@ -1373,7 +1420,7 @@ fn vernier_combined_channels(
     schema: &VernierStreamSchema,
     selection: VernierMiniSelection,
 ) -> Vec<MiniCombinedChannel> {
-    let mut channels = Vec::with_capacity(schema.raw_channel_count() + 3);
+    let mut channels = Vec::with_capacity(schema.raw_channel_count() + 5);
     if selection.raw_vernier {
         for sensor in schema.channels() {
             channels.push(MiniCombinedChannel::new(
@@ -1430,6 +1477,22 @@ fn vernier_combined_channels(
             "N",
             "RespirationForce",
             "Force channel compatibility copy",
+        ));
+    }
+    if selection.steps {
+        channels.push(MiniCombinedChannel::new(
+            "steps",
+            "steps",
+            "StepCount",
+            "Device-reported cumulative step count",
+        ));
+    }
+    if selection.step_rate {
+        channels.push(MiniCombinedChannel::new(
+            "stepRate",
+            "spm",
+            "StepRate",
+            "Device-reported steps per minute",
         ));
     }
     if selection.breathing {
@@ -1552,11 +1615,12 @@ fn append_stream_metadata(
     if description.is_null() {
         return !processing_required;
     }
-    let (manufacturer, model) = if spec.id == "raw_force" {
-        ("Vernier", "Go Direct")
-    } else {
-        ("Polar", "H10")
-    };
+    let (manufacturer, model) =
+        if matches!(spec.id, "raw_force" | "vernier_steps" | "vernier_step_rate") {
+            ("Vernier", "Go Direct")
+        } else {
+            ("Polar", "H10")
+        };
     append_value(
         append_child_value,
         description,

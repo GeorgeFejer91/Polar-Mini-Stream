@@ -186,6 +186,16 @@ const FORCE_CITATIONS: &[MetricCitation] = &[
     ),
     citation(BREATH_ACC, BREATH_ACC_URL),
 ];
+const PEDOMETER_CITATIONS: &[MetricCitation] = &[
+    citation(
+        "Vernier Respiration Belt product specifications",
+        "https://www.vernier.com/product/go-direct-respiration-belt/",
+    ),
+    citation(
+        "Vernier GDX-RB Python channel guide",
+        "https://www.vernier.com/til/19229",
+    ),
+];
 const BREATHING_DYNAMICS_CITATIONS: &[MetricCitation] = &[
     citation(
         BREATH_COMPLEXITY,
@@ -239,6 +249,8 @@ fn formula_for(id: &str) -> &'static str {
         "raw_ecg" => "y(t) = ECG(t) [µV]; x-axis = sensor time t",
         "raw_acc" => "a(t) = [x(t), y(t), z(t)] [mg]",
         "raw_force" => "F(t) = Go Direct force measurement [N]",
+        "vernier_steps" => "Steps(t) = device-reported cumulative step count",
+        "vernier_step_rate" => "StepRate(t) = device-reported steps per minute",
         "acc_magnitude" => "|a(t)| = √(x(t)² + y(t)² + z(t)²) / 1000",
         "ecg_mean" => "μECG(t) = (1/N) Σ ECGᵢ over the preceding 5 s",
         "ecg_rms" => "RMS(t) = √[(1/N) Σ ECGᵢ²] over the preceding 5 s",
@@ -356,6 +368,7 @@ fn formula_template_for(id: &str) -> Option<&'static str> {
 fn formula_source_for(id: &str) -> &'static str {
     match id {
         "raw_force" => "Vernier force",
+        "vernier_steps" | "vernier_step_rate" => "Vernier pedometer",
         "raw_acc"
         | "acc_magnitude"
         | "acc_breathing_magnitude"
@@ -460,6 +473,7 @@ pub fn metric_citations(metric: MetricDefinition) -> Vec<MetricCitation> {
         "Breathing dynamics" => BREATHING_DYNAMICS_CITATIONS,
         "Excitation (experimental)" => EXCITATION_CITATIONS,
         "Raw signals" if metric.id == "raw_force" => FORCE_CITATIONS,
+        "Pedometer" => PEDOMETER_CITATIONS,
         "Raw signals" if metric.id == "raw_acc" || metric.id == "acc_magnitude" => {
             BREATHING_CITATIONS
         }
@@ -534,6 +548,42 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         1,
         0.0,
         "RespirationForce"
+    ),
+    metric!(
+        "vernier_steps",
+        "steps",
+        "Steps",
+        "GDX-RB device-reported cumulative steps · updates on device schedule",
+        "steps",
+        "Pedometer",
+        "The belt's built-in pedometer reports a cumulative step count. The count may span earlier activity because this app does not zero the channel. This is a device-derived count, not raw acceleration.",
+        "device-reported count",
+        "Vernier GDX-RB user manual",
+        "https://www.vernier.com/manuals/GDX-RB",
+        "vernier respiration belt pedometer walking steps count",
+        false,
+        false,
+        1,
+        0.0,
+        "StepCount"
+    ),
+    metric!(
+        "vernier_step_rate",
+        "stepRate",
+        "Step rate",
+        "GDX-RB device-reported cadence · 10 s window and update interval",
+        "spm",
+        "Pedometer",
+        "The belt reports estimated steps per minute from its built-in pedometer. Vernier specifies a 10-second calculation window and a 10-second update interval. It is a derived rate, not raw acceleration.",
+        "device-derived rate",
+        "Vernier GDX-RB user manual",
+        "https://www.vernier.com/manuals/GDX-RB",
+        "vernier respiration belt pedometer cadence step rate steps per minute",
+        false,
+        false,
+        1,
+        0.0,
+        "StepRate"
     ),
     metric!(
         "acc_magnitude",
