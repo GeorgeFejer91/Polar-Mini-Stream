@@ -1,8 +1,8 @@
 use std::{env, fs, path::PathBuf};
 
 use polar_h10_metrics::{
-    METRIC_CATALOG, MetricCitation, MetricDefinition, MetricSelectionTier, POLAR_MINI_ONLY_IDS,
-    metric_citations, metric_formula_definition, metric_selection_tier,
+    METRIC_CATALOG, MetricCitation, MetricDefinition, MetricSelectionTier, metric_citations,
+    metric_formula_definition, metric_selection_tier,
 };
 use serde::Serialize;
 
@@ -19,14 +19,15 @@ struct BrowserMetric {
 }
 
 fn main() {
-    let output = env::args_os()
-        .nth(1)
+    let mut args = env::args_os().skip(1);
+    let output = args
+        .next()
         .map(PathBuf::from)
-        .expect("usage: export_catalog <output.js>");
+        .expect("usage: export_catalog <output.js> [--check]");
+    let check = args.next().is_some_and(|arg| arg == "--check");
     let catalog: Vec<_> = METRIC_CATALOG
         .iter()
         .copied()
-        .filter(|metric| !POLAR_MINI_ONLY_IDS.contains(&metric.id))
         .map(|metric| {
             let formula = metric_formula_definition(metric.id);
             BrowserMetric {
@@ -43,5 +44,13 @@ fn main() {
     let rendered = format!(
         "// Generated from polar-h10-metrics; do not edit by hand.\nwindow.PolarMetricCatalog = Object.freeze({json});\n"
     );
-    fs::write(output, rendered).expect("write browser metric catalog");
+    if check {
+        assert_eq!(
+            fs::read_to_string(&output).expect("read checked-in metric catalog"),
+            rendered,
+            "metric catalog is stale; run cargo run -p polar-h10-metrics --example export_catalog -- docs/metric-catalog.js"
+        );
+    } else {
+        fs::write(output, rendered).expect("write browser metric catalog");
+    }
 }

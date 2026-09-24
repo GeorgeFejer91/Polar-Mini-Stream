@@ -12,8 +12,8 @@ keep derived breathing outputs explicitly identified and quality gated.
 
 ## Non-goals
 
-- No large multi-device controller, browser demo, or GitHub Pages mirror in this
-  repository.
+- No large multi-device controller or browser demo in this repository. The
+  GitHub Pages site documents these two applets and their metrics.
 - No second protocol decoder, metric catalog, or output implementation in the
   WebView.
 - No physiological accuracy claim without an independent reference recording.
@@ -33,6 +33,8 @@ window, BLE session, preferences, executable, and installer. Shared
 the other crates own Polar and Vernier protocol, timing, metrics, and output
 contracts. Raw sensor publication precedes derived metrics and UI delivery.
 JavaScript is presentation and control, never the authoritative data path.
+The Pages metric catalog is generated from Rust definitions; the site documents
+the separate Vernier force-to-waveform path alongside the Polar catalog.
 
 The standalone apps came from `GeorgeFejer91/Polar-Stream` on 2026-09-24.
 That older repository remains separate; this repository is the development

@@ -28,6 +28,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - run: cargo fmt --all -- --check
+      - name: Check generated metric documentation
+        if: runner.os == 'Windows'
+        run: cargo run -p polar-h10-metrics --example export_catalog -- docs/metric-catalog.js --check
       - name: Check project context
         if: runner.os == 'Windows'
         run: powershell -NoProfile -ExecutionPolicy Bypass -File for-ai/scripts/check-context.ps1 -ProjectRoot .
@@ -48,3 +51,4 @@ jobs:
       - run: node --check apps/polar-stream-mini/ui/app.js
       - run: node --check apps/vernier-stream-mini/ui/app.js
       - run: npm run validate:minis
+      - run: npm run validate:docs

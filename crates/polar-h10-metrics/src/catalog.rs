@@ -118,7 +118,7 @@ const BREATH_ACC: &str = "Schipper et al. (2021)";
 const BREATH_ACC_URL: &str = "https://pubmed.ncbi.nlm.nih.gov/33739305/";
 const PHAN_SOURCE: &str = "Phan, Mobile Phone Breathing Detection source";
 const PHAN_SOURCE_URL: &str = "https://github.com/lynphan/Mobile-Phone-Breathing-Detection/blob/main/BreathingDetection/Assets/MobilePhoneBreathingDetection.cs";
-const FLOWBORNE_SOURCE: &str = "Viscereality BreathDetection.cs (MesmerPrism)";
+const FLOWBORNE_SOURCE: &str = "Viscereality BreathDetection.cs (source access required)";
 const FLOWBORNE_SOURCE_URL: &str = "https://github.com/MesmerPrism/Viscereality/blob/927beb17a1d6f90b5f1b3efdcd3d4eab656dfb71/Viscereality/Assets/Scripts/Breathing/BreathDetection.cs";
 const BREATH_COMPLEXITY: &str = "Bará et al. (2024)";
 const BREATH_COMPLEXITY_URL: &str = "https://doi.org/10.1016/j.bbe.2024.04.004";
@@ -355,6 +355,7 @@ fn formula_template_for(id: &str) -> Option<&'static str> {
 
 fn formula_source_for(id: &str) -> &'static str {
     match id {
+        "raw_force" => "Vernier force",
         "raw_acc"
         | "acc_magnitude"
         | "acc_breathing_magnitude"
@@ -416,6 +417,41 @@ pub fn metric_formula_definition(id: &str) -> MetricFormulaDefinition {
 }
 
 pub fn metric_citations(metric: MetricDefinition) -> Vec<MetricCitation> {
+    let method_origin = if metric.id.ends_with("_sampen") {
+        Some(citation(
+            "Richman & Moorman, sample entropy (2000)",
+            "https://pubmed.ncbi.nlm.nih.gov/10843903/",
+        ))
+    } else if metric.id.ends_with("_mse") {
+        Some(citation(
+            "Costa, Goldberger & Peng, multiscale entropy (2005)",
+            "https://pubmed.ncbi.nlm.nih.gov/15783351/",
+        ))
+    } else if metric.id.ends_with("_lzc") {
+        Some(citation(
+            "Lempel & Ziv, sequence complexity (1976)",
+            "https://doi.org/10.1109/TIT.1976.1055501",
+        ))
+    } else {
+        None
+    };
+    if let Some(origin) = method_origin {
+        return vec![
+            origin,
+            citation(metric.citation_label, metric.citation_url),
+            citation(BREATH_ACC, BREATH_ACC_URL),
+        ];
+    }
+    if matches!(metric.id, "flowborne_phase" | "flowborne_motion_score") {
+        return vec![
+            citation(FLOWBORNE_SOURCE, FLOWBORNE_SOURCE_URL),
+            citation(
+                "Fejer et al., Viscereality (2025)",
+                "https://www.hsbi.de/publikationsserver/download/6574/6575/muc-2025-mci-174.pdf",
+            ),
+            citation(BREATH_ACC, BREATH_ACC_URL),
+        ];
+    }
     let family = match metric.category {
         "ECG features" => ECG_CITATIONS,
         "Heart rate" | "HRV & relaxation" => HRV_CITATIONS,
