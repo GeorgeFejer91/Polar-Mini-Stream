@@ -46,10 +46,14 @@ task touches.
    changed.
 7. Report evidence, limitations, commit/remote state, and any blocker.
 
-## New-project state
+## Product route
 
 Created: 2026-09-24
 Repository: https://github.com/GeorgeFejer91/Polar-Mini-Stream
 Visibility at initialization: public
 
-No product stack or output tree is implied by this bootstrap.
+The two Tauri applications in `apps/` are the product. Rust protocol, metrics,
+timing, and LSL code live in `crates/`; `stream-mini-runtime` is their shared
+one-session adapter. Use `PROJECT.md` for the ownership boundary and
+`VERIFICATION.md` for commands. The former large Polar Stream controller and
+browser demo remain in their separate repository.

@@ -16,6 +16,22 @@ to rediscover. Source and tests remain the authority for implementation facts.
   product task must still choose the smallest suitable output structure.
 - Supersedes: None
 
+## D-0002 — Standalone mini streamers own this repository
+
+- Date: 2026-09-24
+- Status: Accepted
+- Context: The user chose both mini streamers as the primary project in a new
+  public repository, while the older Polar Stream checkout contains the large
+  controller, browser demo, and extensive uncommitted work.
+- Decision: Copy the two mini apps and their existing shared Rust crates into
+  `Polar-Mini-Stream` on `main`, preserving app bundle IDs, metric IDs, LSL
+  names, and app-local preferences. Leave the larger controller and browser
+  surfaces in the original repository.
+- Consequences: New work can prioritize the independent mini products. Shared
+  crates initially retain some controller-era code to avoid an unsafe protocol
+  or metric rewrite during extraction; prune only with separate tests.
+- Supersedes: None
+
 ## Record format
 
 For later decisions, add one compact entry with:
