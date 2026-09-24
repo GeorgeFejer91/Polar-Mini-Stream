@@ -50,8 +50,13 @@ are retained to preserve installed-user continuity.
   2026-09-24. Both x64 NSIS installers built from this checkout. Mock processes
   launched from the resulting binaries and advertised distinct Polar and
   Vernier LSL outlets concurrently. These checks do not establish physical
-  BLE, respiratory accuracy, non-Windows runtime, or installed-package
+  H10 BLE, respiratory accuracy, non-Windows runtime, or installed-package
   behavior for this repository's artifacts.
+- A live GDX-RB on firmware 5.3 returned Go Direct available mask `0x00000036`:
+  Force (slot 1), Respiration Rate (2), Steps (4), and Step Rate (5). Read-only
+  metadata queries of all 32 slots found no X/Y/Z acceleration channels.
+  Whether the belt contains a three-axis accelerometer or exposes one through
+  an undocumented interface remains unverified.
 
 Git and runnable checks are the authority for branch, revision, and behavior.
 Do not turn this section into a second status ledger.

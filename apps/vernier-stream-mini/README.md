@@ -24,6 +24,9 @@ settings, and process.
   PID-suffixed stream name and settings are session-only.
 - Without a connected Go Direct sensor, the regular app does not publish
   invented measurements; use the clearly labeled Mock window for synthetic data.
+- To inspect a nearby GDX-RB's advertised and unadvertised Go Direct sensor slots,
+  run `cargo run -p vernier-gdx-input --example gdx_slots --locked` while the belt
+  is powered on and available for a BLE connection.
 - Live state: after samples are flowing through a healthy LSL outlet, the three
   outline rings emit a restrained breathing beacon; connected-only state does
   not animate.
