@@ -30,8 +30,8 @@ physical validation against a respiratory reference remains open.
 Requirements: Rust 1.88 or newer, Node.js/npm, and the platform tooling for
 Tauri v2. The checked-in Windows resources support the Windows host build.
 For another OS, stage the pinned liblsl runtime with
-`scripts/prepare_lsl.py` into each app's `resources/` directory before
-packaging.
+`scripts/prepare_lsl.py` into each app's `resources/` directory (use
+`--output apps/vernier-stream-mini/resources` for Vernier) before packaging.
 
 ```powershell
 npm ci

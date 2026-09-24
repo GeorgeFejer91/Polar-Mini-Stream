@@ -28,7 +28,6 @@ Higher-priority instructions and the current user request always win.
 | --- | --- | --- |
 | Repository task involving Tauri/Rust or packaging | `tauri-rust-developer` | Required when installed. If unavailable, say so and use `for-ai/PROJECT.md` plus `for-ai/VERIFICATION.md` as the fallback. |
 | Polar H10 BLE/ECG integration | `polar-h10-vr` | Conditional for the H10 device path; apply only the non-VR guidance relevant to BLE/raw ECG. |
-| Mini HTML/CSS changes | `uncodixfy` | Conditional for frontend edits. |
 
 ## Supply-chain rule
 

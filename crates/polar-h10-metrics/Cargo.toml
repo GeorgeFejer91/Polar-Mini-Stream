@@ -1,0 +1,15 @@
+[package]
+name = "polar-h10-metrics"
+description = "Modular real-time physiological metric processors for Polar Stream"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+polar-h10-core = { path = "../polar-h10-core" }
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

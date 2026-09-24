@@ -43,8 +43,13 @@ are retained to preserve installed-user continuity.
 
 - Fresh Git repository initialized on 2026-09-24.
 - AI control plane created and mechanically checked.
-- Product extraction is being verified in this repository; do not infer
-  physical BLE, cross-platform, or installer readiness from source checks.
+- The extracted workspace passed Windows host `cargo test --workspace
+  --locked`, Clippy, formatting, JS syntax, and Mini Playwright validation on
+  2026-09-24. Both x64 NSIS installers built from this checkout. Mock processes
+  launched from the resulting binaries and advertised distinct Polar and
+  Vernier LSL outlets concurrently. These checks do not establish physical
+  BLE, respiratory accuracy, non-Windows runtime, or installed-package
+  behavior for this repository's artifacts.
 
 Git and runnable checks are the authority for branch, revision, and behavior.
 Do not turn this section into a second status ledger.
