@@ -37,13 +37,14 @@ const PREFERENCE_SCHEMA: &str = "polar.stream.mini.preferences.v1";
 const LIVE_RECONFIGURED_MESSAGE: &str = "Saved and applied to the active LSL outlets.";
 const POLAR_DIRECT_OUTPUTS: &[&str] = &["raw_ecg", "raw_acc", "heart_rate", "rr_interval"];
 const VERNIER_FORCE_OUTPUT: &str = "raw_force";
-const VERNIER_OUTPUT_IDS: [&str; 6] = [
+const VERNIER_OUTPUT_IDS: [&str; 7] = [
     "rawVernier",
     "rawForce",
     "vernierBreathing",
     "signalStatus",
     "steps",
     "stepRate",
+    "respirationRate",
 ];
 const VERNIER_PERIOD_US: u32 = 50_000;
 const ACC_SAMPLE_PERIOD_NS: u64 = 1_000_000_000 / 200;
@@ -1465,6 +1466,9 @@ fn mini_output_config(kind: MiniAppKind, snapshot: &MiniPreferencesSnapshot) -> 
                 if vernier.step_rate {
                     outputs.push(polar_h10_output::VERNIER_STEP_RATE_OUTPUT.into());
                 }
+                if vernier.respiration_rate {
+                    outputs.push(polar_h10_output::VERNIER_RESPIRATION_RATE_OUTPUT.into());
+                }
                 outputs
             }
         },
@@ -1596,7 +1600,12 @@ fn mock_vernier_sensors() -> Vec<SensorInfo> {
     step_rate.numeric_type = NumericMeasurementType::Real;
     step_rate.description = "Step Rate".into();
     step_rate.unit = "spm".into();
-    vec![force, steps, step_rate]
+    let mut respiration_rate = step_rate.clone();
+    respiration_rate.number = 2;
+    respiration_rate.sensor_id = 2;
+    respiration_rate.description = "Respiration Rate".into();
+    respiration_rate.unit = "bpm".into();
+    vec![force, respiration_rate, steps, step_rate]
 }
 
 async fn run_polar_mock(
@@ -1723,6 +1732,10 @@ async fn run_vernier_mock(
             values: force_values.clone(),
         }];
         if sample_index.is_multiple_of(200) {
+            sensors.push(SensorSamples {
+                sensor_number: 2,
+                values: vec![18.0],
+            });
             sensors.push(SensorSamples {
                 sensor_number: 4,
                 values: vec![12.0 + (sample_index / 200) as f64 * 12.0],
@@ -2435,7 +2448,9 @@ fn polar_metric_options() -> Vec<MiniMetricOption> {
     METRIC_CATALOG
         .iter()
         .copied()
-        .filter(|metric| metric.id != VERNIER_FORCE_OUTPUT && metric.category != "Pedometer")
+        .filter(|metric| {
+            metric.id != VERNIER_FORCE_OUTPUT && !matches!(metric.category, "Pedometer" | "Vernier")
+        })
         .filter(|metric| {
             POLAR_DIRECT_OUTPUTS.contains(&metric.id)
                 || metric_selection_tier(metric.id) == MetricSelectionTier::Release
@@ -2458,7 +2473,7 @@ fn normalize_polar_outputs(input: Option<Vec<String>>) -> Vec<String> {
         let Some(metric) = MetricDefinition::for_id(&id) else {
             continue;
         };
-        if metric.category == "Pedometer" {
+        if matches!(metric.category, "Pedometer" | "Vernier") {
             continue;
         }
         if metric_selection_tier(metric.id) == MetricSelectionTier::Release
@@ -2567,9 +2582,58 @@ mod tests {
     }
 
     #[test]
+    fn each_vernier_selection_becomes_the_next_launch_default() {
+        let path =
+            std::env::temp_dir().join(format!("vernier-mini-outputs-{}.json", process::id()));
+        let _ = fs::remove_file(&path);
+        let store = PreferencesStore::load(path.clone(), MiniAppKind::Vernier);
+        // Exercise every device and app output alone, then a mixed selection.
+        // Loading a fresh store proves the next launch uses disk, not memory.
+        let mut selections = VERNIER_OUTPUT_IDS
+            .iter()
+            .map(|id| vec![(*id).into()])
+            .collect::<Vec<Vec<String>>>();
+        selections.push(vec![
+            "respirationRate".into(),
+            "steps".into(),
+            "rawForce".into(),
+        ]);
+        for (revision, selected) in selections.into_iter().enumerate() {
+            let input = MiniPreferencesInput {
+                stream_name: format!("Remembered-Belt-{revision}"),
+                output_mode: if revision % 2 == 0 {
+                    MiniOutputMode::SingleStream
+                } else {
+                    MiniOutputMode::SeparateStreams
+                },
+                auto_connect: revision % 2 == 0,
+                polar_outputs: Vec::new(),
+                vernier_outputs: Some(selected.clone()),
+            };
+            store
+                .save_input(MiniAppKind::Vernier, input.clone())
+                .unwrap();
+            let restored = PreferencesStore::load(path.clone(), MiniAppKind::Vernier).snapshot();
+            assert_eq!(
+                restored.vernier_outputs,
+                validate_vernier_outputs(selected).unwrap()
+            );
+            assert_eq!(restored.stream_name, input.stream_name);
+            assert_eq!(restored.output_mode, input.output_mode);
+            assert_eq!(restored.auto_connect, input.auto_connect);
+        }
+        fs::remove_file(path).unwrap();
+    }
+
+    #[test]
     fn acc_breathing_outputs_are_mini_selectable_and_survive_preferences() {
         let options = polar_metric_options();
         assert!(!options.iter().any(|metric| metric.category == "Pedometer"));
+        assert!(
+            !options
+                .iter()
+                .any(|metric| metric.id == "vernier_respiration_rate")
+        );
         assert_eq!(
             normalize_polar_outputs(Some(vec!["vernier_steps".into()])).len(),
             POLAR_DIRECT_OUTPUTS.len()
@@ -2871,7 +2935,7 @@ mod tests {
     #[test]
     fn mock_vernier_contract_uses_the_fixed_fast_force_channel() {
         let sensors = mock_vernier_sensors();
-        assert_eq!(sensors.len(), 3);
+        assert_eq!(sensors.len(), 4);
         assert_eq!(sensors[0].number, 1);
         assert!(sensors[0].is_respiration_force());
         assert_eq!(sensors[0].minimum_period_us, VERNIER_PERIOD_US);

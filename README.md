@@ -22,8 +22,9 @@ are retained so installed applets can be upgraded without changing identity.
   Phan event/rate, and [Flowborne](docs/acc-breathing-methods.md).
 - [Vernier Stream Mini](apps/vernier-stream-mini/README.md) lets you select any
   nonempty subset of the belt's numeric channels, Force-only copy, app-derived
-  0–1 breathing waveform, signal-status markers, and separate Steps and Step
-  Rate pedometer outputs. The
+  0–1 breathing waveform, signal-status markers, and individual Steps, Step
+  Rate, and Respiration Rate outputs. Every selection change saves automatically
+  and becomes the next launch's default. The
   [signal reference](https://georgefejer91.github.io/Polar-Mini-Stream/#vernier-outputs)
   distinguishes device values from app processing.
 

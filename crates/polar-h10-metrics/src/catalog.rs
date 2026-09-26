@@ -186,7 +186,7 @@ const FORCE_CITATIONS: &[MetricCitation] = &[
     ),
     citation(BREATH_ACC, BREATH_ACC_URL),
 ];
-const PEDOMETER_CITATIONS: &[MetricCitation] = &[
+const GDX_RB_CITATIONS: &[MetricCitation] = &[
     citation(
         "Vernier Respiration Belt product specifications",
         "https://www.vernier.com/product/go-direct-respiration-belt/",
@@ -251,6 +251,7 @@ fn formula_for(id: &str) -> &'static str {
         "raw_force" => "F(t) = Go Direct force measurement [N]",
         "vernier_steps" => "Steps(t) = device-reported cumulative step count",
         "vernier_step_rate" => "StepRate(t) = device-reported steps per minute",
+        "vernier_respiration_rate" => "RespirationRate(t) = device-reported breaths per minute",
         "acc_magnitude" => "|a(t)| = √(x(t)² + y(t)² + z(t)²) / 1000",
         "ecg_mean" => "μECG(t) = (1/N) Σ ECGᵢ over the preceding 5 s",
         "ecg_rms" => "RMS(t) = √[(1/N) Σ ECGᵢ²] over the preceding 5 s",
@@ -369,6 +370,7 @@ fn formula_source_for(id: &str) -> &'static str {
     match id {
         "raw_force" => "Vernier force",
         "vernier_steps" | "vernier_step_rate" => "Vernier pedometer",
+        "vernier_respiration_rate" => "Vernier GDX-RB firmware",
         "raw_acc"
         | "acc_magnitude"
         | "acc_breathing_magnitude"
@@ -473,7 +475,7 @@ pub fn metric_citations(metric: MetricDefinition) -> Vec<MetricCitation> {
         "Breathing dynamics" => BREATHING_DYNAMICS_CITATIONS,
         "Excitation (experimental)" => EXCITATION_CITATIONS,
         "Raw signals" if metric.id == "raw_force" => FORCE_CITATIONS,
-        "Pedometer" => PEDOMETER_CITATIONS,
+        "Pedometer" | "Vernier" => GDX_RB_CITATIONS,
         "Raw signals" if metric.id == "raw_acc" || metric.id == "acc_magnitude" => {
             BREATHING_CITATIONS
         }
@@ -584,6 +586,24 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         1,
         0.0,
         "StepRate"
+    ),
+    metric!(
+        "vernier_respiration_rate",
+        "respirationRate",
+        "Respiration rate",
+        "GDX-RB device-reported breath rate · 30 s window, 10 s update interval",
+        "bpm",
+        "Vernier",
+        "The belt reports estimated breaths per minute from its force signal. Vernier specifies a 30-second calculation window and a 10-second update interval. This is the device's estimate; the app forwards it unchanged.",
+        "device-derived rate",
+        "Vernier GDX-RB user manual",
+        "https://www.vernier.com/manuals/GDX-RB",
+        "vernier respiration belt breaths per minute respiration rate force",
+        false,
+        false,
+        1,
+        0.0,
+        "RespirationRate"
     ),
     metric!(
         "acc_magnitude",

@@ -62,7 +62,9 @@ or irrelevant full matrix for a documentation-only edit.
 
 For a release or package change, build each affected app's own Tauri package,
 verify bundled resources, and launch the installed copy without replacing the
-other product. Report physical H10/Vernier and non-Windows checks separately.
+other product. Compare installed executables against copies extracted from the
+finalized installer: Tauri patches bundle metadata, so the loose build binary
+can differ. Report physical H10/Vernier and non-Windows checks separately.
 For Pages changes, verify the generated catalog, browser layout/filter behavior,
 and the live deployed URL at the published commit.
 

@@ -5,18 +5,14 @@
   const nativeWindow = window.__TAURI__?.window?.getCurrentWindow?.();
   const isNative = Boolean(core?.invoke && core?.Channel);
   const directPolarOutputs = Object.freeze(["raw_ecg", "raw_acc", "heart_rate", "rr_interval"]);
-  const releaseBreathingIds = Object.freeze([
-    "breathing_volume",
-    "breathing_signal_confidence",
-    "breathing_signal_ready",
-  ]);
   const vernierOutputs = Object.freeze([
-    { id: "rawVernier", label: "Vernier channels", detail: "Force, respiration rate, steps, step rate, and packet diagnostics as received." },
-    { id: "rawForce", label: "Force only", detail: "Belt tension in newtons, copied from the Vernier Force channel." },
-    { id: "vernierBreathing", label: "Breathing waveform", detail: "Our live 0-1 normalization of belt force, not lung volume or breath rate." },
+    { id: "rawVernier", label: "All channels", detail: "Force, respiration rate, steps, step rate, and packet diagnostics as received." },
+    { id: "rawForce", label: "Force", detail: "Belt tension in newtons, copied from the Vernier Force channel." },
+    { id: "vernierBreathing", label: "Breathing", detail: "Our live 0-1 normalization of belt force, not lung volume or breath rate." },
     { id: "signalStatus", label: "Signal status", detail: "Markers for lost and restored Bluetooth signal." },
     { id: "steps", label: "Steps", detail: "Belt pedometer's cumulative step count, as reported by the device." },
     { id: "stepRate", label: "Step rate", detail: "Belt pedometer's estimated steps per minute over a 10-second window." },
+    { id: "respirationRate", label: "Resp. rate", detail: "Belt's estimated breaths per minute over 30 seconds, updated every 10 seconds." },
   ]);
   const defaultVernierOutputIds = Object.freeze(vernierOutputs.slice(0, 4).map((output) => output.id));
   const state = {
@@ -78,9 +74,7 @@
       "device-error-code",
       "mock-button",
       "mock-source",
-      "metrics-button",
       "metric-count",
-      "signal-list",
       "device-status",
       "lsl-status",
       "sample-status",
@@ -90,10 +84,7 @@
       "context-menu",
       "new-node-menu",
       "mock-node-menu",
-      "metrics-dialog",
-      "metrics-close",
       "metric-options",
-      "apply-metrics",
     ]) {
       elements[id] = document.getElementById(id);
     }
@@ -151,7 +142,7 @@
     state.productName = bootstrap.productName || "Vernier Stream Mini";
     state.scanLabel = bootstrap.scanLabel || "Vernier Go Direct";
     state.preferences = bootstrap.preferences || state.preferences;
-    confirmedPreferences = state.preferences;
+    confirmedPreferences = structuredClone(state.preferences);
     state.metrics = bootstrap.metrics || [];
     state.mockMode = Boolean(bootstrap.mockMode);
     state.connected = Boolean(bootstrap.session?.connected);
@@ -180,8 +171,8 @@
     }
     renderMode();
     renderDevices();
+    renderOutputOptions();
     renderSignals();
-    renderMetricDialog();
     renderConnection(bootstrap.session);
     setStatus(isNative ? "Ready" : "Installed app required", null, !isNative);
   }
@@ -218,37 +209,11 @@
   }
 
   function renderSignals() {
-    const list = elements["signal-list"];
-    list.replaceChildren();
-    const chips = [];
-    if (state.kind === "polar") {
-      if (state.preferences.outputMode === "singleStream") {
-        chips.push("single sparse LSL");
-      }
-      const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
-      for (const id of directPolarOutputs) chips.push(streamSuffix(id));
-      for (const metric of state.metrics) {
-        if (!metric.direct && selected.has(metric.id)) chips.push(metric.streamSuffix || metric.id);
-      }
-      const extraCount = state.metrics.filter((metric) => !metric.direct && selected.has(metric.id)).length;
-      elements["metric-count"].textContent = extraCount ? `${extraCount} extra` : "Direct only";
-    } else {
-      const selected = new Set(state.preferences.vernierOutputs || defaultVernierOutputIds);
-      if (state.preferences.outputMode === "singleStream") chips.push("single sparse LSL");
-      for (const output of vernierOutputs) {
-        if (selected.has(output.id)) chips.push(output.id);
-      }
-      elements["metric-count"].textContent = `${selected.size}/${vernierOutputs.length}`;
+    const selected = new Set(state.preferences.vernierOutputs || defaultVernierOutputIds);
+    elements["metric-count"].textContent = `${selected.size}/${vernierOutputs.length}`;
+    for (const checkbox of elements["metric-options"].querySelectorAll("input")) {
+      checkbox.checked = selected.has(checkbox.value);
     }
-    for (const chip of chips) {
-      const span = document.createElement("span");
-      span.textContent = chip;
-      list.append(span);
-    }
-  }
-
-  function streamSuffix(id) {
-    return state.metrics.find((metric) => metric.id === id)?.streamSuffix || id;
   }
 
   function renderConnection(session = null) {
@@ -265,7 +230,9 @@
     elements["mock-button"].disabled = state.busy || !isNative;
     elements["device-select"].disabled = state.busy || state.connected || !isNative;
     elements["bluetooth-toggle"].disabled = state.busy || state.radioBusy || state.connected || !["on", "off"].includes(state.radioStatus);
-    elements["metrics-button"].disabled = state.busy || !isNative;
+    for (const checkbox of elements["metric-options"].querySelectorAll("input")) {
+      checkbox.disabled = state.busy || !isNative;
+    }
     elements["device-status"].textContent = state.connected
       ? session?.deviceName || state.preferences.lastDevice?.name || "Connected"
       : state.mockMode
@@ -300,79 +267,37 @@
       .some((key) => Number(samples?.[key] || 0) > Number(previous?.[key] || 0));
   }
 
-  function renderMetricDialog() {
+  function renderOutputOptions() {
     const options = elements["metric-options"];
     options.replaceChildren();
-    if (state.kind === "vernier") {
-      const selected = new Set(state.preferences.vernierOutputs || defaultVernierOutputIds);
-      for (const output of vernierOutputs) {
-        const label = document.createElement("label");
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.value = output.id;
-        checkbox.checked = selected.has(output.id);
-        checkbox.addEventListener("change", () => {
-          const current = new Set(state.preferences.vernierOutputs || defaultVernierOutputIds);
-          if (!checkbox.checked && current.size === 1) {
-            checkbox.checked = true;
-            setStatus("Keep at least one output", "Config", true);
-            return;
-          }
-          if (checkbox.checked) current.add(output.id);
-          else current.delete(output.id);
-          state.preferences.vernierOutputs = vernierOutputs
-            .filter((candidate) => current.has(candidate.id)).map((candidate) => candidate.id);
-          renderSignals();
-          savePreferences(true);
-        });
-        const copy = document.createElement("span");
-        const title = document.createElement("strong");
-        title.textContent = output.label;
-        const detail = document.createElement("span");
-        detail.textContent = output.detail;
-        copy.append(title, detail);
-        label.append(checkbox, copy);
-        options.append(label);
-      }
-      return;
-    }
-    const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
-    for (const metric of state.metrics.filter((candidate) => !candidate.direct)) {
+    const selected = new Set(state.preferences.vernierOutputs || defaultVernierOutputIds);
+    for (const output of vernierOutputs) {
       const label = document.createElement("label");
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
-      checkbox.value = metric.id;
-      checkbox.checked = selected.has(metric.id);
+      checkbox.setAttribute("aria-label", output.id === "respirationRate" ? "Respiration rate" : output.label);
+      checkbox.setAttribute("aria-description", `${output.id}: ${output.detail}`);
+      checkbox.value = output.id;
+      checkbox.checked = selected.has(output.id);
       checkbox.addEventListener("change", () => {
-        updateMetricSelection(metric.id, checkbox.checked);
-        renderMetricDialog();
+        const current = new Set(state.preferences.vernierOutputs || defaultVernierOutputIds);
+        if (!checkbox.checked && current.size === 1) {
+          checkbox.checked = true;
+          setStatus("Keep at least one output", "Config", true);
+          return;
+        }
+        if (checkbox.checked) current.add(output.id);
+        else current.delete(output.id);
+        state.preferences.vernierOutputs = vernierOutputs
+          .filter((candidate) => current.has(candidate.id)).map((candidate) => candidate.id);
         renderSignals();
+        savePreferences(true);
       });
       const copy = document.createElement("span");
-      const title = document.createElement("strong");
-      title.textContent = metric.label;
-      const detail = document.createElement("span");
-      detail.textContent = `${metric.category} / ${metric.unit || "value"}`;
-      copy.append(title, detail);
+      copy.textContent = output.label;
       label.append(checkbox, copy);
       options.append(label);
     }
-  }
-
-  function updateMetricSelection(id, checked) {
-    const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
-    if (releaseBreathingIds.includes(id)) {
-      for (const breathingId of releaseBreathingIds) {
-        if (checked) selected.add(breathingId);
-        else selected.delete(breathingId);
-      }
-    } else if (checked) {
-      selected.add(id);
-    } else {
-      selected.delete(id);
-    }
-    for (const direct of directPolarOutputs) selected.add(direct);
-    state.preferences.polarOutputs = [...selected];
   }
 
   let saveTimer = 0;
@@ -396,12 +321,11 @@
     const save = async () => {
       try {
         const result = await invoke("save_preferences", { preferences: payload });
-        confirmedPreferences = result.preferences || state.preferences;
+        confirmedPreferences = structuredClone(result.preferences || { ...confirmedPreferences, ...payload });
         if (revision === saveRevision) {
-          state.preferences = confirmedPreferences;
+          state.preferences = structuredClone(confirmedPreferences);
           renderMode();
           renderSignals();
-          if (elements["metrics-dialog"].open) renderMetricDialog();
           if (!quiet || result.reconnectRequired || result.applied) {
             setStatus(result.message || "Saved", "Config", result.reconnectRequired);
           }
@@ -409,13 +333,12 @@
       } catch (error) {
         if (revision === saveRevision) {
           if (confirmedPreferences) {
-            state.preferences = confirmedPreferences;
+            state.preferences = structuredClone(confirmedPreferences);
             elements["stream-name"].value = confirmedPreferences.streamName || "";
             elements["auto-connect"].checked = Boolean(confirmedPreferences.autoConnect);
           }
           renderMode();
           renderSignals();
-          if (elements["metrics-dialog"].open) renderMetricDialog();
           reportError(error);
         }
       }
@@ -816,14 +739,6 @@
     elements["mock-button"].addEventListener("click", openMockNode);
     elements["connect-button"].addEventListener("click", connectSelected);
     elements["disconnect-button"].addEventListener("click", disconnect);
-    elements["metrics-button"].addEventListener("click", () => {
-      renderMetricDialog();
-      elements["metrics-dialog"].showModal();
-    });
-    elements["apply-metrics"].addEventListener("click", (event) => {
-      event.preventDefault();
-      elements["metrics-dialog"].close();
-    });
   }
 
   document.addEventListener("DOMContentLoaded", () => {

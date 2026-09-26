@@ -52,6 +52,7 @@ pub const VERNIER_BREATHING_STREAM_SUFFIX: &str = "vernierBreathing";
 pub const VERNIER_BREATHING_RECORDING_ID: &str = "vernier_breathing";
 pub const VERNIER_STEPS_OUTPUT: &str = "vernier_steps";
 pub const VERNIER_STEP_RATE_OUTPUT: &str = "vernier_step_rate";
+pub const VERNIER_RESPIRATION_RATE_OUTPUT: &str = "vernier_respiration_rate";
 pub const VERNIER_RAW_DIAGNOSTIC_CHANNELS: usize = 7;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -62,6 +63,7 @@ pub struct VernierMiniSelection {
     pub signal_status: bool,
     pub steps: bool,
     pub step_rate: bool,
+    pub respiration_rate: bool,
 }
 
 impl VernierMiniSelection {
@@ -74,6 +76,7 @@ impl VernierMiniSelection {
                 signal_status: true,
                 steps: false,
                 step_rate: false,
+                respiration_rate: false,
             };
         };
         let has = |id| ids.iter().any(|selected| selected == id);
@@ -84,6 +87,7 @@ impl VernierMiniSelection {
             signal_status: has("signalStatus"),
             steps: has("steps"),
             step_rate: has("stepRate"),
+            respiration_rate: has("respirationRate"),
         }
     }
 }
@@ -189,10 +193,11 @@ impl VernierStreamSchema {
             .map(|sensor| sensor.number)
     }
 
-    pub fn pedometer_sensor_number(&self, output_id: &str) -> Option<u8> {
+    pub fn measurement_sensor_number(&self, output_id: &str) -> Option<u8> {
         let (description, unit) = match output_id {
             VERNIER_STEPS_OUTPUT => ("Steps", "steps"),
             VERNIER_STEP_RATE_OUTPUT => ("Step Rate", "spm"),
+            VERNIER_RESPIRATION_RATE_OUTPUT => ("Respiration Rate", "bpm"),
             _ => return None,
         };
         self.channels
@@ -924,11 +929,15 @@ impl OutputRouter {
                 encoding,
                 sensors,
             );
-            for id in [VERNIER_STEPS_OUTPUT, VERNIER_STEP_RATE_OUTPUT] {
+            for id in [
+                VERNIER_STEPS_OUTPUT,
+                VERNIER_STEP_RATE_OUTPUT,
+                VERNIER_RESPIRATION_RATE_OUTPUT,
+            ] {
                 if !config.outputs.iter().any(|selected| selected == id) {
                     continue;
                 }
-                if let Some(number) = schema.pedometer_sensor_number(id)
+                if let Some(number) = schema.measurement_sensor_number(id)
                     && let Some(samples) =
                         sensors.iter().find(|sample| sample.sensor_number == number)
                 {
@@ -1606,12 +1615,16 @@ mod normalization_tests {
         );
         assert_eq!(schema.raw_channel_count(), 11);
         assert_eq!(
-            schema.pedometer_sensor_number(VERNIER_STEPS_OUTPUT),
+            schema.measurement_sensor_number(VERNIER_STEPS_OUTPUT),
             Some(4)
         );
         assert_eq!(
-            schema.pedometer_sensor_number(VERNIER_STEP_RATE_OUTPUT),
+            schema.measurement_sensor_number(VERNIER_STEP_RATE_OUTPUT),
             Some(5)
+        );
+        assert_eq!(
+            schema.measurement_sensor_number(VERNIER_RESPIRATION_RATE_OUTPUT),
+            Some(2)
         );
 
         let mut rows = Vec::new();

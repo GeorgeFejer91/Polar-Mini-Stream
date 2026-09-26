@@ -62,12 +62,12 @@
                 <span>Reconnect</span>
               </label>
               <div class="metric-row" data-tauri-drag-region>
-                <button id="metrics-button" type="button">Outputs</button>
-                <span id="metric-count" data-tauri-drag-region>4/6</span>
+                <span class="field-label" data-tauri-drag-region>Streams</span>
+                <span id="metric-count" data-tauri-drag-region>4/7</span>
               </div>
             </div>
 
-            <div id="signal-list" class="signal-list" aria-label="Included streams" data-tauri-drag-region></div>
+            <div id="metric-options" class="metric-options" role="group" aria-label="Included streams"></div>
 
             <dl class="readout" data-tauri-drag-region>
               <div data-tauri-drag-region><dt data-tauri-drag-region>Device</dt><dd id="device-status" data-tauri-drag-region>No device</dd></div>
@@ -113,20 +113,5 @@
       </div>
     </dialog>
 
-    <dialog id="metrics-dialog" class="node-source-dialog vernier-output-dialog" aria-labelledby="output-dialog-title">
-      <form method="dialog">
-        <header>
-          <div>
-            <strong id="output-dialog-title">Vernier outputs</strong>
-            <span>Choose at least one LSL signal</span>
-          </div>
-          <button id="metrics-close" value="cancel" type="submit" aria-label="Close">x</button>
-        </header>
-        <div id="metric-options" class="metric-options"></div>
-        <footer>
-          <button id="apply-metrics" value="default" type="submit">Done</button>
-        </footer>
-      </form>
-    </dialog>
   </body>
 </html>

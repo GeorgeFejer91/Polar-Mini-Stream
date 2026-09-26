@@ -1186,6 +1186,7 @@ impl MiniCombinedOutput {
             && !selection.raw_force
             && !selection.steps
             && !selection.step_rate
+            && !selection.respiration_rate
         {
             return;
         }
@@ -1202,18 +1203,22 @@ impl MiniCombinedOutput {
                     .and_then(|number| sensors.iter().find(|sensor| sensor.sensor_number == number))
             })
             .flatten();
-        let pedometer = |id| {
+        let measurement = |id| {
             schema
-                .pedometer_sensor_number(id)
+                .measurement_sensor_number(id)
                 .and_then(|number| sensors.iter().find(|sensor| sensor.sensor_number == number))
         };
         let steps = selection
             .steps
-            .then(|| pedometer(crate::VERNIER_STEPS_OUTPUT))
+            .then(|| measurement(crate::VERNIER_STEPS_OUTPUT))
             .flatten();
         let step_rate = selection
             .step_rate
-            .then(|| pedometer(crate::VERNIER_STEP_RATE_OUTPUT))
+            .then(|| measurement(crate::VERNIER_STEP_RATE_OUTPUT))
+            .flatten();
+        let respiration_rate = selection
+            .respiration_rate
+            .then(|| measurement(crate::VERNIER_RESPIRATION_RATE_OUTPUT))
             .flatten();
         let row_count = if selection.raw_vernier {
             encode_vernier_raw_rows(
@@ -1229,7 +1234,7 @@ impl MiniCombinedOutput {
                 sensors,
             )
         } else {
-            [force, steps, step_rate]
+            [force, steps, step_rate, respiration_rate]
                 .into_iter()
                 .flatten()
                 .map(|samples| samples.values.len())
@@ -1268,6 +1273,14 @@ impl MiniCombinedOutput {
             if selection.step_rate {
                 rows.push(
                     step_rate
+                        .and_then(|samples| samples.values.get(row))
+                        .copied()
+                        .unwrap_or(f64::NAN),
+                );
+            }
+            if selection.respiration_rate {
+                rows.push(
+                    respiration_rate
                         .and_then(|samples| samples.values.get(row))
                         .copied()
                         .unwrap_or(f64::NAN),
@@ -1313,7 +1326,8 @@ impl MiniCombinedOutput {
             0
         } + usize::from(selection.raw_force)
             + usize::from(selection.steps)
-            + usize::from(selection.step_rate);
+            + usize::from(selection.step_rate)
+            + usize::from(selection.respiration_rate);
         let channels = vernier_combined_channel_count(schema, selection);
         let mut rows = Vec::with_capacity(values_01.len().saturating_mul(channels));
         for value in values_01 {
@@ -1412,6 +1426,7 @@ fn vernier_combined_channel_count(
     }) + usize::from(selection.raw_force)
         + usize::from(selection.steps)
         + usize::from(selection.step_rate)
+        + usize::from(selection.respiration_rate)
         + usize::from(selection.breathing)
         + usize::from(selection.signal_status)
 }
@@ -1493,6 +1508,14 @@ fn vernier_combined_channels(
             "spm",
             "StepRate",
             "Device-reported steps per minute",
+        ));
+    }
+    if selection.respiration_rate {
+        channels.push(MiniCombinedChannel::new(
+            "respirationRate",
+            "bpm",
+            "RespirationRate",
+            "Device-reported breaths per minute",
         ));
     }
     if selection.breathing {
@@ -1615,12 +1638,14 @@ fn append_stream_metadata(
     if description.is_null() {
         return !processing_required;
     }
-    let (manufacturer, model) =
-        if matches!(spec.id, "raw_force" | "vernier_steps" | "vernier_step_rate") {
-            ("Vernier", "Go Direct")
-        } else {
-            ("Polar", "H10")
-        };
+    let (manufacturer, model) = if matches!(
+        spec.id,
+        "raw_force" | "vernier_steps" | "vernier_step_rate" | "vernier_respiration_rate"
+    ) {
+        ("Vernier", "Go Direct")
+    } else {
+        ("Polar", "H10")
+    };
     append_value(
         append_child_value,
         description,

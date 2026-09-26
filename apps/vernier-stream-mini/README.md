@@ -5,16 +5,21 @@ intentionally a compact transparent-shell window where the detached Polar
 Stream node card is the visible program outline, not the main controller
 workspace.
 
+All seven output checkboxes sit directly inside the mini window in two compact
+rows. Click the checkbox or its label to select a stream; changes save instantly.
+
 - Default outputs: four independently selectable LSL outputs, `rawVernier`
   (every advertised numeric belt channel plus recording diagnostics),
   `rawForce` (unfiltered Force compatibility copy), `vernierBreathing` (our
   relative 0-1 force normalization), and `signalStatus` (loss/restoration
   markers). At least one output remains selected. Choices persist and replace
   active outlets without restarting Bluetooth.
-- Optional `steps` and `stepRate` checkboxes forward the belt's pedometer count
-  and cadence as their own LSL streams, or as columns in Single mode. They
+- Optional `steps`, `stepRate`, and `respirationRate` checkboxes forward the
+  belt's cumulative step count, cadence (steps/min), and respiration estimate
+  (breaths/min) as their own LSL streams, or as columns in Single mode. Together
+  with `rawForce`, all four device signals are individually selectable. They
   publish only when those device channels update. The Mock source includes
-  synthetic pedometer updates every 10 seconds.
+  synthetic rate/count updates every 10 seconds.
 - The documented GDX-RB device channels are Force, Respiration Rate, Steps,
   and Step Rate. Vernier does not document an exposed raw accelerometer channel
   on this belt. Its Force transducer measures tension in a short strap connected
@@ -35,8 +40,10 @@ workspace.
   switch. The app requests radio-control access when the switch is used;
   Windows may prompt or deny it. The NSIS installer cannot pregrant it, and
   hardware or policy blocks remain under Windows control.
-- Memory: app-local stream name, output mode, output selection, reconnect
-  preference, and last Vernier device.
+- Memory: every output checkbox change saves automatically. The last saved
+  selection, stream name, output mode, reconnect preference, and Vernier device
+  are loaded when the regular app next opens. No Apply or Save step is required.
+  If a save fails, the UI restores the last successfully saved selection.
 - Multi-device use: launch multiple app instances.
 - Mocking: **Mock** launches an independent, automatically streaming applet
   with deterministic 20 Hz force/breathing data and real LSL publication. Its

@@ -1,5 +1,5 @@
-//! Synthetic producer for exact consumer-side verification of the two
-//! metadata-driven Vernier LSL outlets.
+//! Synthetic producer for exact consumer-side verification of the
+//! metadata-driven Vernier LSL outputs in separate and sparse single modes.
 
 use std::{env, path::PathBuf, thread, time::Duration};
 
@@ -50,7 +50,12 @@ async fn main() -> Result<(), String> {
         .configure(OutputConfig {
             stream_name: STREAM_BASE.into(),
             lsl_enabled: true,
-            outputs: vec!["vernier_steps".into(), "vernier_step_rate".into()],
+            outputs: vec![
+                "raw_force".into(),
+                "vernier_steps".into(),
+                "vernier_step_rate".into(),
+                "vernier_respiration_rate".into(),
+            ],
             ..OutputConfig::default()
         })
         .await?;
@@ -70,7 +75,7 @@ async fn main() -> Result<(), String> {
                 2,
                 102,
                 "Respiration Rate",
-                "breaths/min",
+                "bpm",
                 NumericMeasurementType::Real,
                 SamplingMode::Aperiodic,
             ),
@@ -124,6 +129,7 @@ async fn main() -> Result<(), String> {
             SampleEncoding::Float32,
             &sensors,
         );
+        let _ = router.publish_force(timestamp_ns, &[sensors[0].values[0] as f32], 100_000);
         let _ = router.publish_vernier_breathing(
             timestamp_ns,
             &[if index.is_multiple_of(2) { 0.25 } else { 0.75 }],
@@ -164,12 +170,20 @@ fn verify_single(path: PathBuf) -> Result<(), String> {
     let output = MiniCombinedOutput::vernier(
         Some(path),
         "polar_vernier_acceptance_single",
-        &["steps".into(), "stepRate".into()],
+        &["steps".into(), "stepRate".into(), "respirationRate".into()],
     )?;
     output.configure_vernier_streams(
         "GDX-RB",
         100_000,
         &[
+            sensor(
+                2,
+                102,
+                "Respiration Rate",
+                "bpm",
+                NumericMeasurementType::Real,
+                SamplingMode::Aperiodic,
+            ),
             sensor(
                 1,
                 101,
@@ -231,6 +245,21 @@ fn verify_single(path: PathBuf) -> Result<(), String> {
                         values: vec![72.0],
                     },
                 ],
+            );
+        }
+        if index == 10 {
+            output.publish_vernier_raw(
+                1_000_000_000 + index * 100_000_000,
+                100_000,
+                index,
+                0,
+                0,
+                500,
+                SampleEncoding::Float32,
+                &[SensorSamples {
+                    sensor_number: 2,
+                    values: vec![18.0],
+                }],
             );
         }
         thread::sleep(Duration::from_millis(100));

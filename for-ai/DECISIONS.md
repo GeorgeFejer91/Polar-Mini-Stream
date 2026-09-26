@@ -81,6 +81,24 @@ to rediscover. Source and tests remain the authority for implementation facts.
 - Supersedes: D-0004's four-output selection set; its acquisition and
   live-reconfiguration decisions remain in force.
 
+## D-0006 — Select every belt signal and restore the latest saved state
+
+- Date: 2026-09-26
+- Status: Accepted
+- Context: Each GDX-RB device variable needs an individual checkbox, and users
+  expect their most recent choices to become the next launch's defaults.
+- Decision: Add optional `respirationRate` alongside Force, Steps, and Step Rate.
+  Use compact inline checkboxes inside the mini window.
+  Retain the four original first-launch selections and existing saved subsets.
+  Save every checkbox change through the native preferences owner; serialize
+  renderer writes and keep the confirmed snapshot independent of UI edits.
+  Reload the last successful state on startup. Mock settings stay session-only.
+- Consequences: Separate and Single LSL contracts include the selected signals
+  only when the device reports samples. Failed saves restore confirmed UI state.
+  Pages documents variable names, units, device schedules, and automatic memory.
+- Supersedes: Extends D-0005's optional output set; its acquisition decisions
+  remain in force.
+
 ## Record format
 
 For later decisions, add one compact entry with:

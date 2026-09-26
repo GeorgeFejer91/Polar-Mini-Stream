@@ -9,9 +9,9 @@ try {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     await page.goto(url);
     const total = await page.locator('.metric-card').count();
-    if (total !== 56) throw new Error(`Expected 56 catalog entries, got ${total}`);
+    if (total !== 57) throw new Error(`Expected 57 catalog entries, got ${total}`);
     const vernierTables = page.locator('#vernier-outputs table');
-    if (await vernierTables.nth(0).locator('tbody tr').count() !== 6 ||
+    if (await vernierTables.nth(0).locator('tbody tr').count() !== 7 ||
         await vernierTables.nth(1).locator('tbody tr').count() !== 4 ||
         await vernierTables.nth(2).locator('tbody tr').count() !== 7) {
       throw new Error('Vernier stream, device channel, or diagnostic reference is incomplete');

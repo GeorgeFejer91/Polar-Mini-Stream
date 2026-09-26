@@ -197,7 +197,7 @@ impl OutputConfig {
         self.validate_collection_bounds()?;
         if let Some(ids) = &self.vernier_outputs {
             if ids.is_empty()
-                || ids.len() > 6
+                || ids.len() > 7
                 || ids.iter().any(|id| {
                     !matches!(
                         id.as_str(),
@@ -207,10 +207,11 @@ impl OutputConfig {
                             | "signalStatus"
                             | "steps"
                             | "stepRate"
+                            | "respirationRate"
                     )
                 })
             {
-                return Err("Vernier outputs must contain one to six known stream IDs.".into());
+                return Err("Vernier outputs must contain one to seven known stream IDs.".into());
             }
             let mut unique = std::collections::HashSet::new();
             if ids.iter().any(|id| !unique.insert(id)) {
