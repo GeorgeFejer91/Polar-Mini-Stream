@@ -9,7 +9,7 @@ try {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     await page.goto(url);
     const total = await page.locator('.metric-card').count();
-    if (total !== 57) throw new Error(`Expected 57 catalog entries, got ${total}`);
+    if (total !== 61) throw new Error(`Expected 61 catalog entries, got ${total}`);
     const vernierTables = page.locator('#vernier-outputs table');
     if (await vernierTables.nth(0).locator('tbody tr').count() !== 7 ||
         await vernierTables.nth(1).locator('tbody tr').count() !== 4 ||
@@ -18,7 +18,7 @@ try {
     }
     await page.locator('#search').fill('flowborne');
     const filtered = await page.locator('.metric-card').count();
-    if (filtered !== 2) throw new Error(`Expected two Flowborne metrics, got ${filtered}`);
+    if (filtered !== 3) throw new Error(`Expected three Flowborne metrics, got ${filtered}`);
     await page.locator('#search').fill('');
     await page.locator('#category').selectOption('HRV & relaxation');
     if (await page.locator('.metric-card').count() !== 5) throw new Error('HRV filter failed');

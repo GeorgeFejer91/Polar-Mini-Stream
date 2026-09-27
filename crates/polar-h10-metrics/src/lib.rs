@@ -26,9 +26,9 @@ pub use breathing::{
 };
 pub use breathing_dynamics::{BreathingDynamicsSnapshot, FeatureSet};
 pub use catalog::{
-    METRIC_CATALOG, MetricCitation, MetricDefinition, MetricFormulaDefinition, MetricSelectionTier,
-    POLAR_MINI_ONLY_IDS, RELEASE_POLAR_RESPIRATION_IDS, metric_citations, metric_definition,
-    metric_formula_definition, metric_selection_tier,
+    ADR_WAVEFORM_IDS, METRIC_CATALOG, MetricCitation, MetricDefinition, MetricFormulaDefinition,
+    MetricSelectionTier, POLAR_MINI_ONLY_IDS, RELEASE_POLAR_RESPIRATION_IDS, adr_companion_ids,
+    metric_citations, metric_definition, metric_formula_definition, metric_selection_tier,
 };
 pub use coherence::CoherenceSnapshot;
 pub use ecg::EcgSnapshot;
@@ -87,19 +87,28 @@ impl MetricSelection {
                     selection.ecg_features = true;
                 }
                 "acc_magnitude" => selection.acc_magnitude = true,
-                "acc_breathing_magnitude"
-                | "breathing_volume"
-                | "breathing_phase"
-                | "breathing_calibration"
-                | "breathing_axis_range"
-                | "breathing_signal_confidence"
-                | "breathing_signal_ready" => selection.breathing = true,
-                "breathing_rate" | "breathing_dynamics_confidence" => {
+                "adr_pca_waveform"
+                | "adr_pca_relative_amplitude"
+                | "adr_pca_phase"
+                | "adr_pca_calibration"
+                | "adr_pca_range"
+                | "adr_pca_quality"
+                | "adr_pca_valid" => selection.breathing = true,
+                "adr_pca_rate" | "adr_dynamics_quality" => {
                     selection.breathing = true;
                     selection.breathing_dynamics = true;
                 }
-                "phan_breath_event" | "phan_breath_rate" => selection.phan_breathing = true,
-                "flowborne_phase" | "flowborne_motion_score" => {
+                "adr_axis_difference_event"
+                | "adr_axis_difference_rate"
+                | "adr_axis_difference_magnitude"
+                | "adr_axis_difference_valid" => selection.phan_breathing = true,
+                "adr_axis_mean_difference" => {
+                    selection.phan_breathing = true;
+                    selection.breathing = true;
+                }
+                "adr_moving_average_phase"
+                | "adr_moving_average_difference"
+                | "adr_moving_average_valid" => {
                     selection.breathing = true;
                     selection.flowborne = true;
                 }
@@ -119,7 +128,7 @@ impl MetricSelection {
                     selection.hrv = true;
                     selection.excitometer = true;
                 }
-                _ if id.starts_with("breath_interval_") || id.starts_with("breath_amplitude_") => {
+                _ if id.starts_with("adr_interval_") || id.starts_with("adr_amplitude_") => {
                     selection.breathing = true;
                     selection.breathing_dynamics = true;
                 }
@@ -348,12 +357,14 @@ impl MetricEngine {
         } else {
             Vec::new()
         };
+        let mut breathing_snapshot = None;
         if self.selection.breathing {
             let breathing = match timing {
                 Some(timing) => self.breathing.push_timed(samples, timing),
                 None => self.breathing.push(samples),
             };
             if let Some(breathing) = breathing {
+                breathing_snapshot = Some(breathing);
                 output.extend(breathing.samples());
                 if self.selection.flowborne {
                     let flowborne = self.flowborne.push(
@@ -361,12 +372,16 @@ impl MetricEngine {
                         timing.is_some_and(|batch| batch.clock_reset || batch.gap_before),
                     );
                     output.push(MetricSample {
-                        id: "flowborne_phase",
+                        id: "adr_moving_average_phase",
                         value: flowborne.phase,
+                    });
+                    output.push(MetricSample {
+                        id: "adr_moving_average_valid",
+                        value: if flowborne.valid { 1.0 } else { 0.0 },
                     });
                     if let Some(score) = flowborne.motion_score {
                         output.push(MetricSample {
-                            id: "flowborne_motion_score",
+                            id: "adr_moving_average_difference",
                             value: score,
                         });
                     }
@@ -381,14 +396,35 @@ impl MetricEngine {
         if self.selection.phan_breathing
             && let Some(snapshot) = self.phan_breathing.push(samples, timing)
         {
+            output.push(MetricSample {
+                id: "adr_axis_difference_magnitude",
+                value: snapshot.rectified_difference_g,
+            });
+            output.push(MetricSample {
+                id: "adr_axis_difference_valid",
+                value: if snapshot.warmed_up { 1.0 } else { 0.0 },
+            });
+            if breathing_snapshot.is_some_and(|breathing| breathing.calibrated) {
+                let axis = self.breathing.diagnostics().pca_axis;
+                let signed = snapshot
+                    .axis_difference_g
+                    .into_iter()
+                    .zip(axis)
+                    .map(|(difference, direction)| difference * direction)
+                    .sum();
+                output.push(MetricSample {
+                    id: "adr_axis_mean_difference",
+                    value: signed,
+                });
+            }
             if snapshot.breath_detected {
                 output.push(MetricSample {
-                    id: "phan_breath_event",
+                    id: "adr_axis_difference_event",
                     value: 1.0,
                 });
             }
             output.push(MetricSample {
-                id: "phan_breath_rate",
+                id: "adr_axis_difference_rate",
                 value: snapshot.breaths_per_minute,
             });
         }
@@ -537,9 +573,8 @@ mod tests {
     #[test]
     fn experimental_breathing_outputs_are_independent_scalar_streams() {
         let mut magnitude =
-            MetricEngine::with_selection(MetricSelection::from_ids(["acc_breathing_magnitude"]));
-        let mut phase =
-            MetricEngine::with_selection(MetricSelection::from_ids(["breathing_phase"]));
+            MetricEngine::with_selection(MetricSelection::from_ids(["adr_pca_waveform"]));
+        let mut phase = MetricEngine::with_selection(MetricSelection::from_ids(["adr_pca_phase"]));
         let mut magnitude_values = Vec::new();
         let mut phase_values = Vec::new();
         for index in 0..2_500 {
@@ -553,21 +588,19 @@ mod tests {
             phase_values = phase.process_accelerometer(&[sample]);
         }
         assert_eq!(magnitude_values.len(), 1);
-        assert_eq!(magnitude_values[0].id, "acc_breathing_magnitude");
+        assert_eq!(magnitude_values[0].id, "adr_pca_waveform");
         assert_eq!(phase_values.len(), 1);
-        assert_eq!(phase_values[0].id, "breathing_phase");
+        assert_eq!(phase_values[0].id, "adr_pca_phase");
         assert!([-1.0, 0.0, 1.0].contains(&phase_values[0].value));
     }
 
     #[test]
     fn breathing_waveform_and_quality_outputs_remain_independently_selectable() {
         let mut waveform =
-            MetricEngine::with_selection(MetricSelection::from_ids(["breathing_volume"]));
-        let mut confidence = MetricEngine::with_selection(MetricSelection::from_ids([
-            "breathing_signal_confidence",
-        ]));
-        let mut ready =
-            MetricEngine::with_selection(MetricSelection::from_ids(["breathing_signal_ready"]));
+            MetricEngine::with_selection(MetricSelection::from_ids(["adr_pca_relative_amplitude"]));
+        let mut confidence =
+            MetricEngine::with_selection(MetricSelection::from_ids(["adr_pca_quality"]));
+        let mut ready = MetricEngine::with_selection(MetricSelection::from_ids(["adr_pca_valid"]));
 
         let mut waveform_values = Vec::new();
         let mut confidence_values = Vec::new();
@@ -585,13 +618,58 @@ mod tests {
         }
 
         assert_eq!(waveform_values.len(), 1);
-        assert_eq!(waveform_values[0].id, "breathing_volume");
+        assert_eq!(waveform_values[0].id, "adr_pca_relative_amplitude");
         assert!((0.0..=1.0).contains(&waveform_values[0].value));
         assert_eq!(confidence_values.len(), 1);
-        assert_eq!(confidence_values[0].id, "breathing_signal_confidence");
+        assert_eq!(confidence_values[0].id, "adr_pca_quality");
         assert!((0.0..=1.0).contains(&confidence_values[0].value));
         assert_eq!(ready_values.len(), 1);
-        assert_eq!(ready_values[0].id, "breathing_signal_ready");
+        assert_eq!(ready_values[0].id, "adr_pca_valid");
         assert_eq!(ready_values[0].value, 1.0);
+    }
+
+    #[test]
+    fn all_four_live_candidates_preserve_their_distinct_signal_semantics() {
+        let mut engine = MetricEngine::with_selection(MetricSelection::from_ids(
+            ADR_WAVEFORM_IDS.iter().copied(),
+        ));
+        let mut ranges = [[f32::INFINITY, f32::NEG_INFINITY]; 4];
+        for index in 0..6_000_u64 {
+            let breath = (std::f64::consts::TAU * 0.2 * index as f64 / 200.0).sin();
+            let sample = AccSample {
+                x_mg: (25.0 * breath) as i16,
+                y_mg: 0,
+                z_mg: 1_000 + (15.0 * breath) as i16,
+            };
+            let values = engine.process_accelerometer_timed(
+                &[sample],
+                TimedAccBatch {
+                    newest_sensor_timestamp_ns: (index + 1) * 5_000_000,
+                    sample_period_ns: 5_000_000,
+                    clock_revision: 1,
+                    clock_reset: false,
+                    gap_before: false,
+                },
+            );
+            if index > 3_000 {
+                for value in values {
+                    let slot = ADR_WAVEFORM_IDS
+                        .iter()
+                        .position(|id| *id == value.id)
+                        .unwrap();
+                    assert!(value.value.is_finite());
+                    ranges[slot][0] = ranges[slot][0].min(value.value);
+                    ranges[slot][1] = ranges[slot][1].max(value.value);
+                }
+            }
+        }
+        for range in &ranges[..3] {
+            assert!(
+                range[0] < -0.001 && range[1] > 0.001,
+                "signed waveform lost direction: {range:?}"
+            );
+        }
+        assert!(ranges[3][0] >= 0.0 && ranges[3][1] - ranges[3][0] > 0.005);
+        assert!(engine.process_accelerometer(&[]).is_empty());
     }
 }

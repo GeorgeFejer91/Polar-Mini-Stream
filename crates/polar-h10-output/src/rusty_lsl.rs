@@ -1002,7 +1002,7 @@ mod tests {
     fn builtin_respiration_descriptor_carries_processing_provenance_only_when_applicable() {
         let provenance = PolarRespirationProvenance::new(Default::default());
         let tree = stream_metadata(
-            MetricSpec::for_id("breathing_volume").unwrap(),
+            MetricSpec::for_id("adr_pca_relative_amplitude").unwrap(),
             None,
             Some(&provenance),
         )
@@ -1029,7 +1029,7 @@ mod tests {
             ..Default::default()
         });
         let legacy_tree = stream_metadata(
-            MetricSpec::for_id("breathing_volume").unwrap(),
+            MetricSpec::for_id("adr_pca_relative_amplitude").unwrap(),
             None,
             Some(&legacy),
         )

@@ -30,6 +30,7 @@ to rediscover. Source and tests remain the authority for implementation facts.
 - Consequences: New work can prioritize the independent mini products. Shared
   crates initially retain some controller-era code to avoid an unsafe protocol
   or metric rewrite during extraction; prune only with separate tests.
+- Follow-up: D-0007 supersedes preservation of respiratory IDs only.
 - Supersedes: None
 
 ## D-0003 — Publish source-derived metric docs and binary releases
@@ -96,8 +97,29 @@ to rediscover. Source and tests remain the authority for implementation facts.
 - Consequences: Separate and Single LSL contracts include the selected signals
   only when the device reports samples. Failed saves restore confirmed UI state.
   Pages documents variable names, units, device schedules, and automatic memory.
+- Follow-up: D-0007 makes the full raw row mandatory; other choices remain optional.
 - Supersedes: Extends D-0005's optional output set; its acquisition decisions
   remain in force.
+
+## D-0007 — Publish live ADR candidates alongside mandatory raw signals
+
+- Date: 2026-09-27
+- Status: Accepted
+- Context: Paired Vernier/Polar experiments need recorded evidence of live
+  candidate waveform production before future Respira integration.
+- Decision: Publish optional signed PCA, Flowborne-style moving-average,
+  signed Phan-window, and original rectified Phan waveforms as dedicated scalar
+  LSL outlets in both modes. Use ADR method names without old aliases. Include
+  selected candidates' readiness/quality companions and immutable provenance.
+  Retain finite diagnostic values when invalid; never invent absent raw data.
+  Make raw Polar ECG/ACC and Vernier raw channels mandatory when available.
+  External projects own recording, markers, and Respira calibration/selection.
+- Consequences: Raw selections cannot be disabled. Former respiratory IDs must
+  be selected again under their new names. Single mode has dedicated ADR
+  outlets in addition to its combined raw/non-ADR outlet. Synthetic online LSL
+  checks demonstrate software behavior; participant validation remains separate.
+- Supersedes: D-0002's preservation of respiratory IDs and D-0006's optional
+  full raw Vernier row. Other acquisition and preference decisions remain.
 
 ## Record format
 

@@ -301,34 +301,34 @@ impl BreathingSnapshot {
     pub(crate) fn samples(self) -> Vec<MetricSample> {
         let mut values = vec![
             MetricSample {
-                id: "breathing_calibration",
+                id: "adr_pca_calibration",
                 value: self.calibration_progress_01,
             },
             MetricSample {
-                id: "breathing_phase",
+                id: "adr_pca_phase",
                 value: self.phase.numeric(),
             },
             MetricSample {
-                id: "breathing_signal_confidence",
+                id: "adr_pca_quality",
                 value: self.confidence_01,
             },
             MetricSample {
-                id: "breathing_signal_ready",
+                id: "adr_pca_valid",
                 value: if self.ready { 1.0 } else { 0.0 },
             },
         ];
         if self.calibrated {
             values.extend([
                 MetricSample {
-                    id: "acc_breathing_magnitude",
+                    id: "adr_pca_waveform",
                     value: self.magnitude_g,
                 },
                 MetricSample {
-                    id: "breathing_volume",
+                    id: "adr_pca_relative_amplitude",
                     value: self.volume_01,
                 },
                 MetricSample {
-                    id: "breathing_axis_range",
+                    id: "adr_pca_range",
                     value: self.axis_range_g,
                 },
             ]);
@@ -845,7 +845,7 @@ mod tests {
             snapshot
                 .samples()
                 .iter()
-                .any(|sample| sample.id == "breathing_phase" && sample.value == 0.0)
+                .any(|sample| sample.id == "adr_pca_phase" && sample.value == 0.0)
         );
     }
 

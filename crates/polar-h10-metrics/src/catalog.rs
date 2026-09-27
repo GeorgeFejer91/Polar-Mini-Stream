@@ -38,39 +38,69 @@ pub enum MetricSelectionTier {
     Compatibility,
 }
 
-/// The deliberately small Polar respiration surface offered for new work.
-/// `breathing_volume` is the continuous research waveform; the other two are
-/// quality indicators and are not physiological breathing measures.
+/// Independently selectable real-time ADR candidates and their diagnostics.
 pub const RELEASE_POLAR_RESPIRATION_IDS: &[&str] = &[
-    "breathing_volume",
-    "breathing_signal_confidence",
-    "breathing_signal_ready",
+    "adr_pca_waveform",
+    "adr_pca_relative_amplitude",
+    "adr_pca_quality",
+    "adr_pca_valid",
+    "adr_moving_average_difference",
+    "adr_moving_average_valid",
+    "adr_axis_mean_difference",
+    "adr_axis_difference_magnitude",
+    "adr_axis_difference_valid",
 ];
+
+/// Numeric single-channel waveform candidates. Each keeps its own native units.
+pub const ADR_WAVEFORM_IDS: &[&str] = &[
+    "adr_pca_waveform",
+    "adr_moving_average_difference",
+    "adr_axis_mean_difference",
+    "adr_axis_difference_magnitude",
+];
+
+/// Selecting a waveform includes the diagnostics needed to interpret it.
+pub fn adr_companion_ids(id: &str) -> &'static [&'static str] {
+    match id {
+        "adr_pca_waveform" | "adr_pca_relative_amplitude" => &["adr_pca_quality", "adr_pca_valid"],
+        "adr_moving_average_difference" => &["adr_moving_average_valid", "adr_pca_quality"],
+        "adr_axis_mean_difference" => &[
+            "adr_axis_difference_valid",
+            "adr_pca_valid",
+            "adr_pca_quality",
+        ],
+        "adr_axis_difference_magnitude" => &["adr_axis_difference_valid"],
+        _ => &[],
+    }
+}
 
 /// Selectable only by Polar Mini; the main/browser release catalog is unchanged.
 pub const POLAR_MINI_ONLY_IDS: &[&str] = &[
-    "phan_breath_event",
-    "phan_breath_rate",
-    "flowborne_phase",
-    "flowborne_motion_score",
+    "adr_axis_difference_event",
+    "adr_axis_difference_rate",
+    "adr_moving_average_phase",
+    "adr_moving_average_difference",
 ];
 
-/// Returns the release-facing selection tier without retiring any public ID.
+/// Returns the selection tier for the current metric catalog.
 pub fn metric_selection_tier(id: &str) -> MetricSelectionTier {
+    if RELEASE_POLAR_RESPIRATION_IDS.contains(&id) {
+        return MetricSelectionTier::Release;
+    }
     if matches!(
         id,
-        "acc_breathing_magnitude"
-            | "phan_breath_event"
-            | "phan_breath_rate"
-            | "flowborne_phase"
-            | "flowborne_motion_score"
-            | "breathing_phase"
-            | "breathing_calibration"
-            | "breathing_axis_range"
-            | "breathing_rate"
-            | "breathing_dynamics_confidence"
-    ) || id.starts_with("breath_interval_")
-        || id.starts_with("breath_amplitude_")
+        "adr_pca_waveform"
+            | "adr_axis_difference_event"
+            | "adr_axis_difference_rate"
+            | "adr_moving_average_phase"
+            | "adr_moving_average_difference"
+            | "adr_pca_phase"
+            | "adr_pca_calibration"
+            | "adr_pca_range"
+            | "adr_pca_rate"
+            | "adr_dynamics_quality"
+    ) || id.starts_with("adr_interval_")
+        || id.starts_with("adr_amplitude_")
     {
         MetricSelectionTier::Compatibility
     } else {
@@ -274,63 +304,61 @@ fn formula_for(id: &str) -> &'static str {
         "coherence_peak_frequency" => "fpeak = argmax P(f), 0.04 ≤ f ≤ 0.26 Hz",
         "coherence_peak_power" => "Ppeak = ∫ P(f)df from fpeak−0.015 to fpeak+0.015 Hz",
         "coherence_total_power" => "Ptotal = ∫ P(f)df from 0.0033 to 0.4 Hz",
-        "acc_breathing_magnitude" => {
+        "adr_pca_waveform" => {
             "b(t) = dot[EMA_dt(selected ACC) − calibration center, calibrated PCA axis]"
         }
-        "breathing_volume" => {
+        "adr_pca_relative_amplitude" => {
             "waveform(t) = clamp[(b(t)−outputLower)/(outputUpper−outputLower), 0, 1]"
         }
-        "breathing_phase" => {
+        "adr_pca_phase" => {
             "phase(t) = hysteresis+dwell[EMA_dt(d((b−fixedLower)/fixedSpan)/dt)]; {−1,0,+1}"
         }
-        "breathing_calibration" => "progress(t) = elapsed accepted source time / calibration time",
-        "breathing_axis_range" => "axisRange = outputUpper − outputLower",
-        "breathing_signal_confidence" => {
-            "confidence = rangeQuality · motionQuality · PCA dominance"
-        }
-        "breathing_signal_ready" => "ready = calibrated ∧ notLost ∧ motionQuality ≥ 0.35",
-        "breathing_rate" => "rate = 60 / mean(same-polarity extremum intervals)",
-        "phan_breath_event" => {
+        "adr_pca_calibration" => "progress(t) = elapsed accepted source time / calibration time",
+        "adr_pca_range" => "axisRange = outputUpper − outputLower",
+        "adr_pca_quality" => "confidence = rangeQuality · motionQuality · PCA dominance",
+        "adr_pca_valid" => "ready = calibrated ∧ notLost ∧ motionQuality ≥ 0.35",
+        "adr_pca_rate" => "rate = 60 / mean(same-polarity extremum intervals)",
+        "adr_axis_difference_event" => {
             "event = onset[Σ |mean₀.₂s(axis) − mean₂₀₀s(axis)| > adaptive threshold, 1 s quiet, 0.25 s refractory]"
         }
-        "phan_breath_rate" => "rate = count(breath events in trailing 60 s) breaths/min",
-        "flowborne_motion_score" => {
+        "adr_axis_difference_rate" => "rate = count(breath events in trailing 60 s) breaths/min",
+        "adr_axis_mean_difference" => {
+            "w(t) = dot[mean_0.2s(ACC) - mean_200s(ACC), calibrated PCA axis]"
+        }
+        "adr_axis_difference_magnitude" => "m(t) = sum_axis |mean_0.2s(axis) - mean_200s(axis)|",
+        "adr_axis_difference_valid" => "valid = at least 0.2 s of accepted contiguous ACC samples",
+        "adr_moving_average_valid" => "valid = PCA ready and 2 s window filled and |contrast| <= 1",
+        "adr_moving_average_difference" => {
             "score = [mean(last 24/90 s, signed ACC projection) − mean(last 180/90 s, signed ACC projection)] / calibrated axis span"
         }
-        "flowborne_phase" => {
+        "adr_moving_average_phase" => {
             "phase = −2 if unready/gap/outlier, +1 if score > 0.025, −1 if score < −0.075, else 0"
         }
-        "breathing_dynamics_confidence" => {
-            "confidence = clamp(max(Ninterval,Namplitude) / 200, 0, 1)"
-        }
-        "breath_interval_mean" => "μI = (1/N) Σ intervalᵢ",
-        "breath_interval_sd" => "sI = √[Σ(intervalᵢ−μI)²/(N−1)]",
-        "breath_interval_cv" => "CVI = sI / |μI|",
-        "breath_interval_acw50" => "ACW50 = first lag k where autocorr(interval,k) < 0.5",
-        "breath_interval_psd_slope" => {
+        "adr_dynamics_quality" => "confidence = clamp(max(Ninterval,Namplitude) / 200, 0, 1)",
+        "adr_interval_mean" => "μI = (1/N) Σ intervalᵢ",
+        "adr_interval_sd" => "sI = √[Σ(intervalᵢ−μI)²/(N−1)]",
+        "adr_interval_cv" => "CVI = sI / |μI|",
+        "adr_interval_acw50" => "ACW50 = first lag k where autocorr(interval,k) < 0.5",
+        "adr_interval_psd_slope" => {
             "slope = OLS slope of log power on log frequency in the low-frequency interval spectrum"
         }
-        "breath_interval_lzc" => {
+        "adr_interval_lzc" => {
             "LZC = normalized Lempel–Ziv phrase count of mean-binarized intervals"
         }
-        "breath_interval_sampen" => "SampEn = −ln(A/B), m=2, r=0.2·SD, delay=1",
-        "breath_interval_mse" => {
-            "MSE = trapezoidal AUC of SampEn across coarse-graining scales 1…5"
-        }
-        "breath_amplitude_mean" => "μA = (1/N) Σ |peakᵢ − troughᵢ|",
-        "breath_amplitude_sd" => "sA = √[Σ(amplitudeᵢ−μA)²/(N−1)]",
-        "breath_amplitude_cv" => "CVA = sA / |μA|",
-        "breath_amplitude_acw50" => "ACW50 = first lag k where autocorr(amplitude,k) < 0.5",
-        "breath_amplitude_psd_slope" => {
+        "adr_interval_sampen" => "SampEn = −ln(A/B), m=2, r=0.2·SD, delay=1",
+        "adr_interval_mse" => "MSE = trapezoidal AUC of SampEn across coarse-graining scales 1…5",
+        "adr_amplitude_mean" => "μA = (1/N) Σ |peakᵢ − troughᵢ|",
+        "adr_amplitude_sd" => "sA = √[Σ(amplitudeᵢ−μA)²/(N−1)]",
+        "adr_amplitude_cv" => "CVA = sA / |μA|",
+        "adr_amplitude_acw50" => "ACW50 = first lag k where autocorr(amplitude,k) < 0.5",
+        "adr_amplitude_psd_slope" => {
             "slope = OLS slope of log power on log frequency in the low-frequency amplitude spectrum"
         }
-        "breath_amplitude_lzc" => {
+        "adr_amplitude_lzc" => {
             "LZC = normalized Lempel–Ziv phrase count of mean-binarized amplitudes"
         }
-        "breath_amplitude_sampen" => "SampEn = −ln(A/B), m=2, r=0.2·SD, delay=1",
-        "breath_amplitude_mse" => {
-            "MSE = trapezoidal AUC of SampEn across coarse-graining scales 1…5"
-        }
+        "adr_amplitude_sampen" => "SampEn = −ln(A/B), m=2, r=0.2·SD, delay=1",
+        "adr_amplitude_mse" => "MSE = trapezoidal AUC of SampEn across coarse-graining scales 1…5",
         "excitement_score" => "score = 1 − [Φ(zRR) + Φ(zRMSSD₁₀)] / 2",
         "excitometer" => "activation = logistic[0.65·z(HR) − 0.35·z(lnRMSSD)]",
         _ => "See the implementation and evidence catalog.",
@@ -354,10 +382,10 @@ fn formula_template_for(id: &str) -> Option<&'static str> {
         "sdnn" => Some("rr_sdnn(rr, 300)"),
         "pnn50" => Some("rr_pnn50(rr, 300)"),
         "sd1" => Some("rr_sd1(rr, 300)"),
-        "acc_breathing_magnitude" => {
-            Some("breathing_magnitude(x, y, z, true, false, true, 0.75, false, false)")
+        "adr_pca_waveform" => {
+            Some("adr_pca_waveform(x, y, z, true, false, true, 0.75, false, false)")
         }
-        "breathing_phase" => Some("breathing_phase(x, y, z, true, false, true, 0.75, 0.60, false)"),
+        "adr_pca_phase" => Some("adr_pca_phase(x, y, z, true, false, true, 0.75, 0.60, false)"),
         "excitement_score" => Some("excitement(rr, 300)"),
         "excitometer" => {
             Some("sigmoid(0.65*zscore_n(60000/rr, 20) - 0.35*zscore_n(rr_ln_rmssd(rr, 300), 20))")
@@ -367,41 +395,14 @@ fn formula_template_for(id: &str) -> Option<&'static str> {
 }
 
 fn formula_source_for(id: &str) -> &'static str {
+    if id.starts_with("adr_") {
+        return "accelerometer";
+    }
     match id {
         "raw_force" => "Vernier force",
         "vernier_steps" | "vernier_step_rate" => "Vernier pedometer",
         "vernier_respiration_rate" => "Vernier GDX-RB firmware",
-        "raw_acc"
-        | "acc_magnitude"
-        | "acc_breathing_magnitude"
-        | "breathing_volume"
-        | "breathing_phase"
-        | "breathing_calibration"
-        | "breathing_axis_range"
-        | "breathing_signal_confidence"
-        | "breathing_signal_ready"
-        | "breathing_rate"
-        | "phan_breath_event"
-        | "phan_breath_rate"
-        | "flowborne_phase"
-        | "flowborne_motion_score"
-        | "breathing_dynamics_confidence"
-        | "breath_interval_mean"
-        | "breath_interval_sd"
-        | "breath_interval_cv"
-        | "breath_interval_acw50"
-        | "breath_interval_psd_slope"
-        | "breath_interval_lzc"
-        | "breath_interval_sampen"
-        | "breath_interval_mse"
-        | "breath_amplitude_mean"
-        | "breath_amplitude_sd"
-        | "breath_amplitude_cv"
-        | "breath_amplitude_acw50"
-        | "breath_amplitude_psd_slope"
-        | "breath_amplitude_lzc"
-        | "breath_amplitude_sampen"
-        | "breath_amplitude_mse" => "accelerometer",
+        "raw_acc" | "acc_magnitude" => "accelerometer",
         "heart_rate" => "heartRate",
         "rr_interval"
         | "mean_nn"
@@ -457,7 +458,10 @@ pub fn metric_citations(metric: MetricDefinition) -> Vec<MetricCitation> {
             citation(BREATH_ACC, BREATH_ACC_URL),
         ];
     }
-    if matches!(metric.id, "flowborne_phase" | "flowborne_motion_score") {
+    if matches!(
+        metric.id,
+        "adr_moving_average_phase" | "adr_moving_average_difference"
+    ) {
         return vec![
             citation(FLOWBORNE_SOURCE, FLOWBORNE_SOURCE_URL),
             citation(
@@ -966,9 +970,9 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "Coherence"
     ),
     metric!(
-        "acc_breathing_magnitude",
-        "accBreathingMagnitude",
-        "ACC breathing projection (g)",
+        "adr_pca_waveform",
+        "adrPcaWaveform",
+        "ADR PCA waveform",
         "Signed principal-axis chest-motion projection",
         "g",
         "Breathing",
@@ -978,15 +982,15 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         BREATH_ACC_URL,
         "acc breath respiration magnitude waveform projection experimental",
         false,
-        true,
+        false,
         1,
         0.0,
-        "Breathing"
+        "Respiration"
     ),
     metric!(
-        "breathing_volume",
-        "breathingVolume",
-        "ACC breathing magnitude (0–1)",
+        "adr_pca_relative_amplitude",
+        "adrPcaRelativeAmplitude",
+        "ADR PCA relative amplitude",
         "Normalized waveform for belt-signal comparison",
         "0–1",
         "Breathing",
@@ -999,12 +1003,12 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         false,
         1,
         0.0,
-        "Breathing"
+        "Respiration"
     ),
     metric!(
-        "phan_breath_event",
-        "phanBreathEvent",
-        "Phan ACC breath event",
+        "adr_axis_difference_event",
+        "adrAxisDifferenceEvent",
+        "ADR axis-difference breath event",
         "Pulse when the adaptive ACC threshold detects a breath",
         "event",
         "Breathing",
@@ -1020,9 +1024,9 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "Markers"
     ),
     metric!(
-        "phan_breath_rate",
-        "phanBreathRate",
-        "Phan ACC breath count rate",
+        "adr_axis_difference_rate",
+        "adrAxisDifferenceRate",
+        "ADR axis-difference respiratory rate",
         "Detected events in the trailing 60 seconds, in breaths/min",
         "breaths/min",
         "Breathing",
@@ -1038,9 +1042,9 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "Respiration"
     ),
     metric!(
-        "flowborne_phase",
-        "flowbornePhase",
-        "Flowborne ACC phase",
+        "adr_moving_average_phase",
+        "adrMovingAveragePhase",
+        "ADR moving-average respiratory phase",
         "+1 inhale · −1 exhale · 0 hold · −2 bad signal",
         "class",
         "Breathing",
@@ -1056,13 +1060,13 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "Breathing"
     ),
     metric!(
-        "flowborne_motion_score",
-        "flowborneMotionScore",
-        "Flowborne ACC motion score",
+        "adr_moving_average_difference",
+        "adrMovingAverageDifference",
+        "ADR moving-average difference waveform",
         "Short-minus-long signed ACC mean / calibrated span",
-        "span",
+        "ratio",
         "Breathing",
-        "The signed classifier input is the 0.267-second mean of the H10 chest-motion projection minus its 2-second mean, divided by the current calibrated axis span. It is emitted only when the Flowborne phase input is ready. This dimensionless acceleration contrast is not controller displacement or measured lung volume.",
+        "This continuous candidate subtracts the 2-second mean of the signed PCA projection from its 0.267-second mean and divides by the calibrated span. Finite diagnostic values remain available during window filling or poor motion quality; the companion validity stream identifies usable intervals. The Flowborne-style transformation is an acceleration-derived contrast, with frequency-dependent shape and delay.",
         "unvalidated H10 adaptation",
         FLOWBORNE_SOURCE,
         FLOWBORNE_SOURCE_URL,
@@ -1071,12 +1075,84 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         false,
         1,
         0.0,
-        "Breathing"
+        "Respiration"
     ),
     metric!(
-        "breathing_signal_confidence",
-        "breathingSignalConfidence",
-        "ACC breathing signal confidence",
+        "adr_moving_average_valid",
+        "adrMovingAverageValid",
+        "ADR moving-average validity",
+        "PCA readiness, full 2 s window and contrast range",
+        "0/1",
+        "Breathing",
+        "One indicates a filled moving-average window, usable PCA input and contrast within one calibrated span. Zero flags diagnostic waveform samples; it does not turn them into a respiratory pause.",
+        "processing readiness indicator",
+        FLOWBORNE_SOURCE,
+        FLOWBORNE_SOURCE_URL,
+        "adr moving average validity flowborne",
+        false,
+        false,
+        1,
+        0.0,
+        "SignalQuality"
+    ),
+    metric!(
+        "adr_axis_mean_difference",
+        "adrAxisMeanDifference",
+        "ADR signed axis-mean difference waveform",
+        "Phan windows projected onto the calibrated PCA axis",
+        "g",
+        "Breathing",
+        "This signed adaptation projects the three per-axis 0.2-second minus 200-second means onto the fixed PCA axis. It preserves direction instead of applying the original Phan rectification, and shares PCA axis learning rather than constituting an independent axis estimator. During startup the long mean uses available samples; both axis-window and PCA validity streams must be consulted.",
+        "live waveform candidate",
+        PHAN_SOURCE,
+        PHAN_SOURCE_URL,
+        "adr phan signed waveform mean difference pca",
+        false,
+        false,
+        1,
+        0.0,
+        "Respiration"
+    ),
+    metric!(
+        "adr_axis_difference_magnitude",
+        "adrAxisDifferenceMagnitude",
+        "ADR rectified axis-difference waveform",
+        "Original Phan sum of absolute per-axis mean differences",
+        "g",
+        "Breathing",
+        "This continuous output exposes the original Phan detector input before thresholding or counting events. Absolute per-axis differences discard inhalation polarity and may introduce two excursions per respiratory cycle; it is retained as a distinct amplitude candidate for passive comparison. The 200-second baseline fills progressively from the available source samples.",
+        "live waveform candidate",
+        PHAN_SOURCE,
+        PHAN_SOURCE_URL,
+        "adr phan rectified waveform absolute magnitude",
+        false,
+        false,
+        1,
+        0.0,
+        "Respiration"
+    ),
+    metric!(
+        "adr_axis_difference_valid",
+        "adrAxisDifferenceValid",
+        "ADR axis-difference validity",
+        "At least 0.2 s of contiguous source data",
+        "0/1",
+        "Breathing",
+        "One indicates a filled short window after the most recent gap or clock reset. The long baseline continues filling for 200 seconds, and the signed adaptation additionally requires PCA validity; this flag is not physiological validation.",
+        "processing readiness indicator",
+        PHAN_SOURCE,
+        PHAN_SOURCE_URL,
+        "adr phan axis difference validity",
+        false,
+        false,
+        1,
+        0.0,
+        "SignalQuality"
+    ),
+    metric!(
+        "adr_pca_quality",
+        "adrPcaQuality",
+        "ADR PCA signal quality index",
         "Calibrated range, motion, and PCA-dominance quality index",
         "0–1",
         "Breathing",
@@ -1089,12 +1165,12 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         false,
         1,
         0.0,
-        "Breathing"
+        "SignalQuality"
     ),
     metric!(
-        "breathing_signal_ready",
-        "breathingSignalReady",
-        "ACC breathing signal ready",
+        "adr_pca_valid",
+        "adrPcaValid",
+        "ADR PCA validity",
         "Calibration, freshness, and motion gate",
         "0/1",
         "Breathing",
@@ -1107,12 +1183,12 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         false,
         1,
         0.0,
-        "Breathing"
+        "SignalQuality"
     ),
     metric!(
-        "breathing_phase",
-        "breathingPhase",
-        "Breath phase classifier",
+        "adr_pca_phase",
+        "adrPcaPhase",
+        "ADR PCA respiratory phase",
         "+1 inhale · −1 exhale · 0 pause or not ready",
         "class",
         "Breathing",
@@ -1128,8 +1204,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "Breathing"
     ),
     metric!(
-        "breathing_calibration",
-        "breathingCalibration",
+        "adr_pca_calibration",
+        "adrPcaCalibration",
         "Breathing calibration",
         "Principal-axis calibration progress",
         "0–1",
@@ -1146,8 +1222,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "Breathing"
     ),
     metric!(
-        "breathing_axis_range",
-        "breathingAxisRange",
+        "adr_pca_range",
+        "adrPcaRange",
         "Breathing axis range",
         "Calibrated 5th–95th percentile travel",
         "g",
@@ -1164,8 +1240,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "Breathing"
     ),
     metric!(
-        "breathing_rate",
-        "breathingRate",
+        "adr_pca_rate",
+        "adrPcaRate",
         "Breathing rate",
         "60 divided by mean peak-to-peak interval",
         "breaths/min",
@@ -1182,8 +1258,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "Breathing"
     ),
     metric!(
-        "breathing_dynamics_confidence",
-        "breathingDynamicsConfidence",
+        "adr_dynamics_quality",
+        "adrDynamicsQuality",
         "Breathing-dynamics confidence",
         "Accepted-breath count and freshness",
         "0–1",
@@ -1200,8 +1276,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "BreathingDynamics"
     ),
     metric!(
-        "breath_interval_mean",
-        "breathIntervalMean",
+        "adr_interval_mean",
+        "adrIntervalMean",
         "Breath interval mean",
         "Mean like-polarity extremum interval",
         "s",
@@ -1218,8 +1294,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "BreathingDynamics"
     ),
     metric!(
-        "breath_interval_sd",
-        "breathIntervalSD",
+        "adr_interval_sd",
+        "adrIntervalSD",
         "Breath interval SD",
         "Sample standard deviation of intervals",
         "s",
@@ -1236,8 +1312,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "BreathingDynamics"
     ),
     metric!(
-        "breath_interval_cv",
-        "breathIntervalCV",
+        "adr_interval_cv",
+        "adrIntervalCV",
         "Breath interval CV",
         "Interval SD divided by mean",
         "ratio",
@@ -1254,8 +1330,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "BreathingDynamics"
     ),
     metric!(
-        "breath_interval_acw50",
-        "breathIntervalACW50",
+        "adr_interval_acw50",
+        "adrIntervalACW50",
         "Breath interval ACW50",
         "First autocorrelation lag below 0.5",
         "breaths",
@@ -1272,8 +1348,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "BreathingDynamics"
     ),
     metric!(
-        "breath_interval_psd_slope",
-        "breathIntervalPsdSlope",
+        "adr_interval_psd_slope",
+        "adrIntervalPsdSlope",
         "Breath interval PSD slope",
         "Low-frequency log–log spectral slope",
         "slope",
@@ -1290,8 +1366,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "BreathingDynamics"
     ),
     metric!(
-        "breath_interval_lzc",
-        "breathIntervalLZC",
+        "adr_interval_lzc",
+        "adrIntervalLZC",
         "Breath interval Lempel–Ziv",
         "Median-binarized normalized complexity",
         "0–1",
@@ -1308,8 +1384,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "BreathingDynamics"
     ),
     metric!(
-        "breath_interval_sampen",
-        "breathIntervalSampEn",
+        "adr_interval_sampen",
+        "adrIntervalSampEn",
         "Breath interval sample entropy",
         "m=2 · r=0.2 SD · delay 1",
         "entropy",
@@ -1326,8 +1402,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "BreathingDynamics"
     ),
     metric!(
-        "breath_interval_mse",
-        "breathIntervalMSE",
+        "adr_interval_mse",
+        "adrIntervalMSE",
         "Breath interval multiscale entropy",
         "Entropy AUC across scales 1–5",
         "entropy AUC",
@@ -1344,8 +1420,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "BreathingDynamics"
     ),
     metric!(
-        "breath_amplitude_mean",
-        "breathAmplitudeMean",
+        "adr_amplitude_mean",
+        "adrAmplitudeMean",
         "Breath amplitude mean",
         "Mean alternating peak-to-trough excursion",
         "0–1",
@@ -1362,8 +1438,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "BreathingDynamics"
     ),
     metric!(
-        "breath_amplitude_sd",
-        "breathAmplitudeSD",
+        "adr_amplitude_sd",
+        "adrAmplitudeSD",
         "Breath amplitude SD",
         "Sample standard deviation of excursions",
         "0–1",
@@ -1380,8 +1456,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "BreathingDynamics"
     ),
     metric!(
-        "breath_amplitude_cv",
-        "breathAmplitudeCV",
+        "adr_amplitude_cv",
+        "adrAmplitudeCV",
         "Breath amplitude CV",
         "Amplitude SD divided by mean",
         "ratio",
@@ -1398,8 +1474,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "BreathingDynamics"
     ),
     metric!(
-        "breath_amplitude_acw50",
-        "breathAmplitudeACW50",
+        "adr_amplitude_acw50",
+        "adrAmplitudeACW50",
         "Breath amplitude ACW50",
         "First autocorrelation lag below 0.5",
         "breaths",
@@ -1416,8 +1492,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "BreathingDynamics"
     ),
     metric!(
-        "breath_amplitude_psd_slope",
-        "breathAmplitudePsdSlope",
+        "adr_amplitude_psd_slope",
+        "adrAmplitudePsdSlope",
         "Breath amplitude PSD slope",
         "Low-frequency log–log spectral slope",
         "slope",
@@ -1434,8 +1510,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "BreathingDynamics"
     ),
     metric!(
-        "breath_amplitude_lzc",
-        "breathAmplitudeLZC",
+        "adr_amplitude_lzc",
+        "adrAmplitudeLZC",
         "Breath amplitude Lempel–Ziv",
         "Mean-binarized normalized complexity",
         "0–1",
@@ -1452,8 +1528,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "BreathingDynamics"
     ),
     metric!(
-        "breath_amplitude_sampen",
-        "breathAmplitudeSampEn",
+        "adr_amplitude_sampen",
+        "adrAmplitudeSampEn",
         "Breath amplitude sample entropy",
         "m=2 · r=0.2 SD · delay 1",
         "entropy",
@@ -1470,8 +1546,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
         "BreathingDynamics"
     ),
     metric!(
-        "breath_amplitude_mse",
-        "breathAmplitudeMSE",
+        "adr_amplitude_mse",
+        "adrAmplitudeMSE",
         "Breath amplitude multiscale entropy",
         "Entropy AUC across scales 1–5",
         "entropy AUC",
@@ -1538,14 +1614,17 @@ mod tests {
 
     #[test]
     fn release_polar_respiration_surface_is_small_and_quality_gated() {
-        assert_eq!(
-            RELEASE_POLAR_RESPIRATION_IDS,
-            [
-                "breathing_volume",
-                "breathing_signal_confidence",
-                "breathing_signal_ready",
-            ]
+        assert!(
+            METRIC_CATALOG.len() <= 64,
+            "metric selection bitset capacity exceeded"
         );
+        for id in ADR_WAVEFORM_IDS {
+            let definition = metric_definition(id).unwrap();
+            assert_eq!(definition.stream_type, "Respiration");
+            assert_eq!(definition.channels, 1);
+            assert!(!definition.normalizable);
+            assert!(!adr_companion_ids(id).is_empty());
+        }
         for metric in METRIC_CATALOG.iter().filter(|metric| {
             metric.category == "Breathing" || metric.category == "Breathing dynamics"
         }) {
@@ -1567,14 +1646,14 @@ mod tests {
 
     #[test]
     fn canonical_breathing_waveform_cannot_be_secondarily_normalized() {
-        let metric = metric_definition("breathing_volume").unwrap();
+        let metric = metric_definition("adr_pca_relative_amplitude").unwrap();
         assert_eq!(metric.unit, "0–1");
         assert!(!metric.normalizable);
     }
 
     #[test]
     fn timed_pca_waveform_is_not_misrepresented_as_a_scalar_formula_template() {
-        let definition = metric_formula_definition("breathing_volume");
+        let definition = metric_formula_definition("adr_pca_relative_amplitude");
         assert!(definition.formula.contains("outputLower"));
         assert_eq!(definition.formula_template, None);
     }

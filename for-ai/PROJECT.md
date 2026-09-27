@@ -8,7 +8,8 @@ Standalone Polar H10 and Vernier Go Direct mini streamers for low-latency BLE-to
 
 Develop and release two independent desktop mini streamers, Polar Stream Mini
 and Vernier Stream Mini. Keep their raw BLE-to-LSL paths observable and fast;
-keep derived breathing outputs explicitly identified and quality gated.
+keep accelerometer-derived respiration (ADR) candidates explicitly identified
+with readiness/quality companions while retaining finite diagnostic values.
 
 ## Non-goals
 
@@ -17,6 +18,7 @@ keep derived breathing outputs explicitly identified and quality gated.
 - No second protocol decoder, metric catalog, or output implementation in the
   WebView.
 - No physiological accuracy claim without an independent reference recording.
+- Recording policy and Respira consumption belong to external projects.
 
 ## Product/control-plane boundary
 
@@ -32,6 +34,9 @@ window, BLE session, preferences, executable, and installer. Shared
 `crates/stream-mini-runtime` owns one-session lifecycle and LSL publication;
 the other crates own Polar and Vernier protocol, timing, metrics, and output
 contracts. Raw sensor publication precedes derived metrics and UI delivery.
+Polar raw ECG/ACC and Vernier's complete raw numeric row (including force) are
+mandatory when available. Four optional continuous ADR candidates use dedicated
+scalar LSL outlets in either output mode; old respiratory IDs have no aliases.
 JavaScript is presentation and control, never the authoritative data path.
 The Pages metric catalog is generated from Rust definitions; the site documents
 the separate Vernier force-to-waveform path alongside the Polar catalog.

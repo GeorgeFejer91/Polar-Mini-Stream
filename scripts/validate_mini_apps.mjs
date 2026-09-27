@@ -213,15 +213,17 @@ async function validateNormalWindow(app) {
     await page.locator('#metric-options input[value="respirationRate"]').check();
     await page.waitForFunction(() => window.__miniSaves.at(-1)?.vernierOutputs?.length === 7);
     assert.equal(await page.locator("#metric-count").textContent(), "7/7");
-    await page.locator('#metric-options input[value="rawVernier"]').uncheck();
+    assert.equal(await page.locator('#metric-options input[value="rawVernier"]').isDisabled(), true);
+    await page.locator('#metric-options input[value="vernierBreathing"]').uncheck();
     await page.waitForFunction(() => window.__miniSaves.at(-1)?.vernierOutputs?.length === 6);
     assert.equal(await page.locator("#metric-count").textContent(), "6/7");
-    assert.equal(await page.locator('#metric-options input[value="rawVernier"]').isChecked(), false);
+    assert.equal(await page.locator('#metric-options input[value="rawVernier"]').isChecked(), true);
     assert.equal(await page.evaluate(() => window.__miniCalls.includes("disconnect_device")), false);
     const savedPreferences = await page.evaluate(() => window.__miniSaves.at(-1));
     const reopened = await createPage(app, { mockMode: false, lslHealthy: true, savedPreferences });
     await reopened.goto(appUrl(app));
-    assert.equal(await reopened.locator('#metric-options input[value="rawVernier"]').isChecked(), false);
+    assert.equal(await reopened.locator('#metric-options input[value="rawVernier"]').isChecked(), true);
+    assert.equal(await reopened.locator('#metric-options input[value="rawVernier"]').isDisabled(), true);
     assert.equal(await reopened.locator('#metric-options input[value="steps"]').isChecked(), true);
     assert.equal(await reopened.locator('#metric-options input[value="stepRate"]').isChecked(), true);
     assert.equal(await reopened.locator('#metric-options input[value="respirationRate"]').isChecked(), true);
@@ -230,18 +232,17 @@ async function validateNormalWindow(app) {
     await assertNoOverflow(reopened);
     await reopened.screenshot({ path: path.join(outputDirectory, "vernier-mini-outputs.png"), omitBackground: true });
     await reopened.locator('#metric-options input[value="rawForce"]').uncheck();
-    await reopened.locator('#metric-options input[value="vernierBreathing"]').uncheck();
     await reopened.locator('#metric-options input[value="steps"]').uncheck();
     await reopened.locator('#metric-options input[value="stepRate"]').uncheck();
     await reopened.locator('#metric-options input[value="respirationRate"]').uncheck();
     await reopened.locator('#metric-options input[value="signalStatus"]').click();
-    assert.equal(await reopened.locator('#metric-options input[value="signalStatus"]').isChecked(), true);
+    assert.equal(await reopened.locator('#metric-options input[value="signalStatus"]').isChecked(), false);
     assert.equal(await reopened.locator("#metric-count").textContent(), "1/7");
     await reopened.evaluate(() => {
       window.__emitMiniEvent({ kind: "connection", connected: true, deviceName: "Test belt" });
       window.__emitMiniEvent({ kind: "samples", vernierRows: 20, metricSamples: 20, lsl: "Publishing 1 stream(s)" });
     });
-    assert.equal(await reopened.locator("#mini-node").evaluate((node) => node.classList.contains("streaming")), false);
+    assert.equal(await reopened.locator("#mini-node").evaluate((node) => node.classList.contains("streaming")), true);
     await reopened.close();
     assert.equal(await page.locator("#device-select option").count(), 1);
     await page.locator("#scan-button").click();
@@ -261,9 +262,10 @@ async function validateNormalWindow(app) {
 
   if (app.kind === "polar") {
     const accIds = [
-      "acc_breathing_magnitude", "breathing_phase", "breathing_rate",
-      "breath_interval_mean", "phan_breath_event", "phan_breath_rate",
-      "flowborne_phase", "flowborne_motion_score",
+      "adr_pca_waveform", "adr_pca_phase", "adr_pca_rate",
+      "adr_interval_mean", "adr_axis_difference_event", "adr_axis_difference_rate",
+      "adr_moving_average_phase", "adr_moving_average_difference",
+      "adr_axis_mean_difference", "adr_axis_difference_magnitude",
     ];
     await page.locator("#metrics-button").click();
     for (const id of accIds) {
@@ -273,7 +275,12 @@ async function validateNormalWindow(app) {
       await option.check();
     }
     await page.waitForFunction(() => window.__miniSaves.some((save) =>
-      ["acc_breathing_magnitude", "breathing_phase", "breathing_rate", "breath_interval_mean", "phan_breath_event", "phan_breath_rate", "flowborne_phase", "flowborne_motion_score"].every((id) => save.polarOutputs?.includes(id))));
+      ["adr_pca_waveform", "adr_pca_phase", "adr_pca_rate", "adr_interval_mean", "adr_axis_difference_event", "adr_axis_difference_rate", "adr_moving_average_phase", "adr_moving_average_difference", "adr_axis_mean_difference", "adr_axis_difference_magnitude"].every((id) => save.polarOutputs?.includes(id))));
+    for (const id of ["adr_pca_quality", "adr_pca_valid", "adr_moving_average_valid", "adr_axis_difference_valid"]) {
+      const companion = page.locator(`#metric-options input[value="${id}"]`);
+      assert.equal(await companion.isChecked(), true);
+      assert.equal(await companion.isDisabled(), true);
+    }
     const savedPreferences = await page.evaluate(() => window.__miniSaves.at(-1));
     const reopened = await createPage(app, { mockMode: false, lslHealthy: true, savedPreferences });
     await reopened.goto(appUrl(app));
@@ -289,7 +296,7 @@ async function validateNormalWindow(app) {
     });
     await reopened.locator("#reset-metrics").click();
     await reopened.waitForFunction(() => window.__miniSaves.some((save) =>
-      save.polarOutputs?.length === 4 && !save.polarOutputs.includes("phan_breath_event")));
+      save.polarOutputs?.length === 4 && !save.polarOutputs.includes("adr_axis_difference_event")));
     assert.equal(await reopened.locator("#reset-metrics").isDisabled(), true);
     assert.equal(await reopened.evaluate(() => window.__miniCalls.includes("disconnect_device")), false);
     const resetPreferences = await reopened.evaluate(() => window.__miniSaves.at(-1));
@@ -297,7 +304,7 @@ async function validateNormalWindow(app) {
     const resetReopened = await createPage(app, { mockMode: false, lslHealthy: true, savedPreferences: resetPreferences });
     await resetReopened.goto(appUrl(app));
     await resetReopened.locator("#metrics-button").click();
-    assert.equal(await resetReopened.locator('#metric-options input[value="phan_breath_event"]').isChecked(), false);
+    assert.equal(await resetReopened.locator('#metric-options input[value="adr_axis_difference_event"]').isChecked(), false);
     await resetReopened.close();
     await page.locator("#metrics-close").click();
   }
@@ -306,7 +313,7 @@ async function validateNormalWindow(app) {
   await page.waitForFunction(() => window.__miniSaves.some((save) => save.outputMode === "singleStream"));
   assert.equal(await page.locator("#stream-mode-toggle").isChecked(), true);
   if (app.kind === "polar") {
-    assert.match(await page.locator("#signal-list").textContent(), /single sparse LSL/);
+    assert.match(await page.locator("#signal-list").textContent(), /single \+ ADR LSL/);
   } else {
     await assertInlineOutputs(page);
   }
@@ -381,21 +388,21 @@ async function validatePreferenceMemory(app) {
   await page.evaluate(() => {
     for (const [id, checked] of [
       ["steps", true], ["stepRate", true], ["respirationRate", true],
-      ["rawVernier", false], ["rawForce", false], ["vernierBreathing", false],
+      ["rawForce", false], ["vernierBreathing", false],
     ]) {
       const input = document.querySelector(`#metric-options input[value="${id}"]`);
       input.checked = checked;
       input.dispatchEvent(new Event("change", { bubbles: true }));
     }
   });
-  await page.waitForFunction(() => window.__miniSaves.length === 6);
-  assert.equal(await page.locator("#metric-count").textContent(), "4/7");
+  await page.waitForFunction(() => window.__miniSaves.length === 5);
+  assert.equal(await page.locator("#metric-count").textContent(), "5/7");
   await page.locator("#stream-mode-toggle").check();
   await page.locator("#auto-connect").check();
   await page.locator("#stream-name").fill("Remembered-Vernier");
   await page.waitForFunction(() => window.__miniSaves.at(-1)?.streamName === "Remembered-Vernier");
   const savedPreferences = await page.evaluate(() => window.__miniSaves.at(-1));
-  assert.deepEqual(savedPreferences.vernierOutputs, ["signalStatus", "steps", "stepRate", "respirationRate"]);
+  assert.deepEqual(savedPreferences.vernierOutputs, ["rawVernier", "signalStatus", "steps", "stepRate", "respirationRate"]);
   assert.equal(savedPreferences.outputMode, "singleStream");
   assert.equal(savedPreferences.autoConnect, true);
   await page.close();
@@ -494,14 +501,20 @@ async function createPage(app, options) {
             scanLabel: app.scanLabel,
             preferences,
             metrics: app.kind === "polar" ? [
-              { id: "acc_breathing_magnitude", streamSuffix: "accBreathingMagnitude", label: "ACC breathing projection", detail: "Signed ACC projection", category: "Breathing", direct: false },
-              { id: "breathing_phase", streamSuffix: "breathingPhase", label: "Breathing phase", detail: "Three-state classifier", category: "Breathing", direct: false },
-              { id: "breathing_rate", streamSuffix: "breathingRate", label: "Breathing rate", detail: "Cycle rate", category: "Breathing", direct: false },
-              { id: "breath_interval_mean", streamSuffix: "breathIntervalMean", label: "Breath interval mean", detail: "Cycle interval", category: "Breathing dynamics", direct: false },
-              { id: "phan_breath_event", streamSuffix: "phanBreathEvent", label: "Phan ACC breath event", detail: "Detected breath pulse", category: "Breathing", direct: false },
-              { id: "phan_breath_rate", streamSuffix: "phanBreathRate", label: "Phan ACC breath count rate", detail: "Rolling count", category: "Breathing", direct: false },
-              { id: "flowborne_phase", streamSuffix: "flowbornePhase", label: "Flowborne ACC phase", detail: "Four-state classifier", category: "Breathing", direct: false },
-              { id: "flowborne_motion_score", streamSuffix: "flowborneMotionScore", label: "Flowborne ACC motion score", detail: "Signed contrast", category: "Breathing", direct: false },
+              { id: "adr_pca_waveform", streamSuffix: "adrPcaWaveform", label: "ADR PCA waveform", detail: "Signed ACC projection", category: "Breathing", direct: false },
+              { id: "adr_pca_quality", streamSuffix: "adrPcaQuality", label: "ADR PCA quality", detail: "Motion quality", category: "Breathing", direct: false },
+              { id: "adr_pca_valid", streamSuffix: "adrPcaValid", label: "ADR PCA validity", detail: "Readiness flag", category: "Breathing", direct: false },
+              { id: "adr_pca_phase", streamSuffix: "adrPcaPhase", label: "Breathing phase", detail: "Three-state classifier", category: "Breathing", direct: false },
+              { id: "adr_pca_rate", streamSuffix: "adrPcaRate", label: "Breathing rate", detail: "Cycle rate", category: "Breathing", direct: false },
+              { id: "adr_interval_mean", streamSuffix: "adrIntervalMean", label: "Breath interval mean", detail: "Cycle interval", category: "Breathing dynamics", direct: false },
+              { id: "adr_axis_difference_event", streamSuffix: "adrAxisDifferenceEvent", label: "Phan ACC breath event", detail: "Detected breath pulse", category: "Breathing", direct: false },
+              { id: "adr_axis_difference_rate", streamSuffix: "adrAxisDifferenceRate", label: "Phan ACC breath count rate", detail: "Rolling count", category: "Breathing", direct: false },
+              { id: "adr_moving_average_phase", streamSuffix: "adrMovingAveragePhase", label: "Flowborne ACC phase", detail: "Four-state classifier", category: "Breathing", direct: false },
+              { id: "adr_moving_average_difference", streamSuffix: "adrMovingAverageDifference", label: "ADR moving-average waveform", detail: "Signed contrast", category: "Breathing", direct: false },
+              { id: "adr_moving_average_valid", streamSuffix: "adrMovingAverageValid", label: "ADR moving-average validity", detail: "Readiness flag", category: "Breathing", direct: false },
+              { id: "adr_axis_mean_difference", streamSuffix: "adrAxisMeanDifference", label: "ADR signed axis-mean difference", detail: "Signed Phan-window adaptation", category: "Breathing", direct: false },
+              { id: "adr_axis_difference_magnitude", streamSuffix: "adrAxisDifferenceMagnitude", label: "ADR rectified axis difference", detail: "Original Phan continuous score", category: "Breathing", direct: false },
+              { id: "adr_axis_difference_valid", streamSuffix: "adrAxisDifferenceValid", label: "ADR axis-difference validity", detail: "Readiness flag", category: "Breathing", direct: false },
             ] : [],
             session: null,
             mockMode: options.mockMode,
@@ -605,6 +618,9 @@ async function assertNoOverflow(page) {
     horizontal: document.documentElement.scrollWidth - window.innerWidth,
     vertical: document.documentElement.scrollHeight - window.innerHeight,
   }));
+  if (overflow.horizontal > 0 || overflow.vertical > 0) {
+    await page.screenshot({ path: path.join(outputDirectory, "mini-overflow.png"), fullPage: true });
+  }
   assert.ok(overflow.horizontal <= 0, `horizontal overflow: ${overflow.horizontal}px`);
   assert.ok(overflow.vertical <= 0, `vertical overflow: ${overflow.vertical}px`);
 }

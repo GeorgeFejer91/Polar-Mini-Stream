@@ -27,11 +27,11 @@ pub struct BreathingDynamicsSnapshot {
 
 impl BreathingDynamicsSnapshot {
     pub(crate) fn samples(self) -> Vec<MetricSample> {
-        let mut values = vec![sample("breathing_dynamics_confidence", self.confidence_01)];
+        let mut values = vec![sample("adr_dynamics_quality", self.confidence_01)];
         if let Some(interval) = self.interval {
             values.extend(feature_samples("interval", interval));
             if interval.mean > 0.0 {
-                values.push(sample("breathing_rate", 60.0 / interval.mean));
+                values.push(sample("adr_pca_rate", 60.0 / interval.mean));
             }
         }
         if let Some(amplitude) = self.amplitude {
@@ -412,25 +412,25 @@ fn coarse_grain(values: &[f32], scale: usize) -> Vec<f32> {
 fn feature_samples(kind: &str, features: FeatureSet) -> Vec<MetricSample> {
     let ids = if kind == "interval" {
         [
-            "breath_interval_mean",
-            "breath_interval_sd",
-            "breath_interval_cv",
-            "breath_interval_acw50",
-            "breath_interval_psd_slope",
-            "breath_interval_lzc",
-            "breath_interval_sampen",
-            "breath_interval_mse",
+            "adr_interval_mean",
+            "adr_interval_sd",
+            "adr_interval_cv",
+            "adr_interval_acw50",
+            "adr_interval_psd_slope",
+            "adr_interval_lzc",
+            "adr_interval_sampen",
+            "adr_interval_mse",
         ]
     } else {
         [
-            "breath_amplitude_mean",
-            "breath_amplitude_sd",
-            "breath_amplitude_cv",
-            "breath_amplitude_acw50",
-            "breath_amplitude_psd_slope",
-            "breath_amplitude_lzc",
-            "breath_amplitude_sampen",
-            "breath_amplitude_mse",
+            "adr_amplitude_mean",
+            "adr_amplitude_sd",
+            "adr_amplitude_cv",
+            "adr_amplitude_acw50",
+            "adr_amplitude_psd_slope",
+            "adr_amplitude_lzc",
+            "adr_amplitude_sampen",
+            "adr_amplitude_mse",
         ]
     };
     let values = [
