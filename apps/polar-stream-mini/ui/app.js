@@ -5,11 +5,13 @@
   const nativeWindow = window.__TAURI__?.window?.getCurrentWindow?.();
   const isNative = Boolean(core?.invoke && core?.Channel);
   const directPolarOutputs = Object.freeze(["raw_ecg", "raw_acc", "heart_rate", "rr_interval"]);
-  const releaseBreathingIds = Object.freeze([
-    "breathing_volume",
-    "breathing_signal_confidence",
-    "breathing_signal_ready",
-  ]);
+  const adrCompanions = Object.freeze({
+    adr_pca_waveform: ["adr_pca_quality", "adr_pca_valid"],
+    adr_pca_relative_amplitude: ["adr_pca_quality", "adr_pca_valid"],
+    adr_moving_average_difference: ["adr_moving_average_valid", "adr_pca_quality"],
+    adr_axis_mean_difference: ["adr_axis_difference_valid", "adr_pca_valid", "adr_pca_quality"],
+    adr_axis_difference_magnitude: ["adr_axis_difference_valid"],
+  });
   const state = {
     kind: "polar",
     productName: "Polar Stream Mini",
@@ -200,7 +202,8 @@
     const chips = [];
     if (state.kind === "polar") {
       if (state.preferences.outputMode === "singleStream") {
-        chips.push("single sparse LSL");
+        chips.push(state.preferences.polarOutputs?.some((id) => id.startsWith("adr_"))
+          ? "single + ADR LSL" : "single sparse LSL");
       }
       const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
       for (const id of directPolarOutputs) chips.push(streamSuffix(id));
@@ -333,6 +336,8 @@
       checkbox.type = "checkbox";
       checkbox.value = metric.id;
       checkbox.checked = selected.has(metric.id);
+      checkbox.disabled = Object.entries(adrCompanions).some(([waveform, required]) =>
+        selected.has(waveform) && required.includes(metric.id));
       checkbox.addEventListener("change", () => {
         updateMetricSelection(metric.id, checkbox.checked);
         renderMetricDialog();
@@ -357,15 +362,19 @@
 
   function updateMetricSelection(id, checked) {
     const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
-    if (releaseBreathingIds.includes(id)) {
-      for (const breathingId of releaseBreathingIds) {
-        if (checked) selected.add(breathingId);
-        else selected.delete(breathingId);
-      }
-    } else if (checked) {
+    if (checked) {
       selected.add(id);
     } else {
       selected.delete(id);
+    }
+    if (!checked && adrCompanions[id]) {
+      for (const companion of adrCompanions[id]) {
+        if (!Object.entries(adrCompanions).some(([waveform, required]) =>
+          selected.has(waveform) && required.includes(companion))) selected.delete(companion);
+      }
+    }
+    for (const waveform of selected) {
+      for (const companion of adrCompanions[waveform] || []) selected.add(companion);
     }
     for (const direct of directPolarOutputs) selected.add(direct);
     state.preferences.polarOutputs = [...selected];

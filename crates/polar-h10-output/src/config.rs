@@ -77,21 +77,21 @@ impl SourcePalette {
 }
 
 const RELEASE_BREATHING_OUTPUT_IDS: [&str; 3] = [
-    "breathing_volume",
-    "breathing_signal_confidence",
-    "breathing_signal_ready",
+    "adr_pca_relative_amplitude",
+    "adr_pca_quality",
+    "adr_pca_valid",
 ];
 
 // Outside the complete release set, keep the historical lookup order so a
 // restored compatibility-only configuration retains its saved processor.
 const BREATHING_OUTPUT_IDS: [&str; 7] = [
-    "breathing_phase",
-    "acc_breathing_magnitude",
-    "breathing_volume",
-    "breathing_calibration",
-    "breathing_axis_range",
-    "breathing_signal_confidence",
-    "breathing_signal_ready",
+    "adr_pca_phase",
+    "adr_pca_waveform",
+    "adr_pca_relative_amplitude",
+    "adr_pca_calibration",
+    "adr_pca_range",
+    "adr_pca_quality",
+    "adr_pca_valid",
 ];
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -374,7 +374,7 @@ impl Default for MetricOutputOptions {
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MetricProcessingOptions {
-    #[serde(default, alias = "breathingPhase")]
+    #[serde(default, alias = "adrPcaPhase")]
     pub breathing: Option<BreathingSettings>,
 }
 
@@ -629,15 +629,17 @@ mod tests {
     }
 
     #[test]
-    fn breathing_display_names_change_without_changing_public_ids_or_suffixes() {
-        let normalized = MetricSpec::for_id("breathing_volume").unwrap();
-        assert_eq!(normalized.id, "breathing_volume");
-        assert_eq!(normalized.suffix(), "breathingVolume");
-        assert_eq!(normalized.label, "ACC breathing magnitude (0–1)");
-        let projection = MetricSpec::for_id("acc_breathing_magnitude").unwrap();
-        assert_eq!(projection.id, "acc_breathing_magnitude");
-        assert_eq!(projection.suffix(), "accBreathingMagnitude");
-        assert_eq!(projection.label, "ACC breathing projection (g)");
+    fn adr_names_distinguish_native_projection_from_relative_amplitude() {
+        let normalized = MetricSpec::for_id("adr_pca_relative_amplitude").unwrap();
+        assert_eq!(normalized.id, "adr_pca_relative_amplitude");
+        assert_eq!(normalized.suffix(), "adrPcaRelativeAmplitude");
+        assert_eq!(normalized.label, "ADR PCA relative amplitude");
+        let projection = MetricSpec::for_id("adr_pca_waveform").unwrap();
+        assert_eq!(projection.id, "adr_pca_waveform");
+        assert_eq!(projection.suffix(), "adrPcaWaveform");
+        assert_eq!(projection.label, "ADR PCA waveform");
+        assert!(MetricSpec::for_id("breathing_volume").is_none());
+        assert!(MetricSpec::for_id("flowborne_motion_score").is_none());
     }
 
     #[test]
@@ -711,36 +713,31 @@ mod tests {
 
     #[test]
     fn non_release_metrics_survive_normalization_and_migration_with_exact_suffixes() {
-        const EXPECTED: [(&str, &str); 26] = [
-            ("acc_breathing_magnitude", "accBreathingMagnitude"),
-            ("phan_breath_event", "phanBreathEvent"),
-            ("phan_breath_rate", "phanBreathRate"),
-            ("flowborne_phase", "flowbornePhase"),
-            ("flowborne_motion_score", "flowborneMotionScore"),
-            ("breathing_phase", "breathingPhase"),
-            ("breathing_calibration", "breathingCalibration"),
-            ("breathing_axis_range", "breathingAxisRange"),
-            ("breathing_rate", "breathingRate"),
-            (
-                "breathing_dynamics_confidence",
-                "breathingDynamicsConfidence",
-            ),
-            ("breath_interval_mean", "breathIntervalMean"),
-            ("breath_interval_sd", "breathIntervalSD"),
-            ("breath_interval_cv", "breathIntervalCV"),
-            ("breath_interval_acw50", "breathIntervalACW50"),
-            ("breath_interval_psd_slope", "breathIntervalPsdSlope"),
-            ("breath_interval_lzc", "breathIntervalLZC"),
-            ("breath_interval_sampen", "breathIntervalSampEn"),
-            ("breath_interval_mse", "breathIntervalMSE"),
-            ("breath_amplitude_mean", "breathAmplitudeMean"),
-            ("breath_amplitude_sd", "breathAmplitudeSD"),
-            ("breath_amplitude_cv", "breathAmplitudeCV"),
-            ("breath_amplitude_acw50", "breathAmplitudeACW50"),
-            ("breath_amplitude_psd_slope", "breathAmplitudePsdSlope"),
-            ("breath_amplitude_lzc", "breathAmplitudeLZC"),
-            ("breath_amplitude_sampen", "breathAmplitudeSampEn"),
-            ("breath_amplitude_mse", "breathAmplitudeMSE"),
+        const EXPECTED: [(&str, &str); 24] = [
+            ("adr_axis_difference_event", "adrAxisDifferenceEvent"),
+            ("adr_axis_difference_rate", "adrAxisDifferenceRate"),
+            ("adr_moving_average_phase", "adrMovingAveragePhase"),
+            ("adr_pca_phase", "adrPcaPhase"),
+            ("adr_pca_calibration", "adrPcaCalibration"),
+            ("adr_pca_range", "adrPcaRange"),
+            ("adr_pca_rate", "adrPcaRate"),
+            ("adr_dynamics_quality", "adrDynamicsQuality"),
+            ("adr_interval_mean", "adrIntervalMean"),
+            ("adr_interval_sd", "adrIntervalSD"),
+            ("adr_interval_cv", "adrIntervalCV"),
+            ("adr_interval_acw50", "adrIntervalACW50"),
+            ("adr_interval_psd_slope", "adrIntervalPsdSlope"),
+            ("adr_interval_lzc", "adrIntervalLZC"),
+            ("adr_interval_sampen", "adrIntervalSampEn"),
+            ("adr_interval_mse", "adrIntervalMSE"),
+            ("adr_amplitude_mean", "adrAmplitudeMean"),
+            ("adr_amplitude_sd", "adrAmplitudeSD"),
+            ("adr_amplitude_cv", "adrAmplitudeCV"),
+            ("adr_amplitude_acw50", "adrAmplitudeACW50"),
+            ("adr_amplitude_psd_slope", "adrAmplitudePsdSlope"),
+            ("adr_amplitude_lzc", "adrAmplitudeLZC"),
+            ("adr_amplitude_sampen", "adrAmplitudeSampEn"),
+            ("adr_amplitude_mse", "adrAmplitudeMSE"),
         ];
 
         let catalog_compatibility = METRIC_CATALOG
@@ -838,18 +835,18 @@ mod tests {
     }
 
     #[test]
-    fn submitted_and_legacy_configs_cannot_normalize_canonical_breathing_volume() {
+    fn submitted_and_legacy_configs_cannot_normalize_canonical_adr_pca_relative_amplitude() {
         for normalization in [NormalizationMode::SlidingWindow, NormalizationMode::Session] {
             let mut metric_options = HashMap::new();
             metric_options.insert(
-                "breathing_volume".into(),
+                "adr_pca_relative_amplitude".into(),
                 MetricOutputOptions {
                     normalization,
                     ..MetricOutputOptions::default()
                 },
             );
             let config = OutputConfig {
-                outputs: vec!["breathing_volume".into()],
+                outputs: vec!["adr_pca_relative_amplitude".into()],
                 metric_options,
                 ..OutputConfig::default()
             };
@@ -857,7 +854,7 @@ mod tests {
             for normalized in [config.clone().validated(), config.migrated()] {
                 let normalized = normalized.unwrap();
                 assert_eq!(
-                    normalized.metric_options["breathing_volume"].normalization,
+                    normalized.metric_options["adr_pca_relative_amplitude"].normalization,
                     NormalizationMode::None
                 );
             }
@@ -868,7 +865,7 @@ mod tests {
     fn clamps_and_scopes_breathing_classifier_settings() {
         let mut metric_options = HashMap::new();
         metric_options.insert(
-            "breathing_phase".into(),
+            "adr_pca_phase".into(),
             MetricOutputOptions {
                 display_window_seconds: 900,
                 processing: MetricProcessingOptions {
@@ -882,13 +879,13 @@ mod tests {
             },
         );
         let config = OutputConfig {
-            outputs: vec!["breathing_phase".into()],
+            outputs: vec!["adr_pca_phase".into()],
             metric_options,
             ..OutputConfig::default()
         }
         .normalized()
         .unwrap();
-        let options = config.metric_options["breathing_phase"];
+        let options = config.metric_options["adr_pca_phase"];
         let classifier = options.processing.breathing.unwrap();
         assert_eq!(options.display_window_seconds, 600);
         assert_eq!(classifier.calibration_window_seconds, 1.0);
@@ -899,7 +896,7 @@ mod tests {
     fn compatibility_breathing_outputs_keep_historical_shared_precedence() {
         let mut metric_options = HashMap::new();
         metric_options.insert(
-            "breathing_phase".into(),
+            "adr_pca_phase".into(),
             MetricOutputOptions {
                 processing: MetricProcessingOptions {
                     breathing: Some(BreathingSettings {
@@ -912,7 +909,7 @@ mod tests {
             },
         );
         metric_options.insert(
-            "acc_breathing_magnitude".into(),
+            "adr_pca_waveform".into(),
             MetricOutputOptions {
                 processing: MetricProcessingOptions {
                     breathing: Some(BreathingSettings {
@@ -925,17 +922,17 @@ mod tests {
             },
         );
         let config = OutputConfig {
-            outputs: vec!["breathing_phase".into(), "acc_breathing_magnitude".into()],
+            outputs: vec!["adr_pca_phase".into(), "adr_pca_waveform".into()],
             metric_options,
             ..OutputConfig::default()
         }
         .normalized()
         .unwrap();
-        let phase = config.metric_options["breathing_phase"]
+        let phase = config.metric_options["adr_pca_phase"]
             .processing
             .breathing
             .unwrap();
-        let projection = config.metric_options["acc_breathing_magnitude"]
+        let projection = config.metric_options["adr_pca_waveform"]
             .processing
             .breathing
             .unwrap();
@@ -961,7 +958,7 @@ mod tests {
         };
         let mut metric_options = HashMap::new();
         metric_options.insert(
-            "breathing_phase".into(),
+            "adr_pca_phase".into(),
             MetricOutputOptions {
                 processing: MetricProcessingOptions {
                     breathing: Some(legacy),
@@ -983,10 +980,10 @@ mod tests {
 
         let config = OutputConfig {
             outputs: vec![
-                "breathing_phase".into(),
-                "breathing_volume".into(),
-                "breathing_signal_confidence".into(),
-                "breathing_signal_ready".into(),
+                "adr_pca_phase".into(),
+                "adr_pca_relative_amplitude".into(),
+                "adr_pca_quality".into(),
+                "adr_pca_valid".into(),
             ],
             metric_options,
             ..OutputConfig::default()
@@ -994,7 +991,7 @@ mod tests {
         .validated()
         .unwrap();
 
-        assert!(config.outputs.iter().any(|id| id == "breathing_phase"));
+        assert!(config.outputs.iter().any(|id| id == "adr_pca_phase"));
         assert_eq!(config.breathing_settings(), current.clamped());
         for id in BREATHING_OUTPUT_IDS {
             if let Some(options) = config.metric_options.get(id) {
@@ -1019,7 +1016,7 @@ mod tests {
     fn breathing_outputs_share_bounded_non_authoritative_presentation() {
         let mut metric_options = HashMap::new();
         metric_options.insert(
-            "breathing_phase".into(),
+            "adr_pca_phase".into(),
             MetricOutputOptions {
                 presentation: MetricPresentationOptions {
                     breathing: Some(BreathingPresentationSettings {
@@ -1031,20 +1028,23 @@ mod tests {
                 ..MetricOutputOptions::default()
             },
         );
-        metric_options.insert("breathing_volume".into(), MetricOutputOptions::default());
+        metric_options.insert(
+            "adr_pca_relative_amplitude".into(),
+            MetricOutputOptions::default(),
+        );
         let config = OutputConfig {
-            outputs: vec!["breathing_phase".into(), "breathing_volume".into()],
+            outputs: vec!["adr_pca_phase".into(), "adr_pca_relative_amplitude".into()],
             metric_options,
             ..OutputConfig::default()
         }
         .normalized()
         .unwrap();
 
-        let phase = config.metric_options["breathing_phase"]
+        let phase = config.metric_options["adr_pca_phase"]
             .presentation
             .breathing
             .unwrap();
-        let volume = config.metric_options["breathing_volume"]
+        let volume = config.metric_options["adr_pca_relative_amplitude"]
             .presentation
             .breathing
             .unwrap();
@@ -1086,7 +1086,7 @@ mod tests {
     fn dynamics_only_configs_use_default_upstream_breathing_settings() {
         let mut metric_options = HashMap::new();
         metric_options.insert(
-            "breath_interval_mean".into(),
+            "adr_interval_mean".into(),
             MetricOutputOptions {
                 processing: MetricProcessingOptions {
                     breathing: Some(BreathingSettings {
@@ -1100,7 +1100,7 @@ mod tests {
             },
         );
         let config = OutputConfig {
-            outputs: vec!["breath_interval_mean".into()],
+            outputs: vec!["adr_interval_mean".into()],
             metric_options,
             ..OutputConfig::default()
         }
@@ -1108,7 +1108,7 @@ mod tests {
         .unwrap();
 
         assert!(
-            config.metric_options["breath_interval_mean"]
+            config.metric_options["adr_interval_mean"]
                 .processing
                 .breathing
                 .is_none()

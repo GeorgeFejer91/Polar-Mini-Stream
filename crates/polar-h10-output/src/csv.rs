@@ -693,7 +693,7 @@ mod tests {
         publisher.publish_heart_rate(61, &[983.5]).unwrap();
         publisher.publish_vernier_breathing_provenance().unwrap();
         publisher
-            .publish_metrics_at(3_000_000_000, &[("breathing_volume", 0.75)])
+            .publish_metrics_at(3_000_000_000, &[("adr_pca_relative_amplitude", 0.75)])
             .unwrap();
         publisher
             .publish_metric_series_at(
@@ -718,7 +718,7 @@ mod tests {
         assert!(contents.contains(",raw_acc,0,3,-4,5,,mg"));
         assert!(contents.contains(",heart_rate,0,,,,61,bpm"));
         assert!(contents.contains(",rr_interval,0,,,,983.5,ms"));
-        assert!(contents.contains(",3000000000,breathing_volume,0,,,,0.75,0–1"));
+        assert!(contents.contains(",3000000000,adr_pca_relative_amplitude,0,,,,0.75,0–1"));
         assert!(contents.contains(",3900000000,vernier_breathing,0,,,,0.25,0–1"));
         assert!(contents.contains(",4000000000,vernier_breathing,1,,,,0.75,0–1"));
         assert!(contents.contains("# schema_version,3"));

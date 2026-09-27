@@ -8,11 +8,12 @@ workspace.
 All seven output checkboxes sit directly inside the mini window in two compact
 rows. Click the checkbox or its label to select a stream; changes save instantly.
 
-- Default outputs: four independently selectable LSL outputs, `rawVernier`
+- Default outputs: `rawVernier`
   (every advertised numeric belt channel plus recording diagnostics),
-  `rawForce` (unfiltered Force compatibility copy), `vernierBreathing` (our
+  `rawForce` (optional unfiltered Force-only copy), `vernierBreathing` (our
   relative 0-1 force normalization), and `signalStatus` (loss/restoration
-  markers). At least one output remains selected. Choices persist and replace
+  markers). `rawVernier` is mandatory and its **Raw data** checkbox stays
+  checked; other outputs are optional. Choices persist and replace
   active outlets without restarting Bluetooth.
 - Optional `steps`, `stepRate`, and `respirationRate` checkboxes forward the
   belt's cumulative step count, cadence (steps/min), and respiration estimate

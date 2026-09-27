@@ -17,6 +17,9 @@ const LONG_LIMIT: usize = 40_000;
 pub(crate) struct PhanBreathingSnapshot {
     pub breath_detected: bool,
     pub breaths_per_minute: f32,
+    pub axis_difference_g: [f32; 3],
+    pub rectified_difference_g: f32,
+    pub warmed_up: bool,
 }
 
 #[derive(Default)]
@@ -50,7 +53,7 @@ impl AxisWindow {
 }
 
 /// Time-scaled adaptation of Phan's single-accelerometer threshold detector.
-/// Only the two final outputs leave this processor; raw ACC remains unchanged.
+/// Also exposes the continuous detector input before rectification/thresholding.
 pub(crate) struct PhanBreathingProcessor {
     short: AxisWindow,
     long: AxisWindow,
@@ -165,9 +168,22 @@ impl PhanBreathingProcessor {
                 self.breaths.pop_front();
             }
         }
+        let axis_difference_g = std::array::from_fn(|axis| {
+            if accepted {
+                (self.short.mean(axis) - self.long.mean(axis)) as f32
+            } else {
+                0.0
+            }
+        });
         accepted.then_some(PhanBreathingSnapshot {
             breath_detected: detected,
             breaths_per_minute: self.breaths.len() as f32,
+            axis_difference_g,
+            rectified_difference_g: axis_difference_g.iter().map(|value| value.abs()).sum(),
+            warmed_up: self
+                .last_sample_ns
+                .zip(self.start_ns)
+                .is_some_and(|(last, start)| last.saturating_sub(start) >= SHORT_NS),
         })
     }
 }

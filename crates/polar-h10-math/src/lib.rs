@@ -981,8 +981,8 @@ fn infer_type(node: &Node, config: &CustomFormulaConfig) -> Result<ValueType, Fo
             }
 
             let boolean_arguments: &[usize] = match name.as_str() {
-                "breathing_magnitude" => &[3, 4, 5, 7, 8],
-                "breathing_phase" => &[3, 4, 5, 8],
+                "adr_pca_waveform" => &[3, 4, 5, 7, 8],
+                "adr_pca_phase" => &[3, 4, 5, 8],
                 _ => &[],
             };
             for (index, argument_type) in argument_types.iter().copied().enumerate() {
@@ -1089,7 +1089,7 @@ fn function_spec(name: &str) -> Option<FunctionSpec> {
             acc_only: false,
             rr_only: true,
         },
-        "breathing_magnitude" => FunctionSpec {
+        "adr_pca_waveform" => FunctionSpec {
             min_arity: 9,
             max_arity: 9,
             stateful: true,
@@ -1097,7 +1097,7 @@ fn function_spec(name: &str) -> Option<FunctionSpec> {
             acc_only: true,
             rr_only: false,
         },
-        "breathing_phase" => FunctionSpec {
+        "adr_pca_phase" => FunctionSpec {
             min_arity: 9,
             max_arity: 9,
             stateful: true,
@@ -1233,7 +1233,7 @@ fn state_capacity(
             Ok(4)
         }
         "derivative" | "integral" => Ok(2),
-        "breathing_magnitude" | "breathing_phase" => {
+        "adr_pca_waveform" | "adr_pca_phase" => {
             validate_breathing_arguments(arguments, config)?;
             Ok(8_000)
         }
@@ -1440,11 +1440,11 @@ fn create_state(
                 FormulaError::field("internal_error", &config.id, "Unknown RR metric function.")
             })?,
         },
-        "breathing_magnitude" | "breathing_phase" => {
+        "adr_pca_waveform" | "adr_pca_phase" => {
             let (settings, normalize) = validate_breathing_arguments(arguments, config)?;
             DspState::Breathing {
                 processor: Box::new(BreathingProcessor::new(settings)),
-                phase: name == "breathing_phase",
+                phase: name == "adr_pca_phase",
                 normalize,
             }
         }

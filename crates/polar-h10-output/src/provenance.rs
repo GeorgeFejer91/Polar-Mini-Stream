@@ -1,6 +1,6 @@
 use polar_h10_metrics::{
     BreathingSettings, BreathingStateMode, BreathingVolumeMode, MetricDefinition,
-    VERNIER_BREATHING_CONTRACT,
+    VERNIER_BREATHING_CONTRACT, adr_companion_ids, metric_formula_definition,
 };
 
 use crate::OutputConfig;
@@ -13,6 +13,50 @@ pub(crate) const APPLICATION_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub(crate) struct ProcessingMetadataField {
     pub(crate) name: &'static str,
     pub(crate) value: String,
+}
+
+/// Candidate-specific semantics augment the shared axis/filter configuration.
+pub(crate) fn adr_candidate_fields(metric: MetricDefinition) -> Vec<ProcessingMetadataField> {
+    if !metric.id.starts_with("adr_") {
+        return Vec::new();
+    }
+    let method = if metric.id.starts_with("adr_moving_average_") {
+        "signed-pca-short-minus-long-mean-v1"
+    } else if metric.id == "adr_axis_mean_difference" {
+        "signed-axis-mean-difference-pca-v1"
+    } else if metric.id.starts_with("adr_axis_difference_") {
+        "rectified-axis-mean-difference-v1"
+    } else {
+        "source-time-pca-projection-v1"
+    };
+    vec![
+        ProcessingMetadataField::new("candidate_method", method),
+        ProcessingMetadataField::new("formula", metric_formula_definition(metric.id).formula),
+        ProcessingMetadataField::new("source_signal", "raw_acc: X,Y,Z in mg, converted to g"),
+        ProcessingMetadataField::new(
+            "companion_metric_ids",
+            adr_companion_ids(metric.id).join(","),
+        ),
+        ProcessingMetadataField::new(
+            "publication",
+            "one snapshot per accepted ACC notification, newest source timestamp; irregular rate",
+        ),
+        ProcessingMetadataField::new("source_reference", metric.citation_url),
+        ProcessingMetadataField::new(
+            "startup",
+            if metric.id.starts_with("adr_axis_") {
+                "0.2 s short and 200 s long windows use available contiguous samples while filling; signed output waits for PCA axis learning"
+            } else if metric.id.starts_with("adr_moving_average_") {
+                "requires PCA axis; partial 0.267 s and 2 s means are published with validity zero while filling"
+            } else {
+                "waveform begins after fixed PCA axis learning; diagnostics precede it"
+            },
+        ),
+        ProcessingMetadataField::new(
+            "invalid_policy",
+            "retain finite diagnostic values with companion validity flags; no fabricated samples during source loss",
+        ),
+    ]
 }
 
 impl ProcessingMetadataField {
@@ -252,7 +296,7 @@ mod tests {
 
         let mut metric_options = HashMap::new();
         metric_options.insert(
-            "breathing_volume".into(),
+            "adr_pca_relative_amplitude".into(),
             MetricOutputOptions {
                 processing: MetricProcessingOptions {
                     breathing: Some(BreathingSettings {
@@ -265,7 +309,7 @@ mod tests {
             },
         );
         let configured = OutputConfig {
-            outputs: vec!["breathing_volume".into()],
+            outputs: vec!["adr_pca_relative_amplitude".into()],
             metric_options,
             ..OutputConfig::default()
         };

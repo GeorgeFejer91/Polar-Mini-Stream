@@ -6,12 +6,13 @@ use std::{
 
 use libloading::Library;
 use polar_h10_core::AccSample;
+use polar_h10_metrics::{ADR_WAVEFORM_IDS, BreathingSettings, adr_companion_ids};
 
 use crate::{
     CustomFormulaConfig, MetricSpec, SourcePalette, VERNIER_BREATHING_OUTLET_KEY,
     VERNIER_RAW_OUTLET_KEY, VernierMiniSelection, VernierStreamSchema, custom_output_stream_name,
     encode_vernier_raw_rows, output_stream_name,
-    provenance::{PolarRespirationProvenance, VernierBreathingProvenance},
+    provenance::{PolarRespirationProvenance, VernierBreathingProvenance, adr_candidate_fields},
     vernier_breathing_stream_name, vernier_raw_stream_name,
 };
 use vernier_gdx_core::{SampleEncoding, SensorSamples};
@@ -280,7 +281,7 @@ impl LslPublisher {
             self.status = format!("Could not create {} stream", spec.label);
             return;
         }
-        if !append_stream_metadata(api, info, spec, palette, respiration_provenance) {
+        if !append_stream_metadata(api, info, base_name, spec, palette, respiration_provenance) {
             unsafe { (api.destroy_streaminfo)(info) };
             self.status = format!(
                 "Could not attach required processing metadata to {}",
@@ -971,6 +972,26 @@ impl MiniCombinedOutput {
                 lsl.status()
             ));
         }
+        // ADR is always a dedicated scalar outlet, including in Single mode.
+        let provenance = PolarRespirationProvenance::new(BreathingSettings::default());
+        for metric in selected_outputs
+            .iter()
+            .filter_map(|id| MetricSpec::for_id(id))
+            .filter(|metric| metric.id.starts_with("adr_"))
+        {
+            lsl.add_outlet_with_palette(&stream_name, metric, None, Some(&provenance));
+        }
+        let expected = 1 + selected_outputs
+            .iter()
+            .filter(|id| id.starts_with("adr_"))
+            .filter(|id| MetricSpec::for_id(id).is_some())
+            .count();
+        if lsl.outlet_count() != expected {
+            return Err(format!(
+                "ADR candidate outlets did not open: {}",
+                lsl.status()
+            ));
+        }
         Ok(Self {
             inner: std::sync::Mutex::new(MiniCombinedInner {
                 lsl,
@@ -1136,6 +1157,13 @@ impl MiniCombinedOutput {
         let Ok(mut inner) = self.inner.lock() else {
             return;
         };
+        for value in values.iter().filter(|value| value.id.starts_with("adr_")) {
+            inner.lsl.push_scalar_series_at(
+                value.id,
+                std::iter::once(value.value),
+                sensor_timestamp_ns,
+            );
+        }
         if values.is_empty() || inner.polar_metric_ids.is_empty() {
             return;
         }
@@ -1351,7 +1379,8 @@ fn polar_combined_metric_ids(selected_outputs: &[String]) -> Vec<String> {
         if matches!(
             id.as_str(),
             "raw_ecg" | "raw_acc" | "heart_rate" | "rr_interval" | "raw_force"
-        ) || ids.iter().any(|known| known == id)
+        ) || id.starts_with("adr_")
+            || ids.iter().any(|known| known == id)
         {
             continue;
         }
@@ -1619,6 +1648,7 @@ fn append_mini_combined_metadata(
 fn append_stream_metadata(
     api: &LslApi,
     info: StreamInfo,
+    base_name: &str,
     spec: MetricSpec,
     palette: Option<&SourcePalette>,
     respiration_provenance: Option<&PolarRespirationProvenance>,
@@ -1660,6 +1690,27 @@ fn append_stream_metadata(
         "Polar Stream",
     );
     append_source_palette(append_child, append_child_value, description, palette);
+    if ADR_WAVEFORM_IDS.contains(&spec.id) {
+        for (name, value) in [
+            ("schema", "adr-waveform/1".to_string()),
+            ("stream_role", "respiration_candidate".to_string()),
+            ("metric_id", spec.id.to_string()),
+            ("raw_source_metric_id", "raw_acc".to_string()),
+            (
+                "companion_streams",
+                adr_companion_ids(spec.id)
+                    .iter()
+                    .filter_map(|id| output_stream_name(base_name, id))
+                    .collect::<Vec<_>>()
+                    .join(","),
+            ),
+            ("interpretation", spec.explainer.to_string()),
+        ] {
+            if !append_value_checked(append_child_value, description, name, &value) {
+                return false;
+            }
+        }
+    }
     let processing_attached = append_polar_respiration_processing(
         append_child,
         append_child_value,
@@ -1711,6 +1762,7 @@ fn append_polar_respiration_processing(
     provenance
         .fields()
         .into_iter()
+        .chain(adr_candidate_fields(spec))
         .all(|field| append_value_checked(append_child_value, processing, field.name, &field.value))
 }
 
@@ -2110,24 +2162,27 @@ mod tests {
     }
 
     #[test]
-    fn mini_acc_methods_have_stable_separate_names_and_single_stream_channels() {
+    fn adr_methods_keep_separate_names_and_are_excluded_from_sparse_channels() {
         let ids = [
-            "phan_breath_event",
-            "phan_breath_rate",
-            "flowborne_phase",
-            "flowborne_motion_score",
+            "adr_axis_difference_event",
+            "adr_axis_difference_rate",
+            "adr_moving_average_phase",
+            "adr_moving_average_difference",
         ];
         let selected = ids.map(str::to_string).to_vec();
         let channels = polar_combined_channels(&polar_combined_metric_ids(&selected));
         for (id, suffix) in [
-            ("phan_breath_event", "phanBreathEvent"),
-            ("phan_breath_rate", "phanBreathRate"),
-            ("flowborne_phase", "flowbornePhase"),
-            ("flowborne_motion_score", "flowborneMotionScore"),
+            ("adr_axis_difference_event", "adrAxisDifferenceEvent"),
+            ("adr_axis_difference_rate", "adrAxisDifferenceRate"),
+            ("adr_moving_average_phase", "adrMovingAveragePhase"),
+            (
+                "adr_moving_average_difference",
+                "adrMovingAverageDifference",
+            ),
         ] {
             let spec = MetricSpec::for_id(id).unwrap();
             assert_eq!(spec.suffix(), suffix);
-            assert!(channels.iter().any(|channel| channel.label == suffix));
+            assert!(!channels.iter().any(|channel| channel.label == suffix));
         }
     }
 
@@ -2153,7 +2208,7 @@ mod tests {
             unavailable_child,
             unavailable_value,
             std::ptr::null_mut(),
-            MetricSpec::for_id("breathing_volume").unwrap(),
+            MetricSpec::for_id("adr_pca_relative_amplitude").unwrap(),
             Some(&provenance),
         ));
         assert!(append_polar_respiration_processing(

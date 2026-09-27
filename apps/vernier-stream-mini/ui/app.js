@@ -6,8 +6,8 @@
   const isNative = Boolean(core?.invoke && core?.Channel);
   const directPolarOutputs = Object.freeze(["raw_ecg", "raw_acc", "heart_rate", "rr_interval"]);
   const vernierOutputs = Object.freeze([
-    { id: "rawVernier", label: "All channels", detail: "Force, respiration rate, steps, step rate, and packet diagnostics as received." },
-    { id: "rawForce", label: "Force", detail: "Belt tension in newtons, copied from the Vernier Force channel." },
+    { id: "rawVernier", label: "Raw data", detail: "Always published: raw force, available device channels and packet diagnostics." },
+    { id: "rawForce", label: "Force only", detail: "Optional force-only copy in newtons. Raw force is always present in Raw data." },
     { id: "vernierBreathing", label: "Breathing", detail: "Our live 0-1 normalization of belt force, not lung volume or breath rate." },
     { id: "signalStatus", label: "Signal status", detail: "Markers for lost and restored Bluetooth signal." },
     { id: "steps", label: "Steps", detail: "Belt pedometer's cumulative step count, as reported by the device." },
@@ -211,6 +211,7 @@
 
   function renderSignals() {
     const selected = new Set(state.preferences.vernierOutputs || defaultVernierOutputIds);
+    selected.add("rawVernier");
     elements["metric-count"].textContent = `${selected.size}/${vernierOutputs.length}`;
     for (const checkbox of elements["metric-options"].querySelectorAll("input")) {
       checkbox.checked = selected.has(checkbox.value);
@@ -232,7 +233,7 @@
     elements["device-select"].disabled = state.busy || state.connected || !isNative;
     elements["bluetooth-toggle"].disabled = state.busy || state.radioBusy || state.connected || !["on", "off"].includes(state.radioStatus);
     for (const checkbox of elements["metric-options"].querySelectorAll("input")) {
-      checkbox.disabled = state.busy || !isNative;
+      checkbox.disabled = state.busy || !isNative || checkbox.value === "rawVernier";
     }
     elements["device-status"].textContent = state.connected
       ? session?.deviceName || state.preferences.lastDevice?.name || "Connected"
@@ -296,11 +297,12 @@
       checkbox.setAttribute("aria-description", `${output.id}: ${output.detail}`);
       checkbox.value = output.id;
       checkbox.checked = selected.has(output.id);
+      checkbox.disabled = output.id === "rawVernier";
       checkbox.addEventListener("change", () => {
         const current = new Set(state.preferences.vernierOutputs || defaultVernierOutputIds);
-        if (!checkbox.checked && current.size === 1) {
+        current.add("rawVernier");
+        if (output.id === "rawVernier") {
           checkbox.checked = true;
-          setStatus("Keep at least one output", "Config", true);
           return;
         }
         if (checkbox.checked) current.add(output.id);

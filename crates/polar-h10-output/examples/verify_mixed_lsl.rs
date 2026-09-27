@@ -54,7 +54,7 @@ async fn main() -> Result<(), String> {
             outputs: vec![
                 "raw_ecg".into(),
                 "raw_acc".into(),
-                "breathing_volume".into(),
+                "adr_pca_relative_amplitude".into(),
             ],
             ..OutputConfig::default()
         })
@@ -123,7 +123,7 @@ async fn main() -> Result<(), String> {
         let _ = polar.publish_metrics_at(
             timestamp_ns,
             &[MetricValue {
-                id: "breathing_volume",
+                id: "adr_pca_relative_amplitude",
                 value: 0.5 + 0.35 * (index as f32 / 6.0).sin(),
             }],
         );

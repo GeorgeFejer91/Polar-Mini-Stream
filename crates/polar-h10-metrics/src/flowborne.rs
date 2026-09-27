@@ -17,6 +17,7 @@ const MAX_SCORE_SPANS: f32 = 1.0;
 pub(crate) struct FlowborneSnapshot {
     pub phase: f32,
     pub motion_score: Option<f32>,
+    pub valid: bool,
 }
 
 /// Controller-style short/long signed-motion comparison on the H10's
@@ -40,7 +41,7 @@ impl FlowborneProcessor {
             || self
                 .last_time
                 .is_some_and(|last| time <= last || time - last > GAP_SECONDS)
-            || !snapshot.ready
+            || !snapshot.calibrated
             || !time.is_finite()
             || !snapshot.magnitude_g.is_finite()
             || !snapshot.axis_range_g.is_finite()
@@ -48,7 +49,7 @@ impl FlowborneProcessor {
         {
             *self = Self::default();
             if discontinuity
-                || !snapshot.ready
+                || !snapshot.calibrated
                 || !time.is_finite()
                 || !snapshot.magnitude_g.is_finite()
                 || !snapshot.axis_range_g.is_finite()
@@ -68,10 +69,6 @@ impl FlowborneProcessor {
         {
             self.values.pop_front();
         }
-        if time - self.first_time.unwrap_or(time) < LONG_SECONDS {
-            return Self::bad_signal();
-        }
-
         let mut short_sum = 0.0_f64;
         let mut short_count = 0_u32;
         let mut long_sum = 0.0_f64;
@@ -87,10 +84,15 @@ impl FlowborneProcessor {
         }
         let score = ((short_sum / f64::from(short_count) - long_sum / self.values.len() as f64)
             / f64::from(snapshot.axis_range_g)) as f32;
-        if !score.is_finite() || score.abs() > MAX_SCORE_SPANS {
+        if !score.is_finite() {
             return Self::bad_signal();
         }
-        let phase = if score > INHALE_SPAN_FRACTION {
+        let valid = snapshot.ready
+            && time - self.first_time.unwrap_or(time) >= LONG_SECONDS
+            && score.abs() <= MAX_SCORE_SPANS;
+        let phase = if !valid {
+            -2.0
+        } else if score > INHALE_SPAN_FRACTION {
             1.0
         } else if score < EXHALE_SPAN_FRACTION {
             -1.0
@@ -100,6 +102,7 @@ impl FlowborneProcessor {
         FlowborneSnapshot {
             phase,
             motion_score: Some(score),
+            valid,
         }
     }
 
@@ -107,6 +110,7 @@ impl FlowborneProcessor {
         FlowborneSnapshot {
             phase: -2.0,
             motion_score: None,
+            valid: false,
         }
     }
 }
@@ -143,5 +147,24 @@ mod tests {
         assert_eq!(classifier.push(sample(2.4, -0.5, true), false).phase, -1.0);
         assert_eq!(classifier.push(sample(4.0, 0.0, true), false).phase, -2.0);
         assert_eq!(classifier.push(sample(4.1, 0.0, false), false).phase, -2.0);
+    }
+
+    #[test]
+    fn records_finite_contrast_during_warmup_and_bad_quality_and_preserves_holds() {
+        let mut classifier = FlowborneProcessor::default();
+        let first = classifier.push(sample(0.0, 0.0, true), false);
+        assert_eq!(first.motion_score, Some(0.0));
+        assert!(!first.valid);
+        for index in 1..=30 {
+            let mut input = sample(index as f64 * 0.1, 0.5, true);
+            input.ready = false;
+            let output = classifier.push(input, false);
+            assert!(output.motion_score.is_some());
+            assert!(!output.valid);
+            assert_eq!(output.phase, -2.0);
+        }
+        let held = classifier.push(sample(3.1, 0.5, true), false);
+        assert!(held.valid);
+        assert!(held.motion_score.unwrap().abs() < 1e-6);
     }
 }

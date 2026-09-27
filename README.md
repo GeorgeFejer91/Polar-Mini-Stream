@@ -18,17 +18,21 @@ are retained so installed applets can be upgraded without changing identity.
 
 - [Polar Stream Mini](apps/polar-stream-mini/README.md) publishes raw ECG,
   X/Y/Z acceleration, heart rate, RR intervals, and selected derived metrics.
-  Its optional ACC breathing outputs include the PCA waveform and phase,
-  Phan event/rate, and [Flowborne](docs/acc-breathing-methods.md).
-- [Vernier Stream Mini](apps/vernier-stream-mini/README.md) lets you select any
-  nonempty subset of the belt's numeric channels, Force-only copy, app-derived
-  0–1 breathing waveform, signal-status markers, and individual Steps, Step
+  Raw ECG and acceleration are always published when available. Four optional
+  [accelerometer-derived respiration (ADR) waveforms](docs/adr-waveforms.md)
+  implement PCA, Flowborne-style moving averages, and two Phan-window variants.
+- [Vernier Stream Mini](apps/vernier-stream-mini/README.md) always publishes the
+  belt's numeric channels, including raw force. Optional outputs are a force-only
+  copy, app-derived 0–1 breathing waveform, signal-status markers, and individual Steps, Step
   Rate, and Respiration Rate outputs. Every selection change saves automatically
   and becomes the next launch's default. The
   [signal reference](https://georgefejer91.github.io/Polar-Mini-Stream/#vernier-outputs)
   distinguishes device values from app processing.
 
 Both apps can publish separate LSL outlets or one sparse combined outlet.
+Selected ADR waveforms and their diagnostics always use dedicated outlets,
+including in Single mode. These apps create streams; recording belongs to an
+external LSL recorder.
 Their **Mock** windows publish clearly labeled synthetic data through the
 production output path. Derived breathing metrics are research estimates;
 physical validation against a respiratory reference remains open.

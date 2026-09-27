@@ -3,14 +3,19 @@
 Standalone one-device Polar H10 BLE-to-LSL applet. The UI is intentionally a
 compact transparent-shell window with its own install, settings, and process.
 
-- Default outputs: raw ECG, raw accelerometer, heart rate, and RR intervals.
-- Optional outputs: Polar metrics including Excite-O-Meter, PCA ACC breathing
-  waveform/phase and dynamics, Phan events/rate, and Flowborne phase/score.
-  See [`docs/acc-breathing-methods.md`](../../docs/acc-breathing-methods.md).
+- Mandatory outputs when available: raw ECG, raw accelerometer, heart rate,
+  and RR intervals.
+- Optional outputs: Polar metrics including Excite-O-Meter and four continuous
+  accelerometer-derived respiration (ADR) candidates: signed PCA projection,
+  Flowborne-style moving-average difference, signed Phan-window difference,
+  and the original rectified Phan score. Readiness/quality companions are added
+  with each candidate. Phase, rate, and dynamics remain separate metrics.
+  See [`docs/adr-waveforms.md`](../../docs/adr-waveforms.md).
 - Checking a realtime metric saves it as a default for future launches and
   applies it to the active LSL output. **Reset metrics** clears all optional
   selections while keeping raw ECG, ACC, heart rate, and RR.
 - Modes: canonical separate LSL streams or one sparse fixed-channel LSL stream.
+  Selected ADR metrics always have dedicated scalar outlets in either mode.
 - For exact ECG/ACC sample timing, use separate streams. The single sparse mode
   preserves acquisition order and clamps overlapping channel timestamps to the
   next microsecond; it does not add full sample periods or drift into the future.

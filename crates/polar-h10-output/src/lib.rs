@@ -1734,7 +1734,7 @@ mod normalization_tests {
                 lsl_enabled: true,
                 csv_enabled: true,
                 osc_enabled: true,
-                outputs: vec!["breathing_volume".into()],
+                outputs: vec!["adr_pca_relative_amplitude".into()],
                 ..OutputConfig::default()
             })
             .await
@@ -1746,7 +1746,7 @@ mod normalization_tests {
         assert!(!inner.config.lsl_enabled);
         assert!(!inner.config.osc_enabled);
         assert!(inner.selected.contains("raw_acc"));
-        assert!(!inner.selected.contains("breathing_volume"));
+        assert!(!inner.selected.contains("adr_pca_relative_amplitude"));
         assert_eq!(inner.csv.as_ref().unwrap().path(), previous_csv);
         drop(inner);
         assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
@@ -1782,7 +1782,7 @@ mod normalization_tests {
             .configure(OutputConfig {
                 stream_name: format!("rejected_{}", std::process::id()),
                 lsl_enabled: true,
-                outputs: vec!["raw_acc".into(), "breathing_volume".into()],
+                outputs: vec!["raw_acc".into(), "adr_pca_relative_amplitude".into()],
                 ..OutputConfig::default()
             })
             .await
@@ -1837,7 +1837,7 @@ mod normalization_tests {
         router
             .configure(OutputConfig {
                 csv_enabled: true,
-                outputs: vec!["breathing_volume".into()],
+                outputs: vec!["adr_pca_relative_amplitude".into()],
                 ..OutputConfig::default()
             })
             .await
@@ -1858,7 +1858,7 @@ mod normalization_tests {
 
         let mut metric_options = HashMap::new();
         metric_options.insert(
-            "breathing_volume".into(),
+            "adr_pca_relative_amplitude".into(),
             MetricOutputOptions {
                 processing: MetricProcessingOptions {
                     breathing: Some(BreathingSettings {
@@ -1873,7 +1873,7 @@ mod normalization_tests {
         router
             .configure(OutputConfig {
                 csv_enabled: true,
-                outputs: vec!["breathing_volume".into()],
+                outputs: vec!["adr_pca_relative_amplitude".into()],
                 metric_options,
                 ..OutputConfig::default()
             })
@@ -2009,7 +2009,7 @@ mod normalization_tests {
             .configure(OutputConfig {
                 stream_name: "Mixed_source-1".into(),
                 csv_enabled: true,
-                outputs: vec!["raw_acc".into(), "breathing_volume".into()],
+                outputs: vec!["raw_acc".into(), "adr_pca_relative_amplitude".into()],
                 ..OutputConfig::default()
             })
             .await
@@ -2052,7 +2052,7 @@ mod normalization_tests {
             polar.publish_metrics_at(
                 200_000_000,
                 &[MetricValue {
-                    id: "breathing_volume",
+                    id: "adr_pca_relative_amplitude",
                     value: 0.75,
                 }],
             ),
@@ -2106,7 +2106,7 @@ mod normalization_tests {
         for _ in 0..40 {
             polar_csv = std::fs::read_to_string(&polar_path).unwrap_or_default();
             vernier_csv = std::fs::read_to_string(&vernier_path).unwrap_or_default();
-            if polar_csv.contains(",breathing_volume,")
+            if polar_csv.contains(",adr_pca_relative_amplitude,")
                 && vernier_csv.contains(",vernier_breathing,")
             {
                 break;
@@ -2114,7 +2114,7 @@ mod normalization_tests {
             std::thread::sleep(Duration::from_millis(10));
         }
         assert!(polar_csv.contains(",raw_acc,0,1,2,3,,mg"));
-        assert!(polar_csv.contains(",200000000,breathing_volume,0,,,,0.75,0–1"));
+        assert!(polar_csv.contains(",200000000,adr_pca_relative_amplitude,0,,,,0.75,0–1"));
         assert!(polar_csv.contains("# polar_respiration_settings_schema,breathing-settings-v1"));
         assert!(!polar_csv.contains("# vernier_breathing_"));
         assert!(vernier_csv.contains(",raw_force,0,,,,10,N"));
