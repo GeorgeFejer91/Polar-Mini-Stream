@@ -24,6 +24,14 @@
             <div class="node-window-actions" data-tauri-drag-region>
               <button id="theme-toggle" type="button" aria-label="Toggle theme" title="Toggle theme"><span class="window-icon theme" aria-hidden="true"></span></button>
               <button id="new-node-top" type="button" aria-label="Open new mini node" title="Open new mini node"><span class="window-icon add" aria-hidden="true"></span></button>
+              <span id="device-battery" class="device-battery" role="img" aria-label="Device battery: disconnected" title="Device battery: disconnected" data-tauri-drag-region>
+                <svg class="battery-icon" viewBox="0 0 24 14" aria-hidden="true" data-tauri-drag-region>
+                  <rect x="1" y="1" width="19" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" />
+                  <path d="M22 5v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  <rect id="battery-fill" x="3" y="3" width="0" height="8" rx=".5" fill="currentColor" />
+                </svg>
+                <span id="battery-percent" aria-hidden="true" data-tauri-drag-region>—</span>
+              </span>
               <button id="minimize-button" type="button" aria-label="Minimize" title="Minimize"><span class="window-icon minimize" aria-hidden="true"></span></button>
               <button id="close-button" class="close" type="button" aria-label="Close" title="Close"><span class="window-icon close" aria-hidden="true"></span></button>
             </div>
@@ -71,20 +79,7 @@
             <div id="metric-options" class="metric-options" role="group" aria-label="Included streams"></div>
 
             <dl class="readout" data-tauri-drag-region>
-              <div class="device-readout" data-tauri-drag-region>
-                <dt data-tauri-drag-region>Device</dt>
-                <dd data-tauri-drag-region>
-                  <span id="device-status" data-tauri-drag-region>No device</span>
-                  <span id="device-battery" class="device-battery" role="img" aria-label="Device battery: disconnected" title="Device battery: disconnected" data-tauri-drag-region>
-                    <svg class="battery-icon" viewBox="0 0 24 14" aria-hidden="true" data-tauri-drag-region>
-                      <rect x="1" y="1" width="19" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" />
-                      <path d="M22 5v4" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                      <rect id="battery-fill" x="3" y="3" width="0" height="8" rx=".5" fill="currentColor" />
-                    </svg>
-                    <span id="battery-percent" aria-hidden="true" data-tauri-drag-region>—</span>
-                  </span>
-                </dd>
-              </div>
+              <div data-tauri-drag-region><dt data-tauri-drag-region>Device</dt><dd id="device-status" data-tauri-drag-region>No device</dd></div>
               <div data-tauri-drag-region><dt data-tauri-drag-region>LSL</dt><dd id="lsl-status" data-tauri-drag-region>Off</dd></div>
               <div data-tauri-drag-region><dt data-tauri-drag-region>Samples</dt><dd id="sample-status" data-tauri-drag-region>0</dd></div>
             </dl>

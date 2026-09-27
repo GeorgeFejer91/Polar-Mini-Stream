@@ -92,15 +92,25 @@ async function validateBatteryWindow(app) {
   assert.equal(await percent.textContent(), "—");
   assert.match(await battery.getAttribute("aria-label"), /disconnected/);
 
-  for (const value of [0, 20, 21, 83, 100, null, -1, 101, 255, 83.5, "83"]) {
-    await page.evaluate((batteryPercent) => window.__emitMiniEvent({
-      kind: "connection", connected: true, deviceName: "Battery test sensor", batteryPercent,
-    }), value);
-    const valid = Number.isInteger(value) && value >= 0 && value <= 100;
-    assert.equal(await percent.textContent(), valid ? `${value}%` : "—");
-    assert.equal(await battery.evaluate((node) => node.classList.contains("low")), valid && value <= 20);
-    assert.equal(Number(await page.locator("#battery-fill").getAttribute("width")), valid ? value * 0.16 : 0);
-    assert.match(await battery.getAttribute("aria-label"), valid ? new RegExp(`${value}%`) : /unavailable/);
+  const colors = {
+    light: { low: "rgb(198, 40, 40)", medium: "rgb(182, 92, 0)", high: "rgb(22, 129, 62)" },
+    dark: { low: "rgb(255, 105, 113)", medium: "rgb(255, 173, 71)", high: "rgb(89, 206, 134)" },
+  };
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate((theme) => { document.documentElement.dataset.theme = theme; }, theme);
+    for (const value of [0, 20, 21, 50, 51, 83, 100, null, -1, 101, 255, 83.5, "83"]) {
+      await page.evaluate((batteryPercent) => window.__emitMiniEvent({
+        kind: "connection", connected: true, deviceName: "Battery test sensor", batteryPercent,
+      }), value);
+      const valid = Number.isInteger(value) && value >= 0 && value <= 100;
+      const level = !valid ? "unknown" : value <= 20 ? "low" : value <= 50 ? "medium" : "high";
+      assert.equal(await percent.textContent(), valid ? `${value}%` : "—");
+      assert.equal(await battery.getAttribute("data-level"), level);
+      const color = await page.locator(".battery-icon").evaluate((node) => getComputedStyle(node).color);
+      assert.equal(color, valid ? colors[theme][level] : await battery.evaluate((node) => getComputedStyle(node).color));
+      assert.equal(Number(await page.locator("#battery-fill").getAttribute("width")), valid ? value * 0.16 : 0);
+      assert.match(await battery.getAttribute("aria-label"), valid ? new RegExp(`${value}%`) : /unavailable/);
+    }
   }
 
   await page.evaluate(() => {
@@ -111,21 +121,16 @@ async function validateBatteryWindow(app) {
   for (const width of [320, 330, 388, 640]) {
     await page.setViewportSize({ width, height: app.height });
     await page.locator('#battery-percent[data-text-fit="fit"]').waitFor();
-    const geometry = await battery.evaluate((node) => {
-      const box = node.getBoundingClientRect();
-      const name = document.getElementById("device-status").getBoundingClientRect();
-      const row = node.parentElement.getBoundingClientRect();
-      const label = document.getElementById("battery-percent");
-      return { separated: name.right <= box.left, inside: box.right <= row.right + 1,
-        readable: label.scrollWidth <= label.clientWidth + 1 && label.scrollHeight <= label.clientHeight + 1 };
-    });
-    assert.deepEqual(geometry, { separated: true, inside: true, readable: true });
+    await assertBatteryTitlebar(page);
     await assertNoOverflow(page);
   }
   await page.setViewportSize({ width: 388, height: app.height });
   for (const theme of ["light", "dark"]) {
     await page.evaluate((theme) => { document.documentElement.dataset.theme = theme; }, theme);
-    await page.screenshot({ path: path.join(outputDirectory, `${app.kind}-mini-battery-${theme}.png`), omitBackground: true });
+    for (const value of [20, 50, 100]) {
+      await page.evaluate((batteryPercent) => window.__emitMiniEvent({ kind: "connection", connected: true, batteryPercent }), value);
+      await page.screenshot({ path: path.join(outputDirectory, `${app.kind}-mini-battery-${theme}-${value}.png`), omitBackground: true });
+    }
   }
   await page.setViewportSize({ width: 320, height: app.height });
   await percent.evaluate((node) => {
@@ -136,6 +141,7 @@ async function validateBatteryWindow(app) {
   });
   await page.locator('#battery-percent[data-text-fit="fit"]').waitFor();
   assert.equal(await percent.evaluate((node) => node.scrollWidth <= node.clientWidth && node.scrollHeight <= node.clientHeight), true);
+  await assertBatteryTitlebar(page);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   // Enlarged text may grow the applet; controls must remain reachable by scrolling.
   assert.equal(await page.locator("body").evaluate((node) => getComputedStyle(node).overflowY), "auto");
@@ -145,10 +151,30 @@ async function validateBatteryWindow(app) {
   await page.evaluate(() => window.__emitMiniEvent({ kind: "connection", connected: false, batteryPercent: 100 }));
   assert.equal(await percent.textContent(), "—");
   assert.match(await battery.getAttribute("aria-label"), /disconnected/);
-  assert.equal(await battery.evaluate((node) => node.classList.contains("low")), false);
+  assert.equal(await battery.getAttribute("data-level"), "unknown");
   await page.evaluate(() => window.__emitMiniEvent({ kind: "connection", connected: true }));
   assert.equal(await percent.textContent(), "—");
   await page.close();
+}
+
+async function assertBatteryTitlebar(page) {
+  const geometry = await page.locator("#device-battery").evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    const header = node.closest("header").getBoundingClientRect();
+    const add = document.getElementById("new-node-top").getBoundingClientRect();
+    const minimize = document.getElementById("minimize-button").getBoundingClientRect();
+    const close = document.getElementById("close-button").getBoundingClientRect();
+    const title = document.getElementById("product-name");
+    const label = document.getElementById("battery-percent");
+    return {
+      beforeControls: add.right <= box.left && box.right <= minimize.left && minimize.right <= close.left,
+      aligned: Math.abs(box.y + box.height / 2 - minimize.y - minimize.height / 2) <= 1,
+      inside: box.left >= header.left && box.right <= header.right && box.top >= header.top && box.bottom <= header.bottom,
+      titleReadable: title.getBoundingClientRect().right <= add.left && title.scrollWidth <= title.clientWidth + 1 && title.scrollHeight <= title.clientHeight + 1,
+      readable: label.scrollWidth <= label.clientWidth + 1 && label.scrollHeight <= label.clientHeight + 1,
+    };
+  });
+  assert.deepEqual(geometry, { beforeControls: true, aligned: true, inside: true, titleReadable: true, readable: true });
 }
 
 async function validateNormalWindow(app) {

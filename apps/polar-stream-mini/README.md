@@ -22,9 +22,10 @@ compact transparent-shell window with its own install, settings, and process.
 - Memory: app-local stream name, output mode, reconnect preference, selected
   metrics, and last H10.
 - Multi-device use: launch multiple app instances.
-- Device battery: a miniature battery icon and percentage show the reading
-  reported at connection. `—` means disconnected or unavailable; mock windows
-  hide the indicator.
+- Device battery: a miniature battery icon and percentage in the title bar,
+  immediately left of minimize and close, show the reading reported at
+  connection. The meter is red at 0–20%, orange at 21–50%, and green at 51–100%.
+  `—` means disconnected or unavailable; mock windows hide the indicator.
 - Mocking: **Mock** launches an independent, automatically streaming applet.
   Its 130 Hz ECG replays a bundled, 60-minute NeuroKit2 ECGSYN recording and
   loops after one hour. ACC (200 Hz), HR/RR, and derived metrics remain

@@ -261,7 +261,7 @@
     const label = percent !== null ? `Device battery: ${percent}% (reported at connection)`
       : state.connected ? "Device battery: unavailable" : "Device battery: disconnected";
     battery.hidden = state.mockMode;
-    battery.classList.toggle("low", percent !== null && percent <= 20);
+    battery.dataset.level = percent === null ? "unknown" : percent <= 20 ? "low" : percent <= 50 ? "medium" : "high";
     battery.setAttribute("aria-label", label);
     battery.title = label;
     document.getElementById("battery-percent").textContent = percent === null ? "—" : `${percent}%`;
