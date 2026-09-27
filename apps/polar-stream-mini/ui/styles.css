@@ -45,7 +45,7 @@ html[data-theme="dark"] {
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { margin: 0; min-width: 300px; min-height: 100%; background: transparent; color: var(--ink); }
-body { min-height: 100vh; overflow: hidden; font-size: 12px; line-height: 1.32; user-select: none; }
+body { min-height: 100vh; overflow-x: hidden; overflow-y: auto; font-size: 12px; line-height: 1.32; user-select: none; }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
 input { user-select: text; }
@@ -393,6 +393,14 @@ body[data-mock="true"] .node-surface {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.readout .device-readout dd { display: flex; align-items: center; gap: 6px; overflow: visible; }
+#device-status { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.device-battery { display: flex; align-items: center; gap: 4px; flex: none; color: var(--muted); }
+.readout .device-battery { pointer-events: auto; }
+.device-battery.low { color: var(--attention); }
+.battery-icon { display: block; width: 20px; height: 12px; flex: none; }
+#battery-percent { display: block; min-width: 5ch; font-size: 10px; line-height: 12px; font-variant-numeric: tabular-nums; white-space: pre-wrap; }
+
 .patch-node footer {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

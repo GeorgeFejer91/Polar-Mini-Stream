@@ -45,6 +45,9 @@ rows. Click the checkbox or its label to select a stream; changes save instantly
   are loaded when the regular app next opens. No Apply or Save step is required.
   If a save fails, the UI restores the last successfully saved selection.
 - Multi-device use: launch multiple app instances.
+- Device battery: a miniature battery icon and percentage show the reading
+  reported at connection. `—` means disconnected or unavailable; mock windows
+  hide the indicator.
 - Mocking: **Mock** launches an independent, automatically streaming applet
   with deterministic 20 Hz force/breathing data and real LSL publication. Its
   PID-suffixed stream name and settings are session-only.

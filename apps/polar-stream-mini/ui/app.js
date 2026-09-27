@@ -25,6 +25,7 @@
     devices: [],
     selectedDeviceId: "",
     connected: false,
+    batteryPercent: null,
     streaming: false,
     mockMode: false,
     busy: false,
@@ -249,6 +250,22 @@
         : "No device";
     elements["lsl-status"].textContent = state.lsl || "Off";
     elements["sample-status"].textContent = sampleSummary();
+    renderBattery();
+  }
+
+  function renderBattery() {
+    if (!state.connected || state.mockMode) state.batteryPercent = null;
+    const percent = Number.isInteger(state.batteryPercent) && state.batteryPercent >= 0 && state.batteryPercent <= 100
+      ? state.batteryPercent : null;
+    const battery = document.getElementById("device-battery");
+    const label = percent !== null ? `Device battery: ${percent}% (reported at connection)`
+      : state.connected ? "Device battery: unavailable" : "Device battery: disconnected";
+    battery.hidden = state.mockMode;
+    battery.classList.toggle("low", percent !== null && percent <= 20);
+    battery.setAttribute("aria-label", label);
+    battery.title = label;
+    document.getElementById("battery-percent").textContent = percent === null ? "—" : `${percent}%`;
+    document.getElementById("battery-fill").setAttribute("width", String((percent ?? 0) * 0.16));
   }
 
   function sampleSummary() {
@@ -601,6 +618,7 @@
       setStatus(event.message || "Status", event.phase || null);
     } else if (event.kind === "connection") {
       state.connected = Boolean(event.connected);
+      state.batteryPercent = event.batteryPercent ?? null;
       state.streaming = false;
       state.lastSampleAt = 0;
       state.samples = null;

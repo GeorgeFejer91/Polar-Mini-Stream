@@ -33,6 +33,7 @@ try {
   for (const app of apps) {
     await validateNormalWindow(app);
     await validateEarlyRememberedConnection(app);
+    await validateBatteryWindow(app);
     if (app.kind === "vernier") {
       await validatePreferenceMemory(app);
       await validateBluetoothUnavailable(app);
@@ -77,6 +78,76 @@ async function validateEarlyRememberedConnection(app) {
   await page.locator("#mini-node.connected").waitFor();
   assert.equal(await page.locator("#node-phase").textContent(), app.kind === "vernier" ? "Connected" : "Live");
   assert.equal(await page.evaluate(() => window.__miniCalls.includes("connect_remembered")), true);
+  assert.equal(await page.locator("#battery-percent").textContent(), "67%");
+  await page.close();
+}
+
+async function validateBatteryWindow(app) {
+  const page = await createPage(app, { mockMode: false, lslHealthy: true });
+  await page.goto(appUrl(app));
+  await page.locator("#node-phase").filter({ hasText: "Ready" }).waitFor();
+  const battery = page.locator("#device-battery");
+  const percent = page.locator("#battery-percent");
+  assert.equal(await battery.isVisible(), true);
+  assert.equal(await percent.textContent(), "—");
+  assert.match(await battery.getAttribute("aria-label"), /disconnected/);
+
+  for (const value of [0, 20, 21, 83, 100, null, -1, 101, 255, 83.5, "83"]) {
+    await page.evaluate((batteryPercent) => window.__emitMiniEvent({
+      kind: "connection", connected: true, deviceName: "Battery test sensor", batteryPercent,
+    }), value);
+    const valid = Number.isInteger(value) && value >= 0 && value <= 100;
+    assert.equal(await percent.textContent(), valid ? `${value}%` : "—");
+    assert.equal(await battery.evaluate((node) => node.classList.contains("low")), valid && value <= 20);
+    assert.equal(Number(await page.locator("#battery-fill").getAttribute("width")), valid ? value * 0.16 : 0);
+    assert.match(await battery.getAttribute("aria-label"), valid ? new RegExp(`${value}%`) : /unavailable/);
+  }
+
+  await page.evaluate(() => {
+    window.__emitMiniEvent({ kind: "connection", connected: true, deviceName: "Long sensor name ".repeat(12), batteryPercent: 100 });
+    window.__emitMiniEvent({ kind: "samples", ecgSamples: 39, vernierRows: 6, lsl: "Publishing 4 LSL streams" });
+  });
+  assert.equal(await percent.textContent(), "100%");
+  for (const width of [320, 330, 388, 640]) {
+    await page.setViewportSize({ width, height: app.height });
+    await page.locator('#battery-percent[data-text-fit="fit"]').waitFor();
+    const geometry = await battery.evaluate((node) => {
+      const box = node.getBoundingClientRect();
+      const name = document.getElementById("device-status").getBoundingClientRect();
+      const row = node.parentElement.getBoundingClientRect();
+      const label = document.getElementById("battery-percent");
+      return { separated: name.right <= box.left, inside: box.right <= row.right + 1,
+        readable: label.scrollWidth <= label.clientWidth + 1 && label.scrollHeight <= label.clientHeight + 1 };
+    });
+    assert.deepEqual(geometry, { separated: true, inside: true, readable: true });
+    await assertNoOverflow(page);
+  }
+  await page.setViewportSize({ width: 388, height: app.height });
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate((theme) => { document.documentElement.dataset.theme = theme; }, theme);
+    await page.screenshot({ path: path.join(outputDirectory, `${app.kind}-mini-battery-${theme}.png`), omitBackground: true });
+  }
+  await page.setViewportSize({ width: 320, height: app.height });
+  await percent.evaluate((node) => {
+    node.style.fontSize = "20px";
+    node.style.lineHeight = "30px";
+    node.style.letterSpacing = "0.12em";
+    node.style.wordSpacing = "0.16em";
+  });
+  await page.locator('#battery-percent[data-text-fit="fit"]').waitFor();
+  assert.equal(await percent.evaluate((node) => node.scrollWidth <= node.clientWidth && node.scrollHeight <= node.clientHeight), true);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  // Enlarged text may grow the applet; controls must remain reachable by scrolling.
+  assert.equal(await page.locator("body").evaluate((node) => getComputedStyle(node).overflowY), "auto");
+  await page.locator("#disconnect-button").scrollIntoViewIfNeeded();
+  assert.ok((await page.locator("#disconnect-button").boundingBox()).y < app.height);
+
+  await page.evaluate(() => window.__emitMiniEvent({ kind: "connection", connected: false, batteryPercent: 100 }));
+  assert.equal(await percent.textContent(), "—");
+  assert.match(await battery.getAttribute("aria-label"), /disconnected/);
+  assert.equal(await battery.evaluate((node) => node.classList.contains("low")), false);
+  await page.evaluate(() => window.__emitMiniEvent({ kind: "connection", connected: true }));
+  assert.equal(await percent.textContent(), "—");
   await page.close();
 }
 
@@ -246,6 +317,7 @@ async function validateMockWindow(app, lslHealthy) {
   assert.equal(await page.locator("#mock-source").isVisible(), true);
   assert.equal(await page.locator("#mock-button").isVisible(), false);
   assert.equal(await page.locator("#node-kind").textContent(), "MOCK");
+  assert.equal(await page.locator("#device-battery").isVisible(), false);
   const frame = await frameState(page);
   assert.equal(frame.animation, lslHealthy ? "stream-beacon" : "none");
   assert.equal(await page.locator("#mini-node").evaluate((node) => node.classList.contains("streaming")), lslHealthy);
@@ -419,6 +491,7 @@ async function createPage(app, options) {
         if (command === "connect_remembered") {
           eventChannel?.onmessage?.({
             kind: "connection", connected: true, deviceName: `Saved ${app.scanLabel}`,
+            batteryPercent: 67,
             message: "Streaming",
           });
           return { ...session, connected: false, deviceId: "saved-device", deviceName: null };
