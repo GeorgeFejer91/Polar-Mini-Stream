@@ -313,28 +313,39 @@ body[data-mock="true"] .node-surface {
 .mini-option-row .check-row input:checked { background: var(--brand); }
 .mini-option-row .check-row input:checked::before { transform: translateX(10px); }
 .mini-option-row .check-row input:disabled { opacity: .5; cursor: not-allowed; }
-.all-in-one-row { justify-content: flex-start; color: var(--ink); font-weight: 700; }
-.all-in-one-row img { width: 18px; height: 14px; flex: none; }
 .metric-row { margin-left: auto; }
 .metric-row button { white-space: nowrap; }
 .signal-list {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  align-items: center;
   min-height: 21px;
 }
-.signal-list > * { pointer-events: none; }
 .readout * { pointer-events: none; }
-.signal-list span {
+.signal-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   max-width: 100%;
-  overflow: hidden;
+  min-height: 20px;
   border-radius: 4px;
-  padding: 3px 5px;
+  padding: 2px 5px;
   background: color-mix(in srgb, var(--node-accent) 9%, var(--field));
   color: var(--muted);
   font: 750 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  cursor: pointer;
+}
+.signal-option:has(input:disabled) { cursor: default; }
+.signal-option input { width: 11px; height: 11px; flex: none; margin: 0; accent-color: var(--brand); }
+.signal-option span { min-width: 0; white-space: nowrap; }
+.signal-option span[data-text-fit="reflow"] {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.signal-option:has(input:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 .readout {
   display: grid;
@@ -400,8 +411,8 @@ body[data-mock="true"] .patch-node footer { grid-template-columns: repeat(2, min
 }
 
 .node-source-dialog {
-  width: min(584px, calc(100vw - 32px));
-  max-height: min(570px, calc(100vh - 32px));
+  width: min(684px, calc(100vw - 32px));
+  max-height: min(608px, calc(100vh - 32px));
   border: 1px solid color-mix(in srgb, var(--line-strong) 72%, transparent);
   border-radius: 7px;
   padding: 0;
@@ -441,7 +452,7 @@ body[data-mock="true"] .patch-node footer { grid-template-columns: repeat(2, min
 .metric-options {
   display: grid;
   gap: 14px;
-  max-height: 470px;
+  max-height: 500px;
   overflow: auto;
   padding: 12px;
 }

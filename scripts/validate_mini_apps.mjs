@@ -274,6 +274,14 @@ async function validateNormalWindow(app) {
   if (app.kind === "polar") {
     assert.equal(await page.locator("#stream-mode-toggle").count(), 0);
     assert.equal(await page.locator("#all-in-one").isChecked(), false);
+    assert.equal(await page.locator("#signal-list input").count(), 5);
+    for (const id of ["raw_ecg", "raw_acc", "heart_rate", "rr_interval"]) {
+      const raw = page.locator(`#signal-list input[value="${id}"]`);
+      assert.equal(await raw.isChecked(), true);
+      assert.equal(await raw.isDisabled(), true);
+    }
+    assert.equal(await page.locator("#all-in-one").isEnabled(), true);
+    assert.equal(await page.locator("#metrics-button").textContent(), "+ Add more metrics");
     const accIds = [
       "adr_pca_waveform", "adr_pca_phase", "adr_pca_rate",
       "adr_interval_mean", "adr_axis_difference_event", "adr_axis_difference_rate",
@@ -281,12 +289,19 @@ async function validateNormalWindow(app) {
       "adr_axis_mean_difference", "adr_axis_difference_magnitude",
     ];
     await page.locator("#metrics-button").click();
+    assert.equal(await page.locator("#metrics-dialog").isVisible(), true);
+    assert.equal(await page.evaluate(() => window.__miniCalls.includes("set_metrics_dialog_open")), true);
+    await page.setViewportSize({ width: 720, height: 640 });
+    await assertNoOverflow(page);
+    await page.screenshot({ path: path.join(outputDirectory, "polar-mini-metrics-large.png"), omitBackground: true });
+    await page.setViewportSize({ width: 388, height: app.height });
     for (const id of accIds) {
       const option = page.locator(`#metric-options input[value="${id}"]`);
       assert.equal(await option.count(), 1);
       assert.match(await option.locator("xpath=../../..").textContent(), /ACC derived/);
       await option.check();
     }
+    assert.equal(await page.evaluate(() => document.activeElement.value), accIds.at(-1));
     await page.waitForFunction(() => window.__miniSaves.some((save) =>
       ["adr_pca_waveform", "adr_pca_phase", "adr_pca_rate", "adr_interval_mean", "adr_axis_difference_event", "adr_axis_difference_rate", "adr_moving_average_phase", "adr_moving_average_difference", "adr_axis_mean_difference", "adr_axis_difference_magnitude"].every((id) => save.polarOutputs?.includes(id))));
     for (const id of ["adr_pca_quality", "adr_pca_valid", "adr_moving_average_valid", "adr_axis_difference_valid"]) {
@@ -323,8 +338,9 @@ async function validateNormalWindow(app) {
     await page.locator("#all-in-one").check();
     await page.waitForFunction(() => window.__miniSaves.at(-1)?.polarOutputs.includes("allInOne"));
     assert.equal(await page.evaluate(() => window.__miniSaves.at(-1)?.outputMode), "separateStreams");
-    assert.match(await page.locator("#signal-list").textContent(), /All-in-one/);
+    assert.equal(await page.locator("#all-in-one").isChecked(), true);
     const combinedPreferences = await page.evaluate(() => window.__miniSaves.at(-1));
+    assert.equal(accIds.every((id) => combinedPreferences.polarOutputs.includes(id)), true);
     const combinedReopened = await createPage(app, { mockMode: false, lslHealthy: true, savedPreferences: combinedPreferences });
     await combinedReopened.goto(appUrl(app));
     assert.equal(await combinedReopened.locator("#all-in-one").isChecked(), true);

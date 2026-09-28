@@ -156,16 +156,11 @@
     if (bootstrap.session?.deviceId) {
       state.selectedDeviceId = bootstrap.session.deviceId;
     }
-    renderAllInOne();
     renderDevices();
     renderSignals();
     renderMetricDialog();
     renderConnection(bootstrap.session);
     setStatus(isNative ? "Ready" : "Installed app required", null, !isNative);
-  }
-
-  function renderAllInOne() {
-    elements["all-in-one"].checked = state.preferences.polarOutputs?.includes("allInOne") || false;
   }
 
   function renderDevices() {
@@ -197,32 +192,15 @@
   }
 
   function renderSignals() {
-    const list = elements["signal-list"];
-    list.replaceChildren();
-    const chips = [];
-    if (state.kind === "polar") {
-      const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
-      for (const id of directPolarOutputs) chips.push(streamSuffix(id));
-      const optional = state.metrics.filter((metric) => !metric.direct && selected.has(metric.id));
-      if (optional.length) chips.push(optional[0].streamSuffix || optional[0].id);
-      if (optional.length > 1) chips.push(`+${optional.length - 1} metrics`);
-      if (selected.has("allInOne")) chips.push("All-in-one");
-      const extraCount = optional.length;
-      elements["metrics-button"].title = extraCount
-        ? `${extraCount} optional realtime metrics selected`
-        : "Add optional realtime metrics";
-    } else {
-      chips.push("rawVernier", "vernierBreathing", "rawForce");
-    }
-    for (const chip of chips) {
-      const span = document.createElement("span");
-      span.textContent = chip;
-      list.append(span);
-    }
-  }
-
-  function streamSuffix(id) {
-    return state.metrics.find((metric) => metric.id === id)?.streamSuffix || id;
+    const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
+    elements["all-in-one"].checked = selected.has("allInOne");
+    const extraCount = state.metrics.filter((metric) => !metric.direct && selected.has(metric.id)).length;
+    elements["metrics-button"].textContent = extraCount
+      ? `+ Add more metrics (${extraCount})`
+      : "+ Add more metrics";
+    elements["metrics-button"].title = extraCount
+      ? `${extraCount} optional metrics selected`
+      : "Add optional Polar metrics";
   }
 
   function renderConnection(session = null) {
@@ -287,6 +265,8 @@
 
   function renderMetricDialog() {
     const options = elements["metric-options"];
+    const scrollTop = options.scrollTop;
+    const focusedId = options.contains(document.activeElement) ? document.activeElement.value : null;
     options.replaceChildren();
     if (state.kind !== "polar") return;
     const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
@@ -306,6 +286,8 @@
       optionalMetrics.filter(isAccDerivedMetric),
       selected,
     );
+    options.scrollTop = scrollTop;
+    if (focusedId) options.querySelector(`input[value="${focusedId}"]`)?.focus({ preventScroll: true });
   }
 
   function isAccDerivedMetric(metric) {
@@ -400,7 +382,6 @@
         savedPolarOutputs = [...(result.preferences?.polarOutputs || payload.polarOutputs)];
         if (revision === saveRevision) {
           state.preferences = result.preferences || state.preferences;
-          renderAllInOne();
           renderSignals();
           if (!quiet || result.reconnectRequired || result.applied) {
             setStatus(result.message || "Saved", "Config", result.reconnectRequired);
@@ -410,7 +391,6 @@
         if (revision === saveRevision) {
           state.preferences.polarOutputs = [...savedPolarOutputs];
           renderMetricDialog();
-          renderAllInOne();
           renderSignals();
           reportError(error);
         }

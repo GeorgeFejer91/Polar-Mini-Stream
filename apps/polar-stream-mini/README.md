@@ -4,7 +4,7 @@ Standalone one-device Polar H10 BLE-to-LSL applet. The UI is intentionally a
 compact transparent-shell window with its own install, settings, and process.
 
 - Mandatory outputs when available: raw ECG, raw accelerometer, heart rate,
-  and RR intervals.
+  and RR intervals. The mini window shows these as checked, locked checkboxes.
 - Optional outputs: Polar metrics including Excite-O-Meter and four continuous
   accelerometer-derived respiration (ADR) candidates: signed PCA projection,
   Flowborne-style moving-average difference, signed Phan-window difference,
@@ -14,9 +14,11 @@ compact transparent-shell window with its own install, settings, and process.
 - Checking a realtime metric saves it as a default for future launches and
   applies it to its individual LSL outlet. **Reset metrics** clears optional
   metric selections while keeping raw ECG, ACC, heart rate, RR, and the
-  All-in-one choice.
+  All-in-one choice. **Add more metrics** opens the full Polar Mini selection
+  catalog in an expanded window.
 - Optional **All-in-one recording stream** adds one sparse fixed-channel LSL
-  outlet alongside the individual outlets. It includes raw ECG, ACC, heart
+  outlet alongside the individual outlets. Its checkbox is the sole control for
+  that extra stream. It includes raw ECG, ACC, heart
   rate, RR, signal events, and every available Polar Mini derived metric,
   including ADR, independently of the individual metric choices.
   Missing fields in each row are NaN. Individual outlets retain their own

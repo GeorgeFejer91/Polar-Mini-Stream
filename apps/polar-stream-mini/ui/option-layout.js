@@ -2,7 +2,8 @@ import { measureLineStats, measureNaturalWidth, prepareWithSegments, setLocale }
 
 document.fonts.ready.then(() => {
   const row = document.querySelector(".mini-option-row");
-  const labels = row.querySelectorAll(".check-row > span");
+  const signals = document.getElementById("signal-list");
+  const labels = document.querySelectorAll(".mini-option-row .check-row > span, .signal-option > span");
   setLocale(document.documentElement.lang || "en");
 
   let pending = false;
@@ -30,6 +31,8 @@ document.fonts.ready.then(() => {
     });
   };
 
-  new ResizeObserver(schedule).observe(row);
+  const observer = new ResizeObserver(schedule);
+  observer.observe(row);
+  observer.observe(signals);
   schedule();
 });
