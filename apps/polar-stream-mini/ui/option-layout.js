@@ -2,6 +2,8 @@ import { measureLineStats, measureNaturalWidth, prepareWithSegments, setLocale }
 
 document.fonts.ready.then(() => {
   const node = document.getElementById("mini-node");
+  const surface = node.querySelector(".node-surface");
+  const actionButtons = node.querySelectorAll("footer button");
   const labels = document.querySelectorAll(
     ".mini-option-row .check-row > span, .signal-option > span, #product-name, #node-phase, #mock-source, .readout dd, .device-row button, .patch-node footer button, #metrics-button",
   );
@@ -9,11 +11,34 @@ document.fonts.ready.then(() => {
   setLocale(document.documentElement.lang || "en");
 
   let pending = false;
+  const fitTypeSize = () => {
+    try {
+      const preferred = Math.max(10, Math.min(15, Math.floor(Math.min(innerWidth * .023, innerHeight * .025))));
+      let size = preferred;
+      for (; size > 10; size--) {
+        if ([...actionButtons].every((button) => {
+          const style = getComputedStyle(button);
+          const width = button.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - 1;
+          const font = `${style.fontStyle} ${style.fontWeight} ${size}px ${style.fontFamily}`;
+          const prepared = prepareWithSegments(button.textContent, font, {
+            letterSpacing: Number.parseFloat(style.letterSpacing) || 0,
+          });
+          return measureLineStats(prepared, width).lineCount === 1 && measureNaturalWidth(prepared) <= width;
+        })) break;
+      }
+      if (surface.style.getPropertyValue("--accordion-type") !== `${size}px`) {
+        surface.style.setProperty("--accordion-type", `${size}px`);
+      }
+    } catch (_error) {
+      surface.style.removeProperty("--accordion-type");
+    }
+  };
   const schedule = () => {
     if (pending) return;
     pending = true;
     requestAnimationFrame(() => {
       pending = false;
+      fitTypeSize();
       for (const label of labels) {
         if (!label.clientWidth) continue;
         try {

@@ -55,9 +55,11 @@ cargo run -p polar-h10-metrics --example export_catalog -- docs/metric-catalog.j
 ```
 
 Mini UI validation must check width-only and height-only resizing at the
-minimum and large sizes: neither main window may show a page or status
-scrollbar, and overlong status values must remain reachable in the full-text
-dialog. The metric picker and device-search dialogs have their own layout gate.
+minimum and large sizes: control groups keep their order while spacing and
+Pretext-checked type scale with both dimensions. Neither main window may show
+a page or status scrollbar, and overlong status values must remain reachable in
+the full-text dialog. The metric picker and device-search dialogs have their
+own layout gate.
 
 ## Gate 3: integrated readiness
 

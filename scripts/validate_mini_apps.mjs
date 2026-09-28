@@ -70,7 +70,7 @@ async function validateResizableWindow(app) {
   }
   assert.deepEqual(await page.evaluate(() => window.__resizeCalls), directions);
 
-  for (const [width, height] of [[320, app.minHeight], [320, app.height], [350, app.minHeight], [351, app.minHeight], [388, app.height], [388, 600], [520, 480], [599, app.minHeight], [599, 480], [600, app.minHeight], [600, app.height], [600, 479], [600, 480], [900, app.minHeight], [900, app.height], [900, 700]]) {
+  for (const [width, height] of [[320, app.minHeight], [320, app.height], [320, 900], [350, app.minHeight], [351, app.minHeight], [388, app.height], [388, 600], [520, 480], [599, app.minHeight], [599, 480], [600, app.minHeight], [600, app.height], [600, 479], [600, 480], [830, 776], [900, app.minHeight], [900, app.height], [900, 700], [1200, app.minHeight]]) {
     await page.setViewportSize({ width, height });
     await page.waitForFunction(() => document.querySelector("#device-status")?.dataset.textFit);
     const geometry = await page.locator("#mini-node").evaluate((node) => {
@@ -79,17 +79,50 @@ async function validateResizableWindow(app) {
         width: frame.width,
         height: frame.height,
         clipped: [...node.querySelectorAll("#product-name, #node-phase, .readout dd, .patch-node footer button")]
-          .some((label) => label.scrollWidth > label.clientWidth + 1 || label.scrollHeight > label.clientHeight + 1),
+          .filter((label) => label.scrollWidth > label.clientWidth + 1 || label.scrollHeight > label.clientHeight + 1)
+          .map((label) => `${label.id}: ${label.scrollWidth}x${label.scrollHeight} > ${label.clientWidth}x${label.clientHeight}`),
       };
     });
     assert.ok(geometry.width >= width - (width <= 350 ? 20 : 28) - 1);
     assert.ok(geometry.height >= height - (width <= 350 ? 14 : 16) - 1);
-    assert.equal(geometry.clipped, false);
+    assert.deepEqual(geometry.clipped, [], `${app.kind} ${width}x${height} clipped default text`);
     await assertNoOverflow(page);
     if (width === 320 || width === 900) {
       await page.screenshot({ path: path.join(outputDirectory, `${app.kind}-resize-${width}.png`), omitBackground: true });
     }
+    if (width === 830) {
+      await page.evaluate(() => { document.documentElement.dataset.theme = "dark"; });
+      await page.screenshot({ path: path.join(outputDirectory, `${app.kind}-accordion-dark.png`), omitBackground: true });
+      await page.evaluate(() => { document.documentElement.dataset.theme = "light"; });
+    }
   }
+
+  const spacing = async (width, height) => {
+    await page.setViewportSize({ width, height });
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    return page.evaluate(() => {
+      const groups = [...document.querySelector(".node-body").children]
+        .filter((element) => getComputedStyle(element).display !== "none");
+      const switches = document.querySelectorAll(".mini-option-row .check-row");
+      return {
+        vertical: groups.at(-1).getBoundingClientRect().top - groups.at(-2).getBoundingClientRect().bottom,
+        horizontal: switches[1].getBoundingClientRect().left - switches[0].getBoundingClientRect().left,
+        type: parseFloat(getComputedStyle(document.querySelector(".field-label")).fontSize),
+      };
+    });
+  };
+  const compactHeight = await spacing(900, app.minHeight);
+  const compactWidth = await spacing(388, 700);
+  const expanded = await spacing(900, 700);
+  assert.ok(expanded.vertical > compactHeight.vertical + 40, `${app.kind} vertical spacing did not expand`);
+  assert.ok(expanded.horizontal > compactWidth.horizontal + 40, `${app.kind} horizontal spacing did not expand`);
+  assert.ok(expanded.type >= compactHeight.type + 3 && expanded.type >= compactWidth.type + 3,
+    `${app.kind} type did not respond to both dimensions`);
+  await page.locator("#mock-button").evaluate((button) => { button.textContent = "Open a separate synthetic mock stream"; });
+  await page.waitForFunction(() => parseFloat(document.querySelector(".node-surface").style.getPropertyValue("--accordion-type")) < 15);
+  await assertNoOverflow(page);
+  await page.locator("#mock-button").evaluate((button) => { button.textContent = "Open mock"; });
+  await page.waitForFunction(() => parseFloat(document.querySelector(".node-surface").style.getPropertyValue("--accordion-type")) === 15);
 
   await page.setViewportSize({ width: 320, height: app.height });
   await page.evaluate(() => window.__emitMiniEvent({

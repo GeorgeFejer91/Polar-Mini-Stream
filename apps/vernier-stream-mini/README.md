@@ -11,9 +11,10 @@ this raw device-data outlet. Click any other checkbox or its label to select
 an additional stream; changes save instantly. **All-in-one** is last and has
 a small merging-stream icon.
 
-Resize the applet from any edge or corner. Controls grow and reflow with the
-window without a main-window scrollbar. An overlong status value can be opened
-in a full-text dialog by clicking it or pressing Enter while focused.
+Resize the applet from any edge or corner. Control groups, spacing, and type
+expand or compress with both dimensions without a main-window scrollbar.
+Click an overlong status value, or focus it and press Enter, to read its full
+text in a dialog.
 
 - Default outlets: `rawVernier` (every advertised numeric belt channel plus
   recording diagnostics) and `vernierBreathing` (a relative 0–1 belt-force

@@ -38,9 +38,10 @@ Polar raw ECG/ACC and Vernier's complete raw numeric row (including force) are
 mandatory when available. Four optional continuous ADR candidates use dedicated
 scalar LSL outlets; old respiratory IDs have no aliases.
 JavaScript is presentation and control, never the authoritative data path.
-Both frameless mini windows resize from their visible panel edges; the panels
-reflow with window size without main-window scrollbars. Pretext detects overlong
-status values, which open in a full-text dialog instead of enlarging the panel.
+Both frameless mini windows resize from their visible panel edges. Their control
+groups retain their order while spacing and type scale with width and height;
+Pretext checks the type fit. Main windows have no scrollbars. Overlong status
+values open in a full-text dialog instead of enlarging the panel.
 The Polar metric picker overlays the current window without changing its size.
 Vernier publishes its raw numeric row continuously and offers optional individual
 outlets plus an independent all-in-one sparse outlet; the latter can coexist

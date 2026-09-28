@@ -91,6 +91,7 @@ select:focus-visible,
 .patch-node.attention { --node-accent: var(--attention); }
 body[data-mock="true"] .patch-node { --node-accent: var(--mock-accent); }
 .node-surface {
+  --accordion-type: clamp(10px, min(2.3vw, 2.5vh), 15px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100%;
@@ -126,11 +127,11 @@ body[data-mock="true"] .node-surface {
   align-items: center;
   gap: 6px;
   min-height: 31px;
-  padding: 7px 8px 5px;
+  padding: clamp(7px, 1.4vh, 12px) clamp(8px, 1.6vw, 20px) clamp(5px, 1vh, 9px);
   background: color-mix(in srgb, var(--node-accent) 9%, var(--surface-2));
 }
 .node-title { min-width: 0; display: grid; gap: 1px; }
-.patch-node .node-title strong { white-space: normal; overflow: visible; }
+.patch-node .node-title strong { font-size: clamp(12px, calc(var(--accordion-type) + 2px), 18px); white-space: normal; overflow: visible; }
 .patch-node strong {
   overflow: hidden;
   font-size: 12px;
@@ -141,8 +142,8 @@ body[data-mock="true"] .node-surface {
 .patch-node header span {
   overflow: hidden;
   color: var(--muted);
-  font-size: 9px;
-  line-height: 1.1;
+  font-size: clamp(9px, calc(var(--accordion-type) - 1px), 14px);
+  line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -216,14 +217,16 @@ body[data-mock="true"] .node-surface {
 
 .node-body {
   display: grid;
-  align-content: start;
-  gap: 5px;
+  align-content: space-between;
+  gap: clamp(4px, calc(2vh - 3px), 12px);
   min-width: 0;
-  padding: 7px 8px 6px;
+  min-height: 0;
+  padding: clamp(7px, 2vh, 18px) clamp(8px, 2vw, 24px) clamp(6px, 1.5vh, 16px);
 }
+.stream-field { display: grid; gap: clamp(3px, .8vh, 7px); }
 .field-label {
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--accordion-type);
   font-weight: 700;
 }
 .text-entry,
@@ -231,6 +234,7 @@ body[data-mock="true"] .node-surface {
   width: 100%;
   min-width: 0;
   height: 27px;
+  font-size: clamp(12px, calc(var(--accordion-type) + 1px), 16px);
   border: 1px solid transparent;
   border-radius: 5px;
   padding: 0 8px;
@@ -253,7 +257,7 @@ body[data-mock="true"] .node-surface {
   padding: 0 7px;
   background: var(--surface-2);
   color: var(--brand-strong);
-  font-size: 10px;
+  font-size: var(--accordion-type);
   font-weight: 780;
 }
 .patch-node footer button:first-child:not(:disabled) {
@@ -289,7 +293,7 @@ body[data-mock="true"] .node-surface {
 .mini-option-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: clamp(4px, 1vw, 12px);
   align-items: center;
 }
 .check-row,
@@ -300,7 +304,7 @@ body[data-mock="true"] .node-surface {
   gap: 6px;
   min-width: 0;
   color: var(--muted);
-  font-size: 10px;
+  font-size: var(--accordion-type);
 }
 .check-row { justify-content: flex-start; cursor: pointer; }
 .check-row input { width: 15px; height: 15px; accent-color: var(--brand); }
@@ -336,7 +340,8 @@ body[data-mock="true"] .node-surface {
 .signal-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  justify-content: space-between;
+  gap: clamp(4px, calc(2vh - 3px), 12px) clamp(4px, 1vw, 12px);
   align-items: center;
   min-height: 21px;
 }
@@ -351,7 +356,7 @@ body[data-mock="true"] .node-surface {
   padding: 2px 5px;
   background: color-mix(in srgb, var(--node-accent) 9%, var(--field));
   color: var(--muted);
-  font: 750 9px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 750 clamp(9px, calc(var(--accordion-type) - 1px), 14px)/1 ui-monospace, SFMono-Regular, Menlo, monospace;
   cursor: pointer;
 }
 .signal-option:has(input:disabled) { cursor: default; }
@@ -367,7 +372,7 @@ body[data-mock="true"] .node-surface {
 }
 .readout {
   display: grid;
-  gap: 3px;
+  gap: clamp(3px, calc(2vh - 4px), 12px);
   margin: 0;
   padding-top: 1px;
 }
@@ -379,7 +384,7 @@ body[data-mock="true"] .node-surface {
 }
 .readout dt {
   color: var(--muted);
-  font-size: 9px;
+  font-size: clamp(9px, calc(var(--accordion-type) - 2px), 13px);
   font-weight: 750;
   line-height: 1.2;
 }
@@ -388,7 +393,7 @@ body[data-mock="true"] .node-surface {
   margin: 0;
   overflow: hidden;
   color: var(--ink);
-  font-size: 10px;
+  font-size: var(--accordion-type);
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -409,9 +414,9 @@ body[data-mock="true"] .node-surface {
 .patch-node footer {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  min-height: 34px;
-  padding: 0 8px 8px;
+  gap: clamp(6px, 1vw, 16px);
+  min-height: clamp(34px, 7vh, 58px);
+  padding: 0 clamp(8px, 1.6vw, 20px) clamp(8px, 1.8vh, 14px);
 }
 body[data-mock="true"] .patch-node footer { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .patch-node footer #mock-button {
@@ -583,27 +588,24 @@ button,
   }
 }
 
+@media (min-width: 480px) {
+  .mini-option-row { justify-content: space-between; }
+  .metric-row { margin-left: 0; }
+}
+
 @media (min-width: 600px) and (min-height: 480px) {
-  .patch-node header { padding: 10px 14px; }
-  .patch-node .node-title strong { font-size: 16px; }
-  .patch-node header span { font-size: 11px; }
-  .node-body { align-content: center; gap: 8px; padding: 14px; }
-  .field-label, .check-row, .metric-row, .readout dd { font-size: 12px; }
-  .text-entry, .device-row select { height: 34px; font-size: 13px; }
-  .device-row button, .metric-row button, .patch-node footer button { min-height: 32px; font-size: 12px; }
-  .mini-option-row, .signal-list { gap: 8px; }
-  .signal-option { padding: 4px 7px; font-size: 11px; }
+  .text-entry, .device-row select { height: 34px; }
+  .device-row button, .metric-row button, .patch-node footer button { min-height: 32px; }
+  .signal-option { padding: 4px 7px; }
   .readout div { grid-template-columns: 64px minmax(0, 1fr); min-height: 19px; }
-  .readout dt { font-size: 11px; }
-  .patch-node footer { min-height: 48px; padding: 0 14px 12px; }
 }
 
 @media (max-width: 350px), (max-height: 300px) {
   .mini-shell { padding: 6px 10px 8px; }
   .node-body { gap: 3px; padding: 4px 7px; }
   .node-window-actions button { width: 19px; height: 19px; }
-  .patch-node header span,
-  .readout dd {
+  .patch-node header span:not([data-text-fit="reveal"]),
+  .readout dd:not([data-text-fit="reveal"]) {
     white-space: normal;
   }
   .metric-group-list { grid-template-columns: 1fr; }
