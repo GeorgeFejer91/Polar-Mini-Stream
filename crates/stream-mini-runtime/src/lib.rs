@@ -37,7 +37,7 @@ const PREFERENCE_SCHEMA: &str = "polar.stream.mini.preferences.v1";
 const LIVE_RECONFIGURED_MESSAGE: &str = "Saved and applied to the active LSL outlets.";
 const POLAR_DIRECT_OUTPUTS: &[&str] = &["raw_ecg", "raw_acc", "heart_rate", "rr_interval"];
 const VERNIER_FORCE_OUTPUT: &str = "raw_force";
-const VERNIER_OUTPUT_IDS: [&str; 7] = [
+const VERNIER_OUTPUT_IDS: [&str; 8] = [
     "rawVernier",
     "rawForce",
     "vernierBreathing",
@@ -45,6 +45,7 @@ const VERNIER_OUTPUT_IDS: [&str; 7] = [
     "steps",
     "stepRate",
     "respirationRate",
+    "allInOne",
 ];
 const VERNIER_PERIOD_US: u32 = 50_000;
 const ACC_SAMPLE_PERIOD_NS: u64 = 1_000_000_000 / 200;
@@ -192,6 +193,16 @@ impl MiniPreferencesSnapshot {
         let mut seen = std::collections::HashSet::new();
         recent_devices.retain(|device| seen.insert(device.id.clone()));
         recent_devices.truncate(6);
+        let mut vernier_outputs = file
+            .vernier_outputs
+            .and_then(|ids| validate_vernier_outputs(ids).ok())
+            .unwrap_or_else(default_vernier_outputs);
+        if kind == MiniAppKind::Vernier
+            && file.output_mode == Some(MiniOutputMode::SingleStream)
+            && !vernier_outputs.iter().any(|id| id == "allInOne")
+        {
+            vernier_outputs.push("allInOne".into());
+        }
         Self {
             schema: PREFERENCE_SCHEMA.into(),
             stream_name: normalize_stream_base(
@@ -200,13 +211,14 @@ impl MiniPreferencesSnapshot {
                     .unwrap_or(kind.default_stream_name()),
             )
             .unwrap_or(fallback.stream_name),
-            output_mode: file.output_mode.unwrap_or_default(),
+            output_mode: if kind == MiniAppKind::Vernier {
+                MiniOutputMode::SeparateStreams
+            } else {
+                file.output_mode.unwrap_or_default()
+            },
             auto_connect: file.auto_connect.unwrap_or(true),
             polar_outputs: normalize_polar_outputs(file.polar_outputs),
-            vernier_outputs: file
-                .vernier_outputs
-                .and_then(|ids| validate_vernier_outputs(ids).ok())
-                .unwrap_or_else(default_vernier_outputs),
+            vernier_outputs,
             last_device,
             recent_devices,
         }
@@ -276,7 +288,11 @@ impl PreferencesStore {
         let mut snapshot = MiniPreferencesSnapshot {
             schema: PREFERENCE_SCHEMA.into(),
             stream_name: normalize_stream_base(&input.stream_name)?,
-            output_mode: input.output_mode,
+            output_mode: if kind == MiniAppKind::Vernier {
+                MiniOutputMode::SeparateStreams
+            } else {
+                input.output_mode
+            },
             auto_connect: input.auto_connect,
             polar_outputs: normalize_polar_outputs(Some(input.polar_outputs)),
             vernier_outputs: if kind == MiniAppKind::Vernier {
@@ -399,6 +415,7 @@ enum MiniOutputHandle {
     Separate(
         Arc<OutputRouter>,
         #[cfg(feature = "liblsl-backend")] Option<Arc<MiniStatusOutput>>,
+        #[cfg(feature = "liblsl-backend")] Option<Arc<MiniCombinedOutput>>,
     ),
     #[cfg(feature = "liblsl-backend")]
     Single(Arc<MiniCombinedOutput>),
@@ -419,9 +436,12 @@ impl MiniOutputHandle {
     fn publish_signal_state(&self, restored: bool) {
         match self {
             #[cfg(feature = "liblsl-backend")]
-            Self::Separate(_, status) => {
+            Self::Separate(_, status, combined) => {
                 if let Some(status) = status {
                     status.publish(restored);
+                }
+                if let Some(combined) = combined {
+                    combined.publish_signal_state(restored);
                 }
             }
             #[cfg(not(feature = "liblsl-backend"))]
@@ -434,19 +454,23 @@ impl MiniOutputHandle {
     fn health(&self) -> String {
         match self {
             #[cfg(feature = "liblsl-backend")]
-            Self::Separate(output, status) => {
-                let health = output.health().lsl;
-                let marker = status.as_ref().map(|marker| marker.health());
+            Self::Separate(output, status, combined) => {
+                let main = output.health().lsl;
                 let count = |text: &str| {
                     text.strip_prefix("Publishing ")
                         .and_then(|suffix| suffix.split_whitespace().next())
                         .and_then(|number| number.parse::<usize>().ok())
+                        .unwrap_or(0)
                 };
-                match (count(&health), marker.as_deref().and_then(count)) {
-                    (Some(main), Some(extra)) => format!("Publishing {} stream(s)", main + extra),
-                    (Some(_), _) => health,
-                    (_, Some(_)) => marker.unwrap_or(health),
-                    _ => health,
+                let total = count(&main)
+                    + status.as_ref().map_or(0, |outlet| count(&outlet.health()))
+                    + combined
+                        .as_ref()
+                        .map_or(0, |outlet| count(&outlet.health()));
+                if total > 0 {
+                    format!("Publishing {total} stream(s)")
+                } else {
+                    main
                 }
             }
             #[cfg(not(feature = "liblsl-backend"))]
@@ -523,7 +547,17 @@ impl MiniOutputHandle {
         sensors: &[SensorInfo],
     ) -> Result<VernierStreamSchema, String> {
         match self {
-            Self::Separate(output, ..) => {
+            #[cfg(feature = "liblsl-backend")]
+            Self::Separate(output, _, combined) => {
+                let schema =
+                    output.configure_vernier_streams(model_code, sample_period_us, sensors)?;
+                if let Some(combined) = combined {
+                    combined.configure_vernier_streams(model_code, sample_period_us, sensors)?;
+                }
+                Ok(schema)
+            }
+            #[cfg(not(feature = "liblsl-backend"))]
+            Self::Separate(output) => {
                 output.configure_vernier_streams(model_code, sample_period_us, sensors)
             }
             #[cfg(feature = "liblsl-backend")]
@@ -535,7 +569,33 @@ impl MiniOutputHandle {
 
     fn publish_vernier_raw(&self, batch: VernierRawBatch<'_>) {
         match self {
-            Self::Separate(output, ..) => output.publish_vernier_raw(
+            #[cfg(feature = "liblsl-backend")]
+            Self::Separate(output, _, combined) => {
+                output.publish_vernier_raw(
+                    batch.host_receive_timestamp_ns,
+                    batch.sample_period_us,
+                    batch.sequence,
+                    batch.dropped_before,
+                    batch.device_drop_reports_before,
+                    batch.decode_latency_ns,
+                    batch.encoding,
+                    batch.sensors,
+                );
+                if let Some(combined) = combined {
+                    combined.publish_vernier_raw(
+                        batch.host_receive_timestamp_ns,
+                        batch.sample_period_us,
+                        batch.sequence,
+                        batch.dropped_before,
+                        batch.device_drop_reports_before,
+                        batch.decode_latency_ns,
+                        batch.encoding,
+                        batch.sensors,
+                    );
+                }
+            }
+            #[cfg(not(feature = "liblsl-backend"))]
+            Self::Separate(output) => output.publish_vernier_raw(
                 batch.host_receive_timestamp_ns,
                 batch.sample_period_us,
                 batch.sequence,
@@ -581,7 +641,24 @@ impl MiniOutputHandle {
         sample_period_us: u32,
     ) -> Option<String> {
         match self {
-            Self::Separate(output, ..) => output.publish_vernier_breathing(
+            #[cfg(feature = "liblsl-backend")]
+            Self::Separate(output, _, combined) => {
+                let warning = output.publish_vernier_breathing(
+                    host_receive_timestamp_ns,
+                    values_01,
+                    sample_period_us,
+                );
+                if let Some(combined) = combined {
+                    combined.publish_vernier_breathing(
+                        host_receive_timestamp_ns,
+                        values_01,
+                        sample_period_us,
+                    );
+                }
+                warning
+            }
+            #[cfg(not(feature = "liblsl-backend"))]
+            Self::Separate(output) => output.publish_vernier_breathing(
                 host_receive_timestamp_ns,
                 values_01,
                 sample_period_us,
@@ -1397,17 +1474,37 @@ async fn build_output(
                         .any(|id| id == "signalStatus");
                 let status = if include_status {
                     Some(Arc::new(MiniStatusOutput::new(
-                        bundled_lsl_for_status,
+                        bundled_lsl_for_status.clone(),
                         &snapshot.stream_name,
                         kind == MiniAppKind::Polar,
                     )?))
                 } else {
                     None
                 };
-                Ok(MiniOutputHandle::Separate(output, status))
+                let combined = if kind == MiniAppKind::Vernier
+                    && snapshot.vernier_outputs.iter().any(|id| id == "allInOne")
+                {
+                    Some(Arc::new(MiniCombinedOutput::vernier(
+                        bundled_lsl_for_status,
+                        &snapshot.stream_name,
+                        &[
+                            "rawVernier".into(),
+                            "vernierBreathing".into(),
+                            "signalStatus".into(),
+                        ],
+                    )?))
+                } else {
+                    None
+                };
+                Ok(MiniOutputHandle::Separate(output, status, combined))
             }
             #[cfg(not(feature = "liblsl-backend"))]
             {
+                if kind == MiniAppKind::Vernier
+                    && snapshot.vernier_outputs.iter().any(|id| id == "allInOne")
+                {
+                    return Err("All-in-one requires the packaged liblsl backend.".into());
+                }
                 Ok(MiniOutputHandle::Separate(output))
             }
         }
@@ -1472,7 +1569,14 @@ fn mini_output_config(kind: MiniAppKind, snapshot: &MiniPreferencesSnapshot) -> 
                 outputs
             }
         },
-        vernier_outputs: (kind == MiniAppKind::Vernier).then(|| snapshot.vernier_outputs.clone()),
+        vernier_outputs: (kind == MiniAppKind::Vernier).then(|| {
+            snapshot
+                .vernier_outputs
+                .iter()
+                .filter(|id| id.as_str() != "allInOne")
+                .cloned()
+                .collect()
+        }),
         ..Default::default()
     }
 }
@@ -2494,7 +2598,7 @@ fn normalize_polar_outputs(input: Option<Vec<String>>) -> Vec<String> {
 }
 
 fn default_vernier_outputs() -> Vec<String> {
-    VERNIER_OUTPUT_IDS[..4]
+    ["rawVernier", "vernierBreathing"]
         .iter()
         .map(|id| (*id).into())
         .collect()
@@ -2597,11 +2701,7 @@ mod tests {
         for (revision, selected) in selections.into_iter().enumerate() {
             let input = MiniPreferencesInput {
                 stream_name: format!("Remembered-Belt-{revision}"),
-                output_mode: if revision % 2 == 0 {
-                    MiniOutputMode::SingleStream
-                } else {
-                    MiniOutputMode::SeparateStreams
-                },
+                output_mode: MiniOutputMode::SeparateStreams,
                 auto_connect: revision % 2 == 0,
                 polar_outputs: Vec::new(),
                 vernier_outputs: Some(selected.clone()),
@@ -2853,15 +2953,28 @@ mod tests {
                 polar_outputs: initial.polar_outputs.clone(),
                 vernier_outputs: Some(initial.vernier_outputs.clone()),
             };
-            let single = save_preferences_inner(
-                &state,
-                input(MiniOutputMode::SingleStream, initial.stream_name.clone()),
-            )
-            .await
-            .unwrap();
-            assert!(single.applied && !single.reconnect_required);
+            let mut combined_input =
+                input(MiniOutputMode::SingleStream, initial.stream_name.clone());
+            if kind == MiniAppKind::Vernier {
+                combined_input
+                    .vernier_outputs
+                    .as_mut()
+                    .unwrap()
+                    .push("allInOne".into());
+            }
+            let combined = save_preferences_inner(&state, combined_input)
+                .await
+                .unwrap();
+            assert!(combined.applied && !combined.reconnect_required);
             let session = active_snapshot(&state).await.unwrap();
-            assert_eq!(session.output_mode, MiniOutputMode::SingleStream);
+            assert_eq!(
+                session.output_mode,
+                if kind == MiniAppKind::Polar {
+                    MiniOutputMode::SingleStream
+                } else {
+                    MiniOutputMode::SeparateStreams
+                }
+            );
             let dedicated_adr_count = if kind == MiniAppKind::Polar {
                 initial
                     .polar_outputs
@@ -2873,7 +2986,14 @@ mod tests {
             };
             assert_eq!(
                 session.lsl,
-                format!("Publishing {} stream(s)", 1 + dedicated_adr_count)
+                format!(
+                    "Publishing {} stream(s)",
+                    if kind == MiniAppKind::Vernier {
+                        3
+                    } else {
+                        1 + dedicated_adr_count
+                    }
+                )
             );
             let single_samples = mock_samples(&state).await;
             assert!(single_samples > first_samples);
@@ -2914,6 +3034,19 @@ mod tests {
                     active_snapshot(&state).await.unwrap().lsl,
                     "Publishing 2 stream(s)"
                 );
+                let all_in_one_only = MiniPreferencesInput {
+                    vernier_outputs: Some(vec!["allInOne".into()]),
+                    ..input(MiniOutputMode::SeparateStreams, initial.stream_name.clone())
+                };
+                let result = save_preferences_inner(&state, all_in_one_only)
+                    .await
+                    .unwrap();
+                assert!(result.applied && !result.reconnect_required);
+                assert_eq!(
+                    active_snapshot(&state).await.unwrap().lsl,
+                    "Publishing 2 stream(s)"
+                );
+                assert!(mock_samples(&state).await > single_samples);
             }
             let invalid = input(MiniOutputMode::SingleStream, String::new());
             assert!(save_preferences_inner(&state, invalid).await.is_err());
@@ -2937,10 +3070,31 @@ mod tests {
         );
         assert!(validate_vernier_outputs(vec!["rawForce".into(), "rawForce".into()]).is_err());
         assert!(validate_vernier_outputs(vec!["rawAcceleration".into()]).is_err());
-        assert_eq!(default_vernier_outputs().len(), 4);
+        assert_eq!(
+            default_vernier_outputs(),
+            vec!["rawVernier", "vernierBreathing"]
+        );
+        assert_eq!(
+            validate_vernier_outputs(vec!["allInOne".into()]).unwrap(),
+            vec!["rawVernier", "allInOne"]
+        );
         assert_eq!(
             validate_vernier_outputs(vec!["stepRate".into(), "steps".into()]).unwrap(),
             vec!["rawVernier", "steps", "stepRate"]
+        );
+    }
+
+    #[test]
+    fn legacy_vernier_single_mode_becomes_an_independent_all_in_one_choice() {
+        let saved: MiniPreferencesFile = serde_json::from_str(
+            r#"{"outputMode":"singleStream","vernierOutputs":["rawVernier","rawForce"]}"#,
+        )
+        .unwrap();
+        let restored = MiniPreferencesSnapshot::from_file(MiniAppKind::Vernier, saved);
+        assert_eq!(restored.output_mode, MiniOutputMode::SeparateStreams);
+        assert_eq!(
+            restored.vernier_outputs,
+            vec!["rawVernier", "rawForce", "allInOne"]
         );
     }
 

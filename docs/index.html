@@ -49,25 +49,26 @@
           <div class="method-row"><div class="method-node vernier-method"><strong>30 s force range</strong><span>5th–95th percentile bounds</span></div><div class="method-node output"><strong>vernierBreathing</strong><span>separate 0–1 LSL waveform</span></div></div>
         </div>
       </div>
-      <p class="diagram-note">Separate mode keeps each outlet's sample timing. Single mode uses fixed sparse channels, with selected ADR waveforms and diagnostics on dedicated outlets. Raw signals remain enabled. Signal-loss markers report gaps; missing measurements are not filled with invented sensor values.</p>
+      <p class="diagram-note">Individual outlets keep each signal's sample timing. Polar's Single mode uses fixed sparse channels, with selected ADR waveforms and diagnostics on dedicated outlets. Vernier's optional All-in-one outlet runs alongside individual outlets. Raw signals remain enabled. Signal-loss markers report gaps; missing measurements are not filled with invented sensor values.</p>
       <div id="vernier-outputs" class="vernier-reference">
         <h3>Vernier Mini outputs</h3>
         <p>The GDX-RB measures tension on its short nylon strap with a force sensor inside the box. Vernier documents four device channels: Force, Respiration Rate, Steps, and Step Rate. The live belt running firmware 5.3 advertised these four and no raw X/Y/Z accelerometer channel. <a href="https://www.vernier.com/manuals/GDX-RB">GDX-RB manual</a></p>
         <div class="reference-table-scroll">
           <table>
-            <thead><tr><th scope="col">Variable (checkbox)</th><th scope="col">What it contains</th><th scope="col">Origin</th></tr></thead>
+            <thead><tr><th scope="col">Outlet (UI label)</th><th scope="col">What it contains</th><th scope="col">Origin</th></tr></thead>
             <tbody>
-              <tr><th scope="row">rawVernier (Raw data)</th><td>Mandatory: all numeric channels advertised by the connected belt, including raw force, plus host receipt, sequence, drop, and decode diagnostics. A missing value in a packet is NaN.</td><td>Device values and app diagnostics.</td></tr>
-              <tr><th scope="row">rawForce (Force only)</th><td>Optional scalar copy of Force in newtons, without filtering. It reflects belt tension, not pressure or lung volume.</td><td>Device Force value.</td></tr>
-              <tr><th scope="row">vernierBreathing (Breathing)</th><td>A relative 0-1 force waveform. The app uses a causal 30-second force history, initial observed min/max bounds, then 5th/95th percentile bounds after 20 valid samples, refreshed every five samples.</td><td>App-derived; not respiration rate.</td></tr>
-              <tr><th scope="row">signalStatus (Signal status)</th><td>Event code 1 for lost Bluetooth signal and 2 for restored signal. Sensor samples are not fabricated during a gap.</td><td>App-derived continuity marker.</td></tr>
+              <tr><th scope="row">rawVernier (always on)</th><td>Mandatory: all numeric channels advertised by the connected belt, including raw force, plus host receipt, sequence, drop, and decode diagnostics. A missing value in a packet is NaN.</td><td>Device values and app diagnostics.</td></tr>
+              <tr><th scope="row">rawForce (Belt force (N))</th><td>Optional scalar copy of Force in newtons, without filtering. It reflects belt tension, not pressure or lung volume.</td><td>Device Force value.</td></tr>
+              <tr><th scope="row">vernierBreathing (Breath wave (0–1))</th><td>A relative 0-1 force waveform. The app uses a causal 30-second force history, initial observed min/max bounds, then 5th/95th percentile bounds after 20 valid samples, refreshed every five samples.</td><td>App-derived; not respiration rate.</td></tr>
+              <tr><th scope="row">signalStatus (Signal events)</th><td>Event code 1 for lost Bluetooth signal and 2 for restored signal. Sensor samples are not fabricated during a gap.</td><td>App-derived continuity marker.</td></tr>
               <tr><th scope="row">steps (Steps)</th><td>Device-reported cumulative Steps count, forwarded when the belt updates it. The app does not reset the count.</td><td>Device pedometer; separate outlet <code>_steps</code>.</td></tr>
-              <tr><th scope="row">stepRate (Step rate)</th><td>Device-reported Step Rate in steps per minute, based on a 10-second calculation window and updated every 10 seconds.</td><td>Device pedometer; separate outlet <code>_stepRate</code>.</td></tr>
-              <tr><th scope="row">respirationRate (Resp. rate)</th><td>Device-reported breaths per minute, estimated from Force over a 30-second window and updated every 10 seconds. The app forwards the device value unchanged.</td><td>Device respiration estimate; separate outlet <code>_respirationRate</code>.</td></tr>
+              <tr><th scope="row">stepRate (Steps/min)</th><td>Device-reported Step Rate in steps per minute, based on a 10-second calculation window and updated every 10 seconds.</td><td>Device pedometer; separate outlet <code>_stepRate</code>.</td></tr>
+              <tr><th scope="row">respirationRate (Breaths/min)</th><td>Device-reported breaths per minute, estimated from Force over a 30-second window and updated every 10 seconds. The app forwards the device value unchanged.</td><td>Device respiration estimate; separate outlet <code>_respirationRate</code>.</td></tr>
+              <tr><th scope="row">All-in-one (stream name without suffix)</th><td>Optional sparse outlet with every raw device channel, diagnostics, normalized breath wave, and signal events. Missing fields in each row are NaN. Its contents do not depend on the individual outlet checkboxes.</td><td>Device values and app-derived values.</td></tr>
             </tbody>
           </table>
         </div>
-        <p>Raw data stays checked and always includes raw force. The remaining six checkboxes add optional outputs or copies: Force only, Breathing, Signal status, Resp. rate, Steps, and Step rate. The four original outputs remain selected on a first launch. Changes save automatically and become the next launch's defaults. Separate mode creates selected outlets; Single mode combines columns into one sparse outlet. Changes replace outlets without restarting Bluetooth. Device values appear when reported. Mock settings are session-only; an external LSL recorder owns recording.</p>
+        <p>The raw data outlet is always on and includes belt force. Seven checkboxes control the optional individual outlets and the independent All-in-one outlet. A first launch selects only Breath wave alongside raw data. Choices save automatically; changing them replaces outlets without restarting Bluetooth. Device values appear when reported. Mock settings are session-only; an external LSL recorder owns recording.</p>
         <h4>Device channels inside rawVernier</h4>
         <p>Channel labels and units come from the connected device's metadata. On the tested GDX-RB firmware 5.3, the channel names and slots were:</p>
         <div class="reference-table-scroll"><table><thead><tr><th scope="col">Device variable</th><th scope="col">Measure and unit</th><th scope="col">Observed slot</th></tr></thead><tbody>
@@ -86,7 +87,7 @@
           <tr><th scope="row">host_receive_timestamp_ns</th><td>Monotonic time since the native measurement-session origin.</td><td>nanoseconds</td></tr>
           <tr><th scope="row">encoding_code</th><td>0 means device Float32 frame; 1 means device Int32 frame.</td><td>code</td></tr>
         </tbody></table></div>
-        <p>In Single mode, device columns use labels such as <code>sensor_4_Steps</code> and <code>sensor_5_Step Rate</code>. Selected individual columns use <code>steps</code>, <code>stepRate</code>, <code>respirationRate</code>, <code>raw_force</code>, <code>vernier_breathing_01</code>, and <code>signal_state</code>. When the full raw row and an individual value are both selected, the value appears in both columns. <code>signal_state</code> is 1 for signal lost and 2 for restored; other columns are NaN on marker rows.</p>
+        <p>In Vernier All-in-one, device columns use labels such as <code>sensor_4_Steps</code> and <code>sensor_5_Step Rate</code>. The additional <code>vernier_breathing_01</code> and <code>signal_state</code> columns contain the normalized waveform and signal markers. <code>signal_state</code> is 1 for signal lost and 2 for restored; unrelated columns are NaN on those rows. Individual outlet selections do not change these columns.</p>
       </div>
     </section>
 

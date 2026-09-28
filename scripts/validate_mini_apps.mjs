@@ -198,32 +198,37 @@ async function validateNormalWindow(app) {
     await page.locator('#connection-feedback[data-text-fit="fit"]').waitFor();
     await assertInlineOutputs(page);
     assert.equal(await page.locator("#metric-options input").count(), 7);
-    assert.equal(await page.locator("#metric-count").textContent(), "4/7");
+    assert.equal(await page.locator("#metric-count").textContent(), "1/7");
+    assert.equal(await page.locator('#metric-options input[value="rawVernier"]').count(), 0);
+    assert.equal(await page.locator("#stream-mode-toggle").count(), 0);
     assert.equal(await page.locator('#metric-options input[value="steps"]').isChecked(), false);
     assert.equal(await page.locator('#metric-options input[value="stepRate"]').isChecked(), false);
     assert.equal(await page.locator('#metric-options input[value="respirationRate"]').isChecked(), false);
     const forceLabel = page.locator('#metric-options label:has(input[value="rawForce"]) span');
+    assert.equal(await forceLabel.textContent(), "Belt force (N)");
+    assert.equal(await page.locator('#metric-options label:has(input[value="vernierBreathing"]) span').textContent(), "Breath wave (0–1)");
+    await forceLabel.click();
+    await page.waitForFunction(() => window.__miniSaves.at(-1)?.vernierOutputs.includes("rawForce"));
     await forceLabel.click();
     await page.waitForFunction(() => !window.__miniSaves.at(-1)?.vernierOutputs.includes("rawForce"));
-    assert.equal(await page.locator('#metric-options input[value="rawForce"]').isChecked(), false);
     await forceLabel.click();
     await page.waitForFunction(() => window.__miniSaves.at(-1)?.vernierOutputs.includes("rawForce"));
     await page.locator('#metric-options input[value="steps"]').check();
     await page.locator('#metric-options input[value="stepRate"]').check();
     await page.locator('#metric-options input[value="respirationRate"]').check();
-    await page.waitForFunction(() => window.__miniSaves.at(-1)?.vernierOutputs?.length === 7);
+    await page.locator('#metric-options input[value="signalStatus"]').check();
+    await page.locator('#metric-options input[value="allInOne"]').check();
+    await page.waitForFunction(() => window.__miniSaves.at(-1)?.vernierOutputs?.length === 8);
     assert.equal(await page.locator("#metric-count").textContent(), "7/7");
-    assert.equal(await page.locator('#metric-options input[value="rawVernier"]').isDisabled(), true);
     await page.locator('#metric-options input[value="vernierBreathing"]').uncheck();
-    await page.waitForFunction(() => window.__miniSaves.at(-1)?.vernierOutputs?.length === 6);
+    await page.waitForFunction(() => window.__miniSaves.at(-1)?.vernierOutputs?.length === 7);
     assert.equal(await page.locator("#metric-count").textContent(), "6/7");
-    assert.equal(await page.locator('#metric-options input[value="rawVernier"]').isChecked(), true);
+    assert.equal(await page.locator('#metric-options input[value="allInOne"]').isChecked(), true);
     assert.equal(await page.evaluate(() => window.__miniCalls.includes("disconnect_device")), false);
     const savedPreferences = await page.evaluate(() => window.__miniSaves.at(-1));
     const reopened = await createPage(app, { mockMode: false, lslHealthy: true, savedPreferences });
     await reopened.goto(appUrl(app));
-    assert.equal(await reopened.locator('#metric-options input[value="rawVernier"]').isChecked(), true);
-    assert.equal(await reopened.locator('#metric-options input[value="rawVernier"]').isDisabled(), true);
+    assert.equal(await reopened.locator('#metric-options input[value="allInOne"]').isChecked(), true);
     assert.equal(await reopened.locator('#metric-options input[value="steps"]').isChecked(), true);
     assert.equal(await reopened.locator('#metric-options input[value="stepRate"]').isChecked(), true);
     assert.equal(await reopened.locator('#metric-options input[value="respirationRate"]').isChecked(), true);
@@ -235,9 +240,10 @@ async function validateNormalWindow(app) {
     await reopened.locator('#metric-options input[value="steps"]').uncheck();
     await reopened.locator('#metric-options input[value="stepRate"]').uncheck();
     await reopened.locator('#metric-options input[value="respirationRate"]').uncheck();
-    await reopened.locator('#metric-options input[value="signalStatus"]').click();
+    await reopened.locator('#metric-options input[value="signalStatus"]').uncheck();
     assert.equal(await reopened.locator('#metric-options input[value="signalStatus"]').isChecked(), false);
-    assert.equal(await reopened.locator("#metric-count").textContent(), "1/7");
+    await reopened.locator('#metric-options input[value="allInOne"]').uncheck();
+    assert.equal(await reopened.locator("#metric-count").textContent(), "0/7");
     await reopened.evaluate(() => {
       window.__emitMiniEvent({ kind: "connection", connected: true, deviceName: "Test belt" });
       window.__emitMiniEvent({ kind: "samples", vernierRows: 20, metricSamples: 20, lsl: "Publishing 1 stream(s)" });
@@ -309,10 +315,10 @@ async function validateNormalWindow(app) {
     await page.locator("#metrics-close").click();
   }
 
-  await page.locator("#stream-mode-toggle").check();
-  await page.waitForFunction(() => window.__miniSaves.some((save) => save.outputMode === "singleStream"));
-  assert.equal(await page.locator("#stream-mode-toggle").isChecked(), true);
   if (app.kind === "polar") {
+    await page.locator("#stream-mode-toggle").check();
+    await page.waitForFunction(() => window.__miniSaves.some((save) => save.outputMode === "singleStream"));
+    assert.equal(await page.locator("#stream-mode-toggle").isChecked(), true);
     assert.match(await page.locator("#signal-list").textContent(), /single \+ ADR LSL/);
   } else {
     await assertInlineOutputs(page);
@@ -356,9 +362,14 @@ async function validateMockWindow(app, lslHealthy) {
   assert.equal(await page.locator("#mini-node").evaluate((node) => node.classList.contains("streaming")), lslHealthy);
   await assertNoOverflow(page);
 
-  await page.locator("#stream-mode-toggle").check();
-  await page.waitForFunction(() => window.__miniSaves.some((save) => save.outputMode === "singleStream"));
-  assert.equal(await page.locator("#stream-mode-toggle").isChecked(), true);
+  if (app.kind === "polar") {
+    await page.locator("#stream-mode-toggle").check();
+    await page.waitForFunction(() => window.__miniSaves.some((save) => save.outputMode === "singleStream"));
+    assert.equal(await page.locator("#stream-mode-toggle").isChecked(), true);
+  } else {
+    await page.locator('#metric-options input[value="allInOne"]').check();
+    await page.waitForFunction(() => window.__miniSaves.some((save) => save.vernierOutputs.includes("allInOne")));
+  }
   assert.equal(await page.evaluate(() => window.__miniCalls.includes("disconnect_device")), false);
 
   if (lslHealthy) {
@@ -388,7 +399,7 @@ async function validatePreferenceMemory(app) {
   await page.evaluate(() => {
     for (const [id, checked] of [
       ["steps", true], ["stepRate", true], ["respirationRate", true],
-      ["rawForce", false], ["vernierBreathing", false],
+      ["rawForce", true], ["vernierBreathing", false],
     ]) {
       const input = document.querySelector(`#metric-options input[value="${id}"]`);
       input.checked = checked;
@@ -396,21 +407,21 @@ async function validatePreferenceMemory(app) {
     }
   });
   await page.waitForFunction(() => window.__miniSaves.length === 5);
-  assert.equal(await page.locator("#metric-count").textContent(), "5/7");
-  await page.locator("#stream-mode-toggle").check();
+  assert.equal(await page.locator("#metric-count").textContent(), "4/7");
+  await page.locator('#metric-options input[value="allInOne"]').check();
   await page.locator("#auto-connect").check();
   await page.locator("#stream-name").fill("Remembered-Vernier");
   await page.waitForFunction(() => window.__miniSaves.at(-1)?.streamName === "Remembered-Vernier");
   const savedPreferences = await page.evaluate(() => window.__miniSaves.at(-1));
-  assert.deepEqual(savedPreferences.vernierOutputs, ["rawVernier", "signalStatus", "steps", "stepRate", "respirationRate"]);
-  assert.equal(savedPreferences.outputMode, "singleStream");
+  assert.deepEqual(savedPreferences.vernierOutputs, ["rawVernier", "rawForce", "steps", "stepRate", "respirationRate", "allInOne"]);
+  assert.equal(savedPreferences.outputMode, "separateStreams");
   assert.equal(savedPreferences.autoConnect, true);
   await page.close();
 
   const reopened = await createPage(app, { mockMode: false, lslHealthy: true, savedPreferences });
   await reopened.goto(appUrl(app));
   assert.equal(await reopened.locator("#stream-name").inputValue(), "Remembered-Vernier");
-  assert.equal(await reopened.locator("#stream-mode-toggle").isChecked(), true);
+  assert.equal(await reopened.locator('#metric-options input[value="allInOne"]').isChecked(), true);
   assert.equal(await reopened.locator("#auto-connect").isChecked(), true);
   for (const input of await reopened.locator("#metric-options input").all()) {
     assert.equal(await input.isChecked(), savedPreferences.vernierOutputs.includes(await input.inputValue()));
@@ -419,18 +430,18 @@ async function validatePreferenceMemory(app) {
   // successful save. Editing the UI must never mutate that snapshot.
   await reopened.evaluate(() => {
     const input = document.querySelector('#metric-options input[value="rawForce"]');
-    input.checked = true;
+    input.checked = false;
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
   await reopened.waitForFunction(() => window.__miniSaves.length === 1);
   await reopened.evaluate(() => {
     window.__miniRejectNextSave = true;
     const input = document.querySelector('#metric-options input[value="rawForce"]');
-    input.checked = false;
+    input.checked = true;
     input.dispatchEvent(new Event("change", { bubbles: true }));
   });
   await reopened.waitForFunction(() => document.querySelector("#node-phase").textContent === "Attention");
-  assert.equal(await reopened.locator('#metric-options input[value="rawForce"]').isChecked(), true);
+  assert.equal(await reopened.locator('#metric-options input[value="rawForce"]').isChecked(), false);
   assert.equal(await reopened.evaluate(() => window.__miniSaves.length), 1);
   await reopened.close();
 }
@@ -450,6 +461,11 @@ async function assertInlineOutputs(page) {
     .every((label) => label.dataset.textFit === "fit"));
   assert.equal(await page.locator(".metric-options span").evaluateAll((labels) =>
     labels.every((label) => label.scrollWidth <= label.clientWidth + 1)), true);
+  assert.equal(await page.evaluate(() => {
+    const reconnect = document.querySelector('.mini-option-row .check-row:nth-child(2)').getBoundingClientRect();
+    const count = document.querySelector('.mini-option-row .metric-row').getBoundingClientRect();
+    return reconnect.right <= count.left + 1;
+  }), true);
 }
 
 async function createPage(app, options) {
@@ -474,11 +490,11 @@ async function createPage(app, options) {
         outputMode: "separateStreams",
         autoConnect: Boolean(options.remembered),
         polarOutputs: ["raw_ecg", "raw_acc", "heart_rate", "rr_interval"],
-        vernierOutputs: ["rawVernier", "rawForce", "vernierBreathing", "signalStatus"],
+        vernierOutputs: ["rawVernier", "vernierBreathing"],
         lastDevice: options.remembered ? { id: "saved-device", name: `Saved ${app.scanLabel}` } : null,
         ...options.savedPreferences,
       };
-      const lsl = options.lslHealthy ? "Publishing 4 LSL streams" : "LSL unavailable";
+      const lsl = options.lslHealthy ? `Publishing ${app.kind === "polar" ? 4 : 2} LSL streams` : "LSL unavailable";
       const session = {
         connected: true,
         deviceId: `mock://${app.kind}-1234`,

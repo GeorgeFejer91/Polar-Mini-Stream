@@ -6,15 +6,15 @@
   const isNative = Boolean(core?.invoke && core?.Channel);
   const directPolarOutputs = Object.freeze(["raw_ecg", "raw_acc", "heart_rate", "rr_interval"]);
   const vernierOutputs = Object.freeze([
-    { id: "rawVernier", label: "Raw data", detail: "Always published: raw force, available device channels and packet diagnostics." },
-    { id: "rawForce", label: "Force only", detail: "Optional force-only copy in newtons. Raw force is always present in Raw data." },
-    { id: "vernierBreathing", label: "Breathing", detail: "Our live 0-1 normalization of belt force, not lung volume or breath rate." },
-    { id: "signalStatus", label: "Signal status", detail: "Markers for lost and restored Bluetooth signal." },
+    { id: "rawForce", label: "Belt force (N)", detail: "Unfiltered belt tension in newtons; also present in the always-on raw data stream." },
+    { id: "vernierBreathing", label: "Breath wave (0–1)", detail: "App-normalized belt-force waveform; not lung volume or breaths per minute." },
+    { id: "signalStatus", label: "Signal events", detail: "Markers for lost and restored Bluetooth signal." },
     { id: "steps", label: "Steps", detail: "Belt pedometer's cumulative step count, as reported by the device." },
-    { id: "stepRate", label: "Step rate", detail: "Belt pedometer's estimated steps per minute over a 10-second window." },
-    { id: "respirationRate", label: "Resp. rate", detail: "Belt's estimated breaths per minute over 30 seconds, updated every 10 seconds." },
+    { id: "stepRate", label: "Steps/min", detail: "Belt pedometer's estimated steps per minute over a 10-second window." },
+    { id: "respirationRate", label: "Breaths/min", detail: "Belt's estimated breaths per minute over 30 seconds, updated every 10 seconds." },
+    { id: "allInOne", label: "All-in-one", detail: "Separate sparse stream containing every device channel, diagnostics, normalized breath wave, and signal events; independent of the individual choices." },
   ]);
-  const defaultVernierOutputIds = Object.freeze(vernierOutputs.slice(0, 4).map((output) => output.id));
+  const defaultVernierOutputIds = Object.freeze(["rawVernier", "vernierBreathing"]);
   const state = {
     kind: "vernier",
     productName: "Vernier Stream Mini",
@@ -57,7 +57,6 @@
       "node-phase",
       "node-kind",
       "stream-name",
-      "stream-mode-toggle",
       "autostart",
       "auto-connect",
       "device-row",
@@ -124,7 +123,7 @@
   function preferencePayload() {
     return {
       streamName: elements["stream-name"].value.trim(),
-      outputMode: elements["stream-mode-toggle"].checked ? "singleStream" : "separateStreams",
+      outputMode: "separateStreams",
       autoConnect: elements["auto-connect"].checked,
       polarOutputs: [...new Set(state.preferences.polarOutputs || directPolarOutputs)],
       vernierOutputs: [...new Set(state.preferences.vernierOutputs || defaultVernierOutputIds)],
@@ -170,16 +169,11 @@
     if (bootstrap.session?.deviceId) {
       state.selectedDeviceId = bootstrap.session.deviceId;
     }
-    renderMode();
     renderDevices();
     renderOutputOptions();
     renderSignals();
     renderConnection(bootstrap.session);
     setStatus(isNative ? "Ready" : "Installed app required", null, !isNative);
-  }
-
-  function renderMode() {
-    elements["stream-mode-toggle"].checked = state.preferences.outputMode === "singleStream";
   }
 
   function renderDevices() {
@@ -211,8 +205,7 @@
 
   function renderSignals() {
     const selected = new Set(state.preferences.vernierOutputs || defaultVernierOutputIds);
-    selected.add("rawVernier");
-    elements["metric-count"].textContent = `${selected.size}/${vernierOutputs.length}`;
+    elements["metric-count"].textContent = `${vernierOutputs.filter((output) => selected.has(output.id)).length}/${vernierOutputs.length}`;
     for (const checkbox of elements["metric-options"].querySelectorAll("input")) {
       checkbox.checked = selected.has(checkbox.value);
     }
@@ -222,7 +215,7 @@
     elements["mini-node"].classList.toggle("connected", state.connected);
     elements["mini-node"].classList.toggle(
       "streaming",
-      state.connected && state.streaming && isLslPublishing(state.lsl) && hasContinuousOutput(),
+      state.connected && state.streaming && isLslPublishing(state.lsl),
     );
     elements["connect-button"].disabled = state.busy || state.connected || !isNative;
     elements["connect-button"].textContent = state.mockMode ? "Start mock" : "Connect";
@@ -233,7 +226,7 @@
     elements["device-select"].disabled = state.busy || state.connected || !isNative;
     elements["bluetooth-toggle"].disabled = state.busy || state.radioBusy || state.connected || !["on", "off"].includes(state.radioStatus);
     for (const checkbox of elements["metric-options"].querySelectorAll("input")) {
-      checkbox.disabled = state.busy || !isNative || checkbox.value === "rawVernier";
+      checkbox.disabled = state.busy || !isNative;
     }
     elements["device-status"].textContent = state.connected
       ? session?.deviceName || state.preferences.lastDevice?.name || "Connected"
@@ -275,11 +268,6 @@
     return String(status || "").startsWith("Publishing ");
   }
 
-  function hasContinuousOutput() {
-    return state.kind !== "vernier" || (state.preferences.vernierOutputs || defaultVernierOutputIds)
-      .some((id) => id !== "signalStatus");
-  }
-
   function hasNewSamples(samples, previous) {
     return ["ecgSamples", "accSamples", "heartRatePackets", "metricSamples", "vernierRows"]
       .some((key) => Number(samples?.[key] || 0) > Number(previous?.[key] || 0));
@@ -293,22 +281,16 @@
       const label = document.createElement("label");
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
-      checkbox.setAttribute("aria-label", output.id === "respirationRate" ? "Respiration rate" : output.label);
+      checkbox.setAttribute("aria-label", output.label);
       checkbox.setAttribute("aria-description", `${output.id}: ${output.detail}`);
       checkbox.value = output.id;
       checkbox.checked = selected.has(output.id);
-      checkbox.disabled = output.id === "rawVernier";
       checkbox.addEventListener("change", () => {
         const current = new Set(state.preferences.vernierOutputs || defaultVernierOutputIds);
-        current.add("rawVernier");
-        if (output.id === "rawVernier") {
-          checkbox.checked = true;
-          return;
-        }
         if (checkbox.checked) current.add(output.id);
         else current.delete(output.id);
-        state.preferences.vernierOutputs = vernierOutputs
-          .filter((candidate) => current.has(candidate.id)).map((candidate) => candidate.id);
+        state.preferences.vernierOutputs = ["rawVernier", ...vernierOutputs
+          .filter((candidate) => current.has(candidate.id)).map((candidate) => candidate.id)];
         renderSignals();
         savePreferences(true);
       });
@@ -343,7 +325,6 @@
         confirmedPreferences = structuredClone(result.preferences || { ...confirmedPreferences, ...payload });
         if (revision === saveRevision) {
           state.preferences = structuredClone(confirmedPreferences);
-          renderMode();
           renderSignals();
           if (!quiet || result.reconnectRequired || result.applied) {
             setStatus(result.message || "Saved", "Config", result.reconnectRequired);
@@ -356,7 +337,6 @@
             elements["stream-name"].value = confirmedPreferences.streamName || "";
             elements["auto-connect"].checked = Boolean(confirmedPreferences.autoConnect);
           }
-          renderMode();
           renderSignals();
           reportError(error);
         }
@@ -664,12 +644,12 @@
       });
       setStatus(event.connected ? "Connected; waiting for fresh LSL samples" : (event.message || "Disconnected"), event.connected ? "Connected" : "Idle");
     } else if (event.kind === "samples") {
-      if (state.connected && hasContinuousOutput() && isLslPublishing(event.lsl) && hasNewSamples(event, state.samples)) {
+      if (state.connected && isLslPublishing(event.lsl) && hasNewSamples(event, state.samples)) {
         state.lastSampleAt = performance.now();
       }
       state.samples = event;
       state.lsl = event.lsl || state.lsl;
-      state.streaming = state.connected && hasContinuousOutput() && isLslPublishing(state.lsl) && state.lastSampleAt > 0
+      state.streaming = state.connected && isLslPublishing(state.lsl) && state.lastSampleAt > 0
         && performance.now() - state.lastSampleAt < 1200;
       renderConnection();
       if (state.streaming) {
@@ -747,9 +727,6 @@
     elements["auto-connect"].addEventListener("change", () => savePreferences(false));
     elements["device-select"].addEventListener("change", () => {
       state.selectedDeviceId = elements["device-select"].value;
-    });
-    elements["stream-mode-toggle"].addEventListener("change", () => {
-      savePreferences(false);
     });
     elements["scan-button"].addEventListener("click", scanDevices);
     elements["device-rescan"].addEventListener("click", scanDevices);

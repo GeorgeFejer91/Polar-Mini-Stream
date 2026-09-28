@@ -40,21 +40,6 @@
             <label class="field-label" for="stream-name">Stream name</label>
             <input id="stream-name" class="text-entry" autocomplete="off" spellcheck="false" />
 
-            <div class="stream-mode-row" data-tauri-drag-region>
-              <span class="stream-mode-option" data-tauri-drag-region>
-                <img src="icons/separate-streams.svg" alt="" aria-hidden="true" data-tauri-drag-region />
-                <span data-tauri-drag-region>Separate</span>
-              </span>
-              <label class="stream-mode-toggle" for="stream-mode-toggle">
-                <input id="stream-mode-toggle" type="checkbox" role="switch" aria-label="Output as one LSL stream" />
-                <span class="stream-mode-track" aria-hidden="true"><span class="stream-mode-thumb"></span></span>
-              </label>
-              <span class="stream-mode-option single" data-tauri-drag-region>
-                <img src="icons/single-stream.svg" alt="" aria-hidden="true" data-tauri-drag-region />
-                <span data-tauri-drag-region>Single</span>
-              </span>
-            </div>
-
             <div id="device-row" class="device-row" data-tauri-drag-region>
               <select id="device-select" aria-label="Device"></select>
               <button id="scan-button" type="button">Scan</button>
@@ -71,8 +56,8 @@
                 <span>Reconnect</span>
               </label>
               <div class="metric-row" data-tauri-drag-region>
-                <span class="field-label" data-tauri-drag-region>Streams</span>
-                <span id="metric-count" data-tauri-drag-region>4/7</span>
+                <span class="field-label" data-tauri-drag-region title="Raw device data is always on; the count shows optional streams">Raw + extras</span>
+                <span id="metric-count" data-tauri-drag-region>1/7</span>
               </div>
             </div>
 
