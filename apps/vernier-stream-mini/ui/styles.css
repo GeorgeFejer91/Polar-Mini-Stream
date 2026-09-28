@@ -268,7 +268,8 @@ body[data-mock="true"] .node-surface {
 }
 .mini-option-row {
   display: flex;
-  gap: 9px;
+  flex-wrap: wrap;
+  gap: 4px;
   align-items: center;
 }
 .check-row,
@@ -283,6 +284,33 @@ body[data-mock="true"] .node-surface {
 }
 .check-row { justify-content: flex-start; cursor: pointer; }
 .check-row input { width: 15px; height: 15px; accent-color: var(--brand); }
+.mini-option-row .check-row { flex: none; max-width: 100%; gap: 3px; white-space: nowrap; }
+.mini-option-row .check-row > span { min-width: 0; }
+.mini-option-row .check-row > span[data-text-fit="reflow"] { white-space: normal; }
+.mini-option-row .check-row input {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 24px;
+  height: 14px;
+  margin: 0;
+  border-radius: 7px;
+  background: var(--line-strong);
+}
+.mini-option-row .check-row input::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary-fg);
+  transition: transform 140ms ease;
+}
+.mini-option-row .check-row input:checked { background: var(--brand); }
+.mini-option-row .check-row input:checked::before { transform: translateX(10px); }
+.mini-option-row .check-row input:disabled { opacity: .5; cursor: not-allowed; }
 .metric-row { margin-left: auto; }
 .metric-row span { white-space: nowrap; }
 .readout * { pointer-events: none; }
@@ -524,7 +552,7 @@ button,
 @media (max-width: 350px), (max-height: 300px) {
   .mini-shell { padding: 6px 10px 8px; }
   .patch-node { width: calc(100vw - 26px); }
-  .node-body { gap: 4px; padding: 6px 7px; }
+  .node-body { gap: 3px; padding: 4px 7px; }
   .node-window-actions button { width: 19px; height: 19px; }
   .patch-node header span,
   .readout dd,

@@ -9,6 +9,7 @@
     <script src="theme-bootstrap.js"></script>
     <script src="app.js" defer></script>
     <script src="battery-layout.js" type="module"></script>
+    <script src="option-layout.js" type="module"></script>
     <script src="status-layout.js" type="module"></script>
   </head>
   <body data-kind="vernier">
@@ -52,8 +53,8 @@
                 <span>Start with PC</span>
               </label>
               <label class="check-row hardware-only">
-                <input id="auto-connect" type="checkbox" />
-                <span>Reconnect</span>
+                <input id="auto-connect" type="checkbox" role="switch" />
+                <span>Automatic reconnect</span>
               </label>
               <div class="metric-row" data-tauri-drag-region>
                 <span class="field-label" data-tauri-drag-region title="Selected LSL outlets; Respyra raw is always on">Streams</span>

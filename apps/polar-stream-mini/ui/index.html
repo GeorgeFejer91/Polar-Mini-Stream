@@ -9,6 +9,7 @@
     <script src="theme-bootstrap.js"></script>
     <script src="app.js" defer></script>
     <script src="battery-layout.js" type="module"></script>
+    <script src="option-layout.js" type="module"></script>
   </head>
   <body data-kind="polar">
     <main class="mini-shell" aria-labelledby="product-name" data-tauri-drag-region>
@@ -51,8 +52,8 @@
                 <span>Start with PC</span>
               </label>
               <label class="check-row hardware-only">
-                <input id="auto-connect" type="checkbox" />
-                <span>Reconnect</span>
+                <input id="auto-connect" type="checkbox" role="switch" />
+                <span>Automatic reconnect</span>
               </label>
               <div class="metric-row polar-only" data-tauri-drag-region>
                 <button id="metrics-button" type="button">+ Realtime metrics</button>
