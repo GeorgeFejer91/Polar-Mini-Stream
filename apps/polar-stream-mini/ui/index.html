@@ -39,21 +39,6 @@
             <label class="field-label" for="stream-name">Stream name</label>
             <input id="stream-name" class="text-entry" autocomplete="off" spellcheck="false" />
 
-            <div class="stream-mode-row" data-tauri-drag-region>
-              <span class="stream-mode-option" data-tauri-drag-region>
-                <img src="icons/separate-streams.svg" alt="" aria-hidden="true" data-tauri-drag-region />
-                <span data-tauri-drag-region>Separate</span>
-              </span>
-              <label class="stream-mode-toggle" for="stream-mode-toggle">
-                <input id="stream-mode-toggle" type="checkbox" role="switch" aria-label="Output as one LSL stream" />
-                <span class="stream-mode-track" aria-hidden="true"><span class="stream-mode-thumb"></span></span>
-              </label>
-              <span class="stream-mode-option single" data-tauri-drag-region>
-                <img src="icons/single-stream.svg" alt="" aria-hidden="true" data-tauri-drag-region />
-                <span data-tauri-drag-region>Single</span>
-              </span>
-            </div>
-
             <div id="device-row" class="device-row" data-tauri-drag-region>
               <select id="device-select" aria-label="Device"></select>
               <button id="scan-button" type="button">Scan</button>
@@ -73,6 +58,12 @@
                 <button id="metrics-button" type="button">+ Realtime metrics</button>
               </div>
             </div>
+
+            <label class="check-row all-in-one-row" title="Add a sparse recording outlet with ECG, ACC, heart rate, RR, and every available Polar Mini metric">
+              <input id="all-in-one" type="checkbox" />
+              <img src="icons/all-in-one.svg" alt="" aria-hidden="true" />
+              <span>All-in-one recording stream</span>
+            </label>
 
             <div id="signal-list" class="signal-list" aria-label="Included streams" data-tauri-drag-region></div>
 
@@ -101,7 +92,7 @@
         <header class="dialog-header" data-tauri-drag-region>
           <div data-tauri-drag-region>
             <strong data-tauri-drag-region>Realtime metrics</strong>
-            <span data-tauri-drag-region>Add derived LSL outputs. Raw ECG, ACC, heart rate, and RR stay included.</span>
+            <span data-tauri-drag-region>Add individual derived LSL outputs. Raw ECG, ACC, heart rate, and RR stay included.</span>
           </div>
           <button id="metrics-close" value="cancel" type="submit" aria-label="Close">x</button>
         </header>

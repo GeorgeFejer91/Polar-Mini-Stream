@@ -203,6 +203,13 @@ impl MiniPreferencesSnapshot {
         {
             vernier_outputs.push("allInOne".into());
         }
+        let mut polar_outputs = normalize_polar_outputs(file.polar_outputs);
+        if kind == MiniAppKind::Polar
+            && file.output_mode == Some(MiniOutputMode::SingleStream)
+            && !polar_outputs.iter().any(|id| id == "allInOne")
+        {
+            polar_outputs.push("allInOne".into());
+        }
         Self {
             schema: PREFERENCE_SCHEMA.into(),
             stream_name: normalize_stream_base(
@@ -211,13 +218,15 @@ impl MiniPreferencesSnapshot {
                     .unwrap_or(kind.default_stream_name()),
             )
             .unwrap_or(fallback.stream_name),
-            output_mode: if kind == MiniAppKind::Vernier {
+            output_mode: if kind == MiniAppKind::Vernier
+                || file.output_mode == Some(MiniOutputMode::SingleStream)
+            {
                 MiniOutputMode::SeparateStreams
             } else {
                 file.output_mode.unwrap_or_default()
             },
             auto_connect: file.auto_connect.unwrap_or(true),
-            polar_outputs: normalize_polar_outputs(file.polar_outputs),
+            polar_outputs,
             vernier_outputs,
             last_device,
             recent_devices,
@@ -482,7 +491,16 @@ impl MiniOutputHandle {
 
     fn publish_polar_ecg(&self, sensor_timestamp_ns: u64, samples: &[i32]) -> Option<String> {
         match self {
-            Self::Separate(output, ..) => output.publish_ecg(sensor_timestamp_ns, samples),
+            #[cfg(feature = "liblsl-backend")]
+            Self::Separate(output, _, combined) => {
+                let warning = output.publish_ecg(sensor_timestamp_ns, samples);
+                if let Some(combined) = combined {
+                    combined.publish_polar_ecg(sensor_timestamp_ns, samples);
+                }
+                warning
+            }
+            #[cfg(not(feature = "liblsl-backend"))]
+            Self::Separate(output) => output.publish_ecg(sensor_timestamp_ns, samples),
             #[cfg(feature = "liblsl-backend")]
             Self::Single(output) => {
                 output.publish_polar_ecg(sensor_timestamp_ns, samples);
@@ -497,9 +515,16 @@ impl MiniOutputHandle {
         samples: &[polar_h10_core::AccSample],
     ) -> Option<String> {
         match self {
-            Self::Separate(output, ..) => {
-                output.publish_accelerometer(sensor_timestamp_ns, samples)
+            #[cfg(feature = "liblsl-backend")]
+            Self::Separate(output, _, combined) => {
+                let warning = output.publish_accelerometer(sensor_timestamp_ns, samples);
+                if let Some(combined) = combined {
+                    combined.publish_polar_accelerometer(sensor_timestamp_ns, samples);
+                }
+                warning
             }
+            #[cfg(not(feature = "liblsl-backend"))]
+            Self::Separate(output) => output.publish_accelerometer(sensor_timestamp_ns, samples),
             #[cfg(feature = "liblsl-backend")]
             Self::Single(output) => {
                 output.publish_polar_accelerometer(sensor_timestamp_ns, samples);
@@ -514,9 +539,16 @@ impl MiniOutputHandle {
         rr_intervals_ms: &[f32],
     ) -> Option<String> {
         match self {
-            Self::Separate(output, ..) => {
-                output.publish_heart_rate(beats_per_minute, rr_intervals_ms)
+            #[cfg(feature = "liblsl-backend")]
+            Self::Separate(output, _, combined) => {
+                let warning = output.publish_heart_rate(beats_per_minute, rr_intervals_ms);
+                if let Some(combined) = combined {
+                    combined.publish_polar_heart_rate(beats_per_minute, rr_intervals_ms);
+                }
+                warning
             }
+            #[cfg(not(feature = "liblsl-backend"))]
+            Self::Separate(output) => output.publish_heart_rate(beats_per_minute, rr_intervals_ms),
             #[cfg(feature = "liblsl-backend")]
             Self::Single(output) => {
                 output.publish_polar_heart_rate(beats_per_minute, rr_intervals_ms);
@@ -531,7 +563,16 @@ impl MiniOutputHandle {
         values: &[MetricValue<'_>],
     ) -> Option<String> {
         match self {
-            Self::Separate(output, ..) => output.publish_metrics_at(sensor_timestamp_ns, values),
+            #[cfg(feature = "liblsl-backend")]
+            Self::Separate(output, _, combined) => {
+                let warning = output.publish_metrics_at(sensor_timestamp_ns, values);
+                if let Some(combined) = combined {
+                    combined.publish_polar_metrics_at(sensor_timestamp_ns, values);
+                }
+                warning
+            }
+            #[cfg(not(feature = "liblsl-backend"))]
+            Self::Separate(output) => output.publish_metrics_at(sensor_timestamp_ns, values),
             #[cfg(feature = "liblsl-backend")]
             Self::Single(output) => {
                 output.publish_polar_metrics_at(sensor_timestamp_ns, values);
@@ -683,8 +724,12 @@ struct PolarMiniSettings {
 
 impl PolarMiniSettings {
     fn from_outputs(outputs: &[String]) -> Self {
+        let mut selected = outputs.to_vec();
+        if outputs.iter().any(|id| id == "allInOne") {
+            selected.extend(polar_combined_outputs());
+        }
         Self {
-            selection: MetricSelection::from_ids(outputs.iter().map(String::as_str)),
+            selection: MetricSelection::from_ids(selected.iter().map(String::as_str)),
         }
     }
 }
@@ -1481,27 +1526,39 @@ async fn build_output(
                 } else {
                     None
                 };
-                let combined = if kind == MiniAppKind::Vernier
-                    && snapshot.vernier_outputs.iter().any(|id| id == "allInOne")
-                {
-                    Some(Arc::new(MiniCombinedOutput::vernier(
-                        bundled_lsl_for_status,
-                        &snapshot.stream_name,
-                        &[
-                            "rawVernier".into(),
-                            "vernierBreathing".into(),
-                            "signalStatus".into(),
-                        ],
-                    )?))
-                } else {
-                    None
+                let combined = match kind {
+                    MiniAppKind::Polar
+                        if snapshot.polar_outputs.iter().any(|id| id == "allInOne") =>
+                    {
+                        Some(Arc::new(MiniCombinedOutput::polar_alongside_individuals(
+                            bundled_lsl_for_status,
+                            &snapshot.stream_name,
+                            &polar_combined_outputs(),
+                        )?))
+                    }
+                    MiniAppKind::Vernier
+                        if snapshot.vernier_outputs.iter().any(|id| id == "allInOne") =>
+                    {
+                        Some(Arc::new(MiniCombinedOutput::vernier(
+                            bundled_lsl_for_status,
+                            &snapshot.stream_name,
+                            &[
+                                "rawVernier".into(),
+                                "vernierBreathing".into(),
+                                "signalStatus".into(),
+                            ],
+                        )?))
+                    }
+                    _ => None,
                 };
                 Ok(MiniOutputHandle::Separate(output, status, combined))
             }
             #[cfg(not(feature = "liblsl-backend"))]
             {
-                if kind == MiniAppKind::Vernier
-                    && snapshot.vernier_outputs.iter().any(|id| id == "allInOne")
+                if (kind == MiniAppKind::Vernier
+                    && snapshot.vernier_outputs.iter().any(|id| id == "allInOne"))
+                    || (kind == MiniAppKind::Polar
+                        && snapshot.polar_outputs.iter().any(|id| id == "allInOne"))
                 {
                     return Err("All-in-one requires the packaged liblsl backend.".into());
                 }
@@ -1551,7 +1608,12 @@ fn mini_output_config(kind: MiniAppKind, snapshot: &MiniPreferencesSnapshot) -> 
         audio_enabled: false,
         source_palette: source_palette(kind.palette_id()),
         outputs: match kind {
-            MiniAppKind::Polar => snapshot.polar_outputs.clone(),
+            MiniAppKind::Polar => snapshot
+                .polar_outputs
+                .iter()
+                .filter(|id| id.as_str() != "allInOne")
+                .cloned()
+                .collect(),
             MiniAppKind::Vernier => {
                 let mut outputs = Vec::new();
                 if vernier.raw_force {
@@ -2565,6 +2627,13 @@ fn polar_metric_options() -> Vec<MiniMetricOption> {
         .collect()
 }
 
+fn polar_combined_outputs() -> Vec<String> {
+    polar_metric_options()
+        .iter()
+        .map(|metric| metric.id.to_string())
+        .collect()
+}
+
 fn normalize_polar_outputs(input: Option<Vec<String>>) -> Vec<String> {
     let mut outputs = POLAR_DIRECT_OUTPUTS
         .iter()
@@ -2572,6 +2641,10 @@ fn normalize_polar_outputs(input: Option<Vec<String>>) -> Vec<String> {
         .collect::<Vec<_>>();
     for id in input.unwrap_or_default() {
         if outputs.iter().any(|known| known == &id) || id == VERNIER_FORCE_OUTPUT {
+            continue;
+        }
+        if id == "allInOne" {
+            outputs.push(id);
             continue;
         }
         let Some(metric) = MetricDefinition::for_id(&id) else {
@@ -2748,6 +2821,29 @@ mod tests {
             assert!(outputs.iter().any(|selected| selected == id), "{id}");
         }
         assert_eq!(normalize_polar_outputs(Some(outputs.clone())), outputs);
+    }
+
+    #[test]
+    fn polar_all_in_one_computes_metrics_without_individual_metric_outlets() {
+        let selected = normalize_polar_outputs(Some(vec!["allInOne".into()]));
+        let snapshot = MiniPreferencesSnapshot {
+            polar_outputs: selected.clone(),
+            ..MiniPreferencesSnapshot::default_for(MiniAppKind::Polar)
+        };
+        assert_eq!(
+            mini_output_config(MiniAppKind::Polar, &snapshot)
+                .outputs
+                .len(),
+            4
+        );
+        let mut engine =
+            MetricEngine::with_selection(PolarMiniSettings::from_outputs(&selected).selection);
+        let values = engine.process_accelerometer(&[AccSample {
+            x_mg: 1_000,
+            y_mg: 0,
+            z_mg: 0,
+        }]);
+        assert!(values.iter().any(|value| value.id == "acc_magnitude"));
     }
 
     #[cfg(all(target_os = "windows", feature = "liblsl-backend"))]
@@ -2945,6 +3041,27 @@ mod tests {
             }
             let first_samples = mock_samples(&state).await;
             assert!(first_samples > 0);
+            if kind == MiniAppKind::Polar {
+                let selected = normalize_polar_outputs(Some(vec!["allInOne".into()]));
+                let result = save_preferences_inner(
+                    &state,
+                    MiniPreferencesInput {
+                        stream_name: initial.stream_name.clone(),
+                        output_mode: MiniOutputMode::SeparateStreams,
+                        auto_connect: false,
+                        polar_outputs: selected,
+                        vernier_outputs: None,
+                    },
+                )
+                .await
+                .unwrap();
+                assert!(result.applied && !result.reconnect_required);
+                assert_eq!(
+                    active_snapshot(&state).await.unwrap().lsl,
+                    "Publishing 6 stream(s)"
+                );
+                assert!(mock_samples(&state).await > first_samples);
+            }
 
             let input = |mode, stream_name: String| MiniPreferencesInput {
                 stream_name,
@@ -3095,6 +3212,29 @@ mod tests {
         assert_eq!(
             restored.vernier_outputs,
             vec!["rawVernier", "rawForce", "allInOne"]
+        );
+    }
+
+    #[test]
+    fn legacy_polar_single_mode_becomes_an_independent_all_in_one_choice() {
+        let saved: MiniPreferencesFile = serde_json::from_str(
+            r#"{"outputMode":"singleStream","polarOutputs":["raw_ecg","adr_pca_waveform"]}"#,
+        )
+        .unwrap();
+        let restored = MiniPreferencesSnapshot::from_file(MiniAppKind::Polar, saved);
+        assert_eq!(restored.output_mode, MiniOutputMode::SeparateStreams);
+        assert!(restored.polar_outputs.iter().any(|id| id == "allInOne"));
+        assert!(
+            restored
+                .polar_outputs
+                .iter()
+                .any(|id| id == "adr_pca_waveform")
+        );
+        assert!(
+            restored
+                .polar_outputs
+                .iter()
+                .any(|id| id == "adr_pca_valid")
         );
     }
 

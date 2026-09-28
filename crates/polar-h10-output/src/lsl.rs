@@ -947,6 +947,23 @@ impl MiniCombinedOutput {
         stream_name: &str,
         selected_outputs: &[String],
     ) -> Result<Self, String> {
+        Self::polar_with_adr_outlets(bundled_library, stream_name, selected_outputs, true)
+    }
+
+    pub fn polar_alongside_individuals(
+        bundled_library: Option<PathBuf>,
+        stream_name: &str,
+        selected_outputs: &[String],
+    ) -> Result<Self, String> {
+        Self::polar_with_adr_outlets(bundled_library, stream_name, selected_outputs, false)
+    }
+
+    fn polar_with_adr_outlets(
+        bundled_library: Option<PathBuf>,
+        stream_name: &str,
+        selected_outputs: &[String],
+        include_adr_outlets: bool,
+    ) -> Result<Self, String> {
         let stream_name = crate::normalize_stream_base(stream_name)?;
         let polar_metric_ids = polar_combined_metric_ids(selected_outputs);
         let mut lsl = LslPublisher::new(bundled_library);
@@ -972,20 +989,23 @@ impl MiniCombinedOutput {
                 lsl.status()
             ));
         }
-        // ADR is always a dedicated scalar outlet, including in Single mode.
-        let provenance = PolarRespirationProvenance::new(BreathingSettings::default());
-        for metric in selected_outputs
-            .iter()
-            .filter_map(|id| MetricSpec::for_id(id))
-            .filter(|metric| metric.id.starts_with("adr_"))
-        {
-            lsl.add_outlet_with_palette(&stream_name, metric, None, Some(&provenance));
+        if include_adr_outlets {
+            // Legacy Single mode has no individual router to own these outlets.
+            let provenance = PolarRespirationProvenance::new(BreathingSettings::default());
+            for metric in selected_outputs
+                .iter()
+                .filter_map(|id| MetricSpec::for_id(id))
+                .filter(|metric| metric.id.starts_with("adr_"))
+            {
+                lsl.add_outlet_with_palette(&stream_name, metric, None, Some(&provenance));
+            }
         }
-        let expected = 1 + selected_outputs
-            .iter()
-            .filter(|id| id.starts_with("adr_"))
-            .filter(|id| MetricSpec::for_id(id).is_some())
-            .count();
+        let expected = 1 + usize::from(include_adr_outlets)
+            * selected_outputs
+                .iter()
+                .filter(|id| id.starts_with("adr_"))
+                .filter(|id| MetricSpec::for_id(id).is_some())
+                .count();
         if lsl.outlet_count() != expected {
             return Err(format!(
                 "ADR candidate outlets did not open: {}",
@@ -1379,8 +1399,7 @@ fn polar_combined_metric_ids(selected_outputs: &[String]) -> Vec<String> {
         if matches!(
             id.as_str(),
             "raw_ecg" | "raw_acc" | "heart_rate" | "rr_interval" | "raw_force"
-        ) || id.starts_with("adr_")
-            || ids.iter().any(|known| known == id)
+        ) || ids.iter().any(|known| known == id)
         {
             continue;
         }
@@ -2162,7 +2181,7 @@ mod tests {
     }
 
     #[test]
-    fn adr_methods_keep_separate_names_and_are_excluded_from_sparse_channels() {
+    fn adr_methods_keep_separate_names_and_are_included_in_sparse_channels() {
         let ids = [
             "adr_axis_difference_event",
             "adr_axis_difference_rate",
@@ -2182,7 +2201,7 @@ mod tests {
         ] {
             let spec = MetricSpec::for_id(id).unwrap();
             assert_eq!(spec.suffix(), suffix);
-            assert!(!channels.iter().any(|channel| channel.label == suffix));
+            assert!(channels.iter().any(|channel| channel.label == suffix));
         }
     }
 

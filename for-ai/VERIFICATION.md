@@ -57,10 +57,12 @@ cargo run -p polar-h10-metrics --example export_catalog -- docs/metric-catalog.j
 ## Gate 3: integrated readiness
 
 For ADR processing/output changes, build `verify_adr_lsl` in
-`polar-h10-output` and run it against the bundled liblsl in both `separate` and
-`single` modes. Concurrently run `scripts/verify_adr_lsl.py` in the matching mode
-using official pylsl. This observes wall-clock-paced metric generation, four
-candidate outlets, companion/raw streams, metadata, and source timestamps.
+`polar-h10-output` and run it against the bundled liblsl in `separate`,
+`single`, and `both` modes. Concurrently run `scripts/verify_adr_lsl.py` in the
+matching mode using official pylsl. This observes wall-clock-paced metric
+generation, selected candidate outlets, companion/raw streams, the optional
+combined outlet with unselected metrics alongside individual outlets, metadata,
+and source timestamps.
 It does not establish physical respiratory agreement. See
 [`docs/adr-waveforms.md`](../docs/adr-waveforms.md) for commands and contracts.
 

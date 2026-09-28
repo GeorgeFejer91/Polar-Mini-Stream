@@ -44,11 +44,12 @@ rate, currently 200 Hz. Candidates therefore have notification-level timing,
 not a claimed 200 Hz output rate. No interpolation or acceleration-to-position
 integration is performed.
 
-Dedicated ADR outlets exist in both Separate and Single modes. Single mode
-keeps non-ADR data in the sparse combined outlet and excludes ADR from that
-outlet. Separate mode is preferred for exact raw ECG/ACC timing. Changing names,
-mode, or selections replaces outlets; recorder discovery must follow the
-selected names and metadata.
+Selected ADR values have dedicated scalar outlets. The optional Polar
+All-in-one outlet also includes all available ADR values as sparse columns
+alongside raw ECG, ACC, heart rate, RR, and other available metrics, even when
+their individual outlets are off. Use individual outlets
+for exact per-signal timing. Changing names or selections replaces outlets;
+recorder discovery must follow the selected names and metadata.
 
 | Candidate | Automatically selected companions |
 | --- | --- |

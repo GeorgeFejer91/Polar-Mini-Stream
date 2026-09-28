@@ -5,9 +5,11 @@ intentionally a compact transparent-shell window where the detached Polar
 Stream node card is the visible program outline, not the main controller
 workspace.
 
-Seven optional outlet checkboxes sit directly inside the mini window. Click a
-checkbox or its label to select a stream; changes save instantly. The raw
-device-data outlet stays on and has no checkbox.
+Eight outlet checkboxes sit directly inside the mini window. The first,
+**Respyra raw**, is checked and locked: Respyra reads Force in newtons from
+this raw device-data outlet. Click any other checkbox or its label to select
+an additional stream; changes save instantly. **All-in-one** is last and has
+a small merging-stream icon.
 
 - Default outlets: `rawVernier` (every advertised numeric belt channel plus
   recording diagnostics) and `vernierBreathing` (a relative 0–1 belt-force

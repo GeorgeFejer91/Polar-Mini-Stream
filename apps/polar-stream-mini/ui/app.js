@@ -51,7 +51,7 @@
       "node-phase",
       "node-kind",
       "stream-name",
-      "stream-mode-toggle",
+      "all-in-one",
       "autostart",
       "auto-connect",
       "device-row",
@@ -112,7 +112,7 @@
   function preferencePayload() {
     return {
       streamName: elements["stream-name"].value.trim(),
-      outputMode: elements["stream-mode-toggle"].checked ? "singleStream" : "separateStreams",
+      outputMode: "separateStreams",
       autoConnect: elements["auto-connect"].checked,
       polarOutputs: [...new Set(state.preferences.polarOutputs || directPolarOutputs)],
     };
@@ -156,7 +156,7 @@
     if (bootstrap.session?.deviceId) {
       state.selectedDeviceId = bootstrap.session.deviceId;
     }
-    renderMode();
+    renderAllInOne();
     renderDevices();
     renderSignals();
     renderMetricDialog();
@@ -164,8 +164,8 @@
     setStatus(isNative ? "Ready" : "Installed app required", null, !isNative);
   }
 
-  function renderMode() {
-    elements["stream-mode-toggle"].checked = state.preferences.outputMode === "singleStream";
+  function renderAllInOne() {
+    elements["all-in-one"].checked = state.preferences.polarOutputs?.includes("allInOne") || false;
   }
 
   function renderDevices() {
@@ -201,21 +201,16 @@
     list.replaceChildren();
     const chips = [];
     if (state.kind === "polar") {
-      if (state.preferences.outputMode === "singleStream") {
-        chips.push(state.preferences.polarOutputs?.some((id) => id.startsWith("adr_"))
-          ? "single + ADR LSL" : "single sparse LSL");
-      }
       const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
       for (const id of directPolarOutputs) chips.push(streamSuffix(id));
       const optional = state.metrics.filter((metric) => !metric.direct && selected.has(metric.id));
       if (optional.length) chips.push(optional[0].streamSuffix || optional[0].id);
       if (optional.length > 1) chips.push(`+${optional.length - 1} metrics`);
+      if (selected.has("allInOne")) chips.push("All-in-one");
       const extraCount = optional.length;
       elements["metrics-button"].title = extraCount
         ? `${extraCount} optional realtime metrics selected`
         : "Add optional realtime metrics";
-    } else if (state.preferences.outputMode === "singleStream") {
-      chips.push("single sparse LSL", "raw channels", "breathing");
     } else {
       chips.push("rawVernier", "vernierBreathing", "rawForce");
     }
@@ -244,6 +239,7 @@
     elements["mock-button"].disabled = state.busy || !isNative;
     elements["device-select"].disabled = state.busy || state.connected || !isNative;
     elements["metrics-button"].disabled = state.busy || !isNative;
+    elements["all-in-one"].disabled = state.busy || !isNative;
     elements["device-status"].textContent = state.connected
       ? session?.deviceName || state.preferences.lastDevice?.name || "Connected"
       : state.mockMode
@@ -294,7 +290,7 @@
     options.replaceChildren();
     if (state.kind !== "polar") return;
     const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
-    elements["reset-metrics"].disabled = ![...selected].some((id) => !directPolarOutputs.includes(id));
+    elements["reset-metrics"].disabled = ![...selected].some((id) => !directPolarOutputs.includes(id) && id !== "allInOne");
     const optionalMetrics = state.metrics.filter((candidate) => !candidate.direct);
     appendMetricGroup(
       options,
@@ -404,7 +400,7 @@
         savedPolarOutputs = [...(result.preferences?.polarOutputs || payload.polarOutputs)];
         if (revision === saveRevision) {
           state.preferences = result.preferences || state.preferences;
-          renderMode();
+          renderAllInOne();
           renderSignals();
           if (!quiet || result.reconnectRequired || result.applied) {
             setStatus(result.message || "Saved", "Config", result.reconnectRequired);
@@ -414,7 +410,7 @@
         if (revision === saveRevision) {
           state.preferences.polarOutputs = [...savedPolarOutputs];
           renderMetricDialog();
-          renderMode();
+          renderAllInOne();
           renderSignals();
           reportError(error);
         }
@@ -719,7 +715,9 @@
     elements["device-select"].addEventListener("change", () => {
       state.selectedDeviceId = elements["device-select"].value;
     });
-    elements["stream-mode-toggle"].addEventListener("change", () => {
+    elements["all-in-one"].addEventListener("change", () => {
+      updateMetricSelection("allInOne", elements["all-in-one"].checked);
+      renderSignals();
       savePreferences(false);
     });
     elements["scan-button"].addEventListener("click", scanDevices);
@@ -730,7 +728,7 @@
     elements["metrics-guide"].addEventListener("click", openMetricGuide);
     elements["metrics-dialog"].addEventListener("close", restoreCompactWindow);
     elements["reset-metrics"].addEventListener("click", () => {
-      state.preferences.polarOutputs = [...directPolarOutputs];
+      state.preferences.polarOutputs = [...directPolarOutputs, ...(state.preferences.polarOutputs.includes("allInOne") ? ["allInOne"] : [])];
       renderMetricDialog();
       renderSignals();
       savePreferences(false);

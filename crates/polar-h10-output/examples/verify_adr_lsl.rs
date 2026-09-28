@@ -17,12 +17,15 @@ async fn main() -> Result<(), String> {
     let library = env::args_os()
         .nth(1)
         .map(PathBuf::from)
-        .ok_or("usage: verify_adr_lsl <lsl.dll> <separate|single>")?;
-    let single = env::args().nth(2).as_deref() == Some("single");
-    let base = if single {
-        "adr_acceptance_single"
-    } else {
-        "adr_acceptance_separate"
+        .ok_or("usage: verify_adr_lsl <lsl.dll> <separate|single|both>")?;
+    let mode = env::args()
+        .nth(2)
+        .ok_or("choose separate, single, or both")?;
+    let base = match mode.as_str() {
+        "single" => "adr_acceptance_single",
+        "separate" => "adr_acceptance_separate",
+        "both" => "adr_acceptance_both",
+        _ => return Err("choose separate, single, or both".into()),
     };
     let mut ids = vec!["raw_ecg".to_string(), "raw_acc".to_string()];
     for id in ADR_WAVEFORM_IDS {
@@ -33,18 +36,34 @@ async fn main() -> Result<(), String> {
         }
     }
     let router = OutputRouter::with_bundled_lsl(Some(library.clone()));
-    let combined = if single {
-        Some(MiniCombinedOutput::polar(Some(library), base, &ids)?)
-    } else {
+    if mode != "single" {
+        let individual_ids = if mode == "both" {
+            std::iter::once("raw_ecg")
+                .chain(std::iter::once("raw_acc"))
+                .chain(std::iter::once(ADR_WAVEFORM_IDS[0]))
+                .chain(adr_companion_ids(ADR_WAVEFORM_IDS[0]).iter().copied())
+                .map(str::to_string)
+                .collect()
+        } else {
+            ids.clone()
+        };
         router
             .configure(OutputConfig {
                 stream_name: base.into(),
                 lsl_enabled: true,
-                outputs: ids.clone(),
+                outputs: individual_ids,
                 ..OutputConfig::default()
             })
             .await?;
-        None
+    }
+    let combined = match mode.as_str() {
+        "single" => Some(MiniCombinedOutput::polar(Some(library), base, &ids)?),
+        "both" => Some(MiniCombinedOutput::polar_alongside_individuals(
+            Some(library),
+            base,
+            &ids,
+        )?),
+        _ => None,
     };
     let mut engine =
         MetricEngine::with_selection(MetricSelection::from_ids(ids.iter().map(String::as_str)));
@@ -72,16 +91,17 @@ async fn main() -> Result<(), String> {
         let ecg = (0..13)
             .map(|index| ((batch * 13 + index) % 400) as i32 - 200)
             .collect::<Vec<_>>();
-        if let Some(output) = &combined {
-            output.publish_polar_ecg(timestamp, &ecg);
-            output.publish_polar_accelerometer(timestamp, &samples);
-        } else {
+        if mode != "single" {
             if let Some(error) = router.publish_ecg(timestamp, &ecg) {
                 return Err(error);
             }
             if let Some(error) = router.publish_accelerometer(timestamp, &samples) {
                 return Err(error);
             }
+        }
+        if let Some(output) = &combined {
+            output.publish_polar_ecg(timestamp, &ecg);
+            output.publish_polar_accelerometer(timestamp, &samples);
         }
         let began = Instant::now();
         let metrics = engine.process_accelerometer_timed(
@@ -102,10 +122,13 @@ async fn main() -> Result<(), String> {
                 value: sample.value,
             })
             .collect::<Vec<_>>();
+        if mode != "single"
+            && let Some(error) = router.publish_metrics_at(timestamp, &values)
+        {
+            return Err(error);
+        }
         if let Some(output) = &combined {
             output.publish_polar_metrics_at(timestamp, &values);
-        } else if let Some(error) = router.publish_metrics_at(timestamp, &values) {
-            return Err(error);
         }
     }
     thread::sleep(Duration::from_secs(2));

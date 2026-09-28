@@ -197,9 +197,14 @@ async function validateNormalWindow(app) {
     assert.equal(await page.locator("#connection-feedback").textContent(), "Ready");
     await page.locator('#connection-feedback[data-text-fit="fit"]').waitFor();
     await assertInlineOutputs(page);
-    assert.equal(await page.locator("#metric-options input").count(), 7);
-    assert.equal(await page.locator("#metric-count").textContent(), "1/7");
-    assert.equal(await page.locator('#metric-options input[value="rawVernier"]').count(), 0);
+    assert.equal(await page.locator("#metric-options input").count(), 8);
+    assert.equal(await page.locator("#metric-count").textContent(), "2/8");
+    assert.equal(await page.locator('#metric-options input').first().inputValue(), "rawVernier");
+    assert.equal(await page.locator('#metric-options input[value="rawVernier"]').isChecked(), true);
+    assert.equal(await page.locator('#metric-options input[value="rawVernier"]').isDisabled(), true);
+    assert.equal(await page.locator('#metric-options label:has(input[value="rawVernier"]) span').textContent(), "Respyra raw");
+    assert.equal(await page.locator('#metric-options input').last().inputValue(), "allInOne");
+    assert.equal(await page.locator('#metric-options label:has(input[value="allInOne"]) img').count(), 1);
     assert.equal(await page.locator("#stream-mode-toggle").count(), 0);
     assert.equal(await page.locator('#metric-options input[value="steps"]').isChecked(), false);
     assert.equal(await page.locator('#metric-options input[value="stepRate"]').isChecked(), false);
@@ -219,10 +224,10 @@ async function validateNormalWindow(app) {
     await page.locator('#metric-options input[value="signalStatus"]').check();
     await page.locator('#metric-options input[value="allInOne"]').check();
     await page.waitForFunction(() => window.__miniSaves.at(-1)?.vernierOutputs?.length === 8);
-    assert.equal(await page.locator("#metric-count").textContent(), "7/7");
+    assert.equal(await page.locator("#metric-count").textContent(), "8/8");
     await page.locator('#metric-options input[value="vernierBreathing"]').uncheck();
     await page.waitForFunction(() => window.__miniSaves.at(-1)?.vernierOutputs?.length === 7);
-    assert.equal(await page.locator("#metric-count").textContent(), "6/7");
+    assert.equal(await page.locator("#metric-count").textContent(), "7/8");
     assert.equal(await page.locator('#metric-options input[value="allInOne"]').isChecked(), true);
     assert.equal(await page.evaluate(() => window.__miniCalls.includes("disconnect_device")), false);
     const savedPreferences = await page.evaluate(() => window.__miniSaves.at(-1));
@@ -243,7 +248,7 @@ async function validateNormalWindow(app) {
     await reopened.locator('#metric-options input[value="signalStatus"]').uncheck();
     assert.equal(await reopened.locator('#metric-options input[value="signalStatus"]').isChecked(), false);
     await reopened.locator('#metric-options input[value="allInOne"]').uncheck();
-    assert.equal(await reopened.locator("#metric-count").textContent(), "0/7");
+    assert.equal(await reopened.locator("#metric-count").textContent(), "1/8");
     await reopened.evaluate(() => {
       window.__emitMiniEvent({ kind: "connection", connected: true, deviceName: "Test belt" });
       window.__emitMiniEvent({ kind: "samples", vernierRows: 20, metricSamples: 20, lsl: "Publishing 1 stream(s)" });
@@ -267,6 +272,8 @@ async function validateNormalWindow(app) {
   }
 
   if (app.kind === "polar") {
+    assert.equal(await page.locator("#stream-mode-toggle").count(), 0);
+    assert.equal(await page.locator("#all-in-one").isChecked(), false);
     const accIds = [
       "adr_pca_waveform", "adr_pca_phase", "adr_pca_rate",
       "adr_interval_mean", "adr_axis_difference_event", "adr_axis_difference_rate",
@@ -313,13 +320,15 @@ async function validateNormalWindow(app) {
     assert.equal(await resetReopened.locator('#metric-options input[value="adr_axis_difference_event"]').isChecked(), false);
     await resetReopened.close();
     await page.locator("#metrics-close").click();
-  }
-
-  if (app.kind === "polar") {
-    await page.locator("#stream-mode-toggle").check();
-    await page.waitForFunction(() => window.__miniSaves.some((save) => save.outputMode === "singleStream"));
-    assert.equal(await page.locator("#stream-mode-toggle").isChecked(), true);
-    assert.match(await page.locator("#signal-list").textContent(), /single \+ ADR LSL/);
+    await page.locator("#all-in-one").check();
+    await page.waitForFunction(() => window.__miniSaves.at(-1)?.polarOutputs.includes("allInOne"));
+    assert.equal(await page.evaluate(() => window.__miniSaves.at(-1)?.outputMode), "separateStreams");
+    assert.match(await page.locator("#signal-list").textContent(), /All-in-one/);
+    const combinedPreferences = await page.evaluate(() => window.__miniSaves.at(-1));
+    const combinedReopened = await createPage(app, { mockMode: false, lslHealthy: true, savedPreferences: combinedPreferences });
+    await combinedReopened.goto(appUrl(app));
+    assert.equal(await combinedReopened.locator("#all-in-one").isChecked(), true);
+    await combinedReopened.close();
   } else {
     await assertInlineOutputs(page);
   }
@@ -363,9 +372,9 @@ async function validateMockWindow(app, lslHealthy) {
   await assertNoOverflow(page);
 
   if (app.kind === "polar") {
-    await page.locator("#stream-mode-toggle").check();
-    await page.waitForFunction(() => window.__miniSaves.some((save) => save.outputMode === "singleStream"));
-    assert.equal(await page.locator("#stream-mode-toggle").isChecked(), true);
+    await page.locator("#all-in-one").check();
+    await page.waitForFunction(() => window.__miniSaves.some((save) => save.polarOutputs.includes("allInOne")));
+    assert.equal(await page.locator("#all-in-one").isChecked(), true);
   } else {
     await page.locator('#metric-options input[value="allInOne"]').check();
     await page.waitForFunction(() => window.__miniSaves.some((save) => save.vernierOutputs.includes("allInOne")));
@@ -407,7 +416,7 @@ async function validatePreferenceMemory(app) {
     }
   });
   await page.waitForFunction(() => window.__miniSaves.length === 5);
-  assert.equal(await page.locator("#metric-count").textContent(), "4/7");
+  assert.equal(await page.locator("#metric-count").textContent(), "5/8");
   await page.locator('#metric-options input[value="allInOne"]').check();
   await page.locator("#auto-connect").check();
   await page.locator("#stream-name").fill("Remembered-Vernier");
@@ -449,7 +458,7 @@ async function validatePreferenceMemory(app) {
 async function assertInlineOutputs(page) {
   assert.equal(await page.locator("#metrics-dialog, #metrics-button").count(), 0);
   const inputs = page.locator("#mini-node #metric-options input");
-  assert.equal(await inputs.count(), 7);
+  assert.equal(await inputs.count(), 8);
   for (const input of await inputs.all()) {
     assert.equal(await input.isVisible(), true);
     const box = await input.boundingBox();

@@ -6,6 +6,7 @@
   const isNative = Boolean(core?.invoke && core?.Channel);
   const directPolarOutputs = Object.freeze(["raw_ecg", "raw_acc", "heart_rate", "rr_interval"]);
   const vernierOutputs = Object.freeze([
+    { id: "rawVernier", label: "Respyra raw", detail: "Required VernierRaw stream with Force in newtons and every device channel; Respyra reads Force from this outlet." },
     { id: "rawForce", label: "Belt force (N)", detail: "Unfiltered belt tension in newtons; also present in the always-on raw data stream." },
     { id: "vernierBreathing", label: "Breath wave (0–1)", detail: "App-normalized belt-force waveform; not lung volume or breaths per minute." },
     { id: "signalStatus", label: "Signal events", detail: "Markers for lost and restored Bluetooth signal." },
@@ -226,7 +227,7 @@
     elements["device-select"].disabled = state.busy || state.connected || !isNative;
     elements["bluetooth-toggle"].disabled = state.busy || state.radioBusy || state.connected || !["on", "off"].includes(state.radioStatus);
     for (const checkbox of elements["metric-options"].querySelectorAll("input")) {
-      checkbox.disabled = state.busy || !isNative;
+      checkbox.disabled = checkbox.value === "rawVernier" || state.busy || !isNative;
     }
     elements["device-status"].textContent = state.connected
       ? session?.deviceName || state.preferences.lastDevice?.name || "Connected"
@@ -285,18 +286,30 @@
       checkbox.setAttribute("aria-description", `${output.id}: ${output.detail}`);
       checkbox.value = output.id;
       checkbox.checked = selected.has(output.id);
-      checkbox.addEventListener("change", () => {
+      checkbox.disabled = output.id === "rawVernier";
+      if (output.id !== "rawVernier") checkbox.addEventListener("change", () => {
         const current = new Set(state.preferences.vernierOutputs || defaultVernierOutputIds);
         if (checkbox.checked) current.add(output.id);
         else current.delete(output.id);
         state.preferences.vernierOutputs = ["rawVernier", ...vernierOutputs
-          .filter((candidate) => current.has(candidate.id)).map((candidate) => candidate.id)];
+          .filter((candidate) => candidate.id !== "rawVernier" && current.has(candidate.id))
+          .map((candidate) => candidate.id)];
         renderSignals();
         savePreferences(true);
       });
       const copy = document.createElement("span");
       copy.textContent = output.label;
-      label.append(checkbox, copy);
+      label.title = output.detail;
+      if (output.id === "allInOne") {
+        label.classList.add("all-in-one-option");
+        const icon = document.createElement("img");
+        icon.src = "icons/all-in-one.svg";
+        icon.alt = "";
+        icon.setAttribute("aria-hidden", "true");
+        label.append(checkbox, icon, copy);
+      } else {
+        label.append(checkbox, copy);
+      }
       options.append(label);
     }
   }

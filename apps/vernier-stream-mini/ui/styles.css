@@ -464,6 +464,12 @@ body[data-mock="true"] .patch-node footer { grid-template-columns: repeat(2, min
   padding: 1px 0;
   cursor: pointer;
 }
+.metric-options label:has(input:disabled) { cursor: default; }
+.metric-options .all-in-one-option {
+  grid-template-columns: 10px 15px minmax(0, 1fr);
+  gap: 3px;
+}
+.all-in-one-option img { width: 15px; height: 12px; }
 .metric-options input {
   width: 10px;
   height: 10px;
