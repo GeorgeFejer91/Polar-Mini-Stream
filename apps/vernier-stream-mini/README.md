@@ -11,6 +11,9 @@ this raw device-data outlet. Click any other checkbox or its label to select
 an additional stream; changes save instantly. **All-in-one** is last and has
 a small merging-stream icon.
 
+Resize the applet from any edge or corner. Controls grow and reflow with the
+window; long status text remains reachable by scrolling.
+
 - Default outlets: `rawVernier` (every advertised numeric belt channel plus
   recording diagnostics) and `vernierBreathing` (a relative 0–1 belt-force
   waveform). The raw outlet is mandatory. Individual force, signal events,

@@ -622,6 +622,14 @@
     }
   }
 
+  function resizeFromBorder(event) {
+    const grip = event.target.closest("[data-resize-direction]");
+    if (!grip || event.button !== 0 || !nativeWindow?.startResizeDragging) return;
+    event.preventDefault();
+    event.stopPropagation();
+    nativeWindow.startResizeDragging(grip.dataset.resizeDirection).catch(reportError);
+  }
+
   function withBusy(work) {
     state.busy = true;
     renderConnection();
@@ -727,6 +735,7 @@
     elements["theme-toggle"].addEventListener("click", toggleTheme);
     elements["new-node-top"].addEventListener("click", openNewNode);
     elements["minimize-button"].addEventListener("click", minimizeApp);
+    elements["mini-node"].addEventListener("pointerdown", resizeFromBorder);
     elements["close-button"].addEventListener("click", closeApp);
     elements["new-node-menu"].addEventListener("click", openNewNode);
     elements["mock-node-menu"].addEventListener("click", openMockNode);

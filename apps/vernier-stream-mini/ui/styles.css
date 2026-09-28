@@ -70,7 +70,7 @@ select:focus-visible,
   min-height: 100vh;
   display: grid;
   align-items: start;
-  justify-items: center;
+  justify-items: stretch;
   padding: 7px 14px 9px;
   background: transparent;
 }
@@ -78,7 +78,8 @@ select:focus-visible,
 .patch-node {
   --node-accent: var(--line-strong);
   position: relative;
-  width: min(352px, calc(100vw - 30px));
+  width: 100%;
+  min-width: 0;
   cursor: grab;
   filter: drop-shadow(0 7px 10px rgb(20 35 29 / 18%));
 }
@@ -91,12 +92,26 @@ body[data-mock="true"] .patch-node { --node-accent: var(--mock-accent); }
 .node-surface {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto auto;
+  min-height: calc(100vh - 16px);
   overflow: hidden;
   border: 1px solid var(--frame-inner);
   border-radius: 16px;
   background: color-mix(in srgb, var(--node-accent) 5%, var(--surface));
   box-shadow: var(--frame-rings);
 }
+.resize-grip { position: absolute; z-index: 5; display: block; touch-action: none; }
+.resize-grip.north, .resize-grip.south { left: 12px; right: 12px; height: 12px; cursor: ns-resize; }
+.resize-grip.north { top: -6px; }
+.resize-grip.south { bottom: -6px; }
+.resize-grip.east, .resize-grip.west { top: 12px; bottom: 12px; width: 12px; cursor: ew-resize; }
+.resize-grip.east { right: -6px; }
+.resize-grip.west { left: -6px; }
+.resize-grip.north-east, .resize-grip.south-west { width: 18px; height: 18px; cursor: nesw-resize; }
+.resize-grip.north-west, .resize-grip.south-east { width: 18px; height: 18px; cursor: nwse-resize; }
+.resize-grip.north-east, .resize-grip.north-west { top: -6px; }
+.resize-grip.south-east, .resize-grip.south-west { bottom: -6px; }
+.resize-grip.north-east, .resize-grip.south-east { right: -6px; }
+.resize-grip.north-west, .resize-grip.south-west { left: -6px; }
 .patch-node.streaming .node-surface {
   animation: stream-beacon 2.4s ease-in-out infinite;
   will-change: box-shadow;
@@ -129,6 +144,14 @@ body[data-mock="true"] .node-surface {
   line-height: 1.1;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.patch-node header #node-phase[data-text-fit="reflow"],
+.readout dd[data-text-fit="reflow"],
+#mock-source[data-text-fit="reflow"] {
+  overflow: visible;
+  overflow-wrap: break-word;
+  text-overflow: clip;
+  white-space: normal;
 }
 .patch-node mark {
   padding: 2px 5px;
@@ -199,6 +222,7 @@ body[data-mock="true"] .node-surface {
 
 .node-body {
   display: grid;
+  align-content: start;
   gap: 4px;
   min-width: 0;
   padding: 7px 8px 6px;
@@ -343,6 +367,7 @@ body[data-mock="true"] .node-surface {
   white-space: nowrap;
 }
 #device-status { white-space: nowrap; }
+#device-status[data-text-fit="reflow"] { white-space: normal; }
 #device-battery { display: flex; align-items: center; gap: 3px; flex: none; margin: 0 3px; overflow: visible; color: var(--muted); }
 #device-battery[data-level="low"] .battery-icon { color: var(--battery-low); }
 #device-battery[data-level="medium"] .battery-icon { color: var(--battery-medium); }
@@ -549,9 +574,29 @@ button,
   }
 }
 
+@media (min-width: 600px) {
+  .patch-node header { padding: 10px 14px; }
+  .patch-node .node-title strong { font-size: 16px; }
+  .patch-node header span { font-size: 11px; }
+  .node-body { align-content: center; gap: 8px; padding: 14px; }
+  .field-label, .check-row, .metric-row, .readout dd { font-size: 12px; }
+  .text-entry, .device-row select { height: 34px; font-size: 13px; }
+  .device-row button, .patch-node footer button { min-height: 32px; font-size: 12px; }
+  .mini-option-row { gap: 8px; }
+  .metric-options { gap: 5px 10px; }
+  .metric-options label { min-height: 23px; grid-template-columns: 14px minmax(0, 1fr); }
+  .metric-options .all-in-one-option { grid-template-columns: 14px 15px minmax(0, 1fr); }
+  .metric-options input { width: 14px; height: 14px; }
+  .metric-options span { font-size: 12px; line-height: 16px; }
+  .readout div { grid-template-columns: 64px minmax(0, 1fr); min-height: 19px; }
+  .readout dt { font-size: 11px; }
+  .patch-node footer { min-height: 48px; padding: 0 14px 12px; }
+  .connection-feedback { font-size: 12px; line-height: 16px; }
+}
+
 @media (max-width: 350px), (max-height: 300px) {
   .mini-shell { padding: 6px 10px 8px; }
-  .patch-node { width: calc(100vw - 26px); }
+  .node-surface { min-height: calc(100vh - 14px); }
   .node-body { gap: 3px; padding: 4px 7px; }
   .node-window-actions button { width: 19px; height: 19px; }
   .patch-node header span,

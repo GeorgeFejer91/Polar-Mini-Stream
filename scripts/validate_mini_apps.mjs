@@ -31,7 +31,9 @@ const apps = [
 const browser = await chromium.launch({ headless: true, args: ["--allow-file-access-from-files"] });
 try {
   for (const app of apps) {
+    await validateResizeConfig(app);
     await validateNormalWindow(app);
+    await validateResizableWindow(app);
     await validateEarlyRememberedConnection(app);
     await validateBatteryWindow(app);
     if (app.kind === "vernier") {
@@ -44,6 +46,86 @@ try {
   }
 } finally {
   await browser.close();
+}
+
+async function validateResizeConfig(app) {
+  const appRoot = path.join(root, "apps", `${app.kind}-stream-mini`);
+  const config = JSON.parse(await fs.readFile(path.join(appRoot, "tauri.conf.json"), "utf8"));
+  const capability = JSON.parse(await fs.readFile(path.join(appRoot, "capabilities", "default.json"), "utf8"));
+  assert.equal(config.app.windows[0].resizable, true);
+  assert.equal(config.app.windows[0].minWidth, 320);
+  assert.ok(capability.permissions.includes("core:window:allow-start-resize-dragging"));
+}
+
+async function validateResizableWindow(app) {
+  const page = await createPage(app, { mockMode: false, lslHealthy: true });
+  await page.goto(appUrl(app));
+  await page.locator("#node-phase").filter({ hasText: "Ready" }).waitFor();
+  const directions = ["North", "East", "South", "West", "NorthEast", "SouthEast", "SouthWest", "NorthWest"];
+  for (const direction of directions) {
+    await page.locator(`[data-resize-direction="${direction}"]`).click();
+  }
+  assert.deepEqual(await page.evaluate(() => window.__resizeCalls), directions);
+
+  for (const [width, height] of [[320, app.height], [388, app.height], [388, 600], [520, 480], [600, 480], [900, 700]]) {
+    await page.setViewportSize({ width, height });
+    await page.waitForFunction(() => document.querySelector("#device-status")?.dataset.textFit);
+    const geometry = await page.locator("#mini-node").evaluate((node) => {
+      const frame = node.querySelector(".node-surface").getBoundingClientRect();
+      return {
+        width: frame.width,
+        height: frame.height,
+        clipped: [...node.querySelectorAll("#product-name, #node-phase, .readout dd, .patch-node footer button")]
+          .some((label) => label.scrollWidth > label.clientWidth + 1 || label.scrollHeight > label.clientHeight + 1),
+      };
+    });
+    assert.ok(geometry.width >= width - (width <= 350 ? 20 : 28) - 1);
+    assert.ok(geometry.height >= height - (width <= 350 ? 14 : 16) - 1);
+    assert.equal(geometry.clipped, false);
+    await assertNoOverflow(page);
+    if (width === 320 || width === 900) {
+      await page.screenshot({ path: path.join(outputDirectory, `${app.kind}-resize-${width}.png`), omitBackground: true });
+    }
+  }
+
+  await page.setViewportSize({ width: 320, height: app.height });
+  await page.evaluate(() => window.__emitMiniEvent({
+    kind: "connection", connected: true, deviceName: "Long sensor name Long sensor name Long sensor name",
+  }));
+  await page.locator('#device-status[data-text-fit="reflow"]').waitFor();
+  assert.equal(await page.locator("#device-status").evaluate((node) => node.scrollWidth <= node.clientWidth + 1), true);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.evaluate(() => window.__emitMiniEvent({
+    kind: "connection", connected: true, deviceName: "A".repeat(100),
+  }));
+  await page.locator('#device-status[data-text-fit="reflow"]').waitFor();
+  assert.equal(await page.locator("#device-status").evaluate((node) => node.scrollWidth <= node.clientWidth + 1), true);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.evaluate(() => window.__emitMiniEvent({
+    kind: "connection", connected: true, deviceName: "Long sensor name Long sensor name Long sensor name",
+  }));
+  await page.setViewportSize({ width: 900, height: 700 });
+  await page.locator('#device-status[data-text-fit="fit"]').waitFor();
+  await page.setViewportSize({ width: 320, height: app.height });
+  await page.locator("#device-status").evaluate((node) => {
+    node.style.fontSize = "20px";
+    node.style.lineHeight = "30px";
+    node.style.letterSpacing = "0.12em";
+    node.style.wordSpacing = "0.16em";
+  });
+  await page.locator('#device-status[data-text-fit="reflow"]').waitFor();
+  assert.equal(await page.locator("#device-status").evaluate((node) =>
+    node.scrollWidth <= node.clientWidth + 1 && node.scrollHeight <= node.clientHeight + 1), true);
+  await assertNoHorizontalOverflow(page);
+  await page.locator("#disconnect-button").scrollIntoViewIfNeeded();
+  await page.setViewportSize({ width: 900, height: 700 });
+  if (app.kind === "polar") {
+    await page.locator("#metrics-button").click();
+    assert.equal(await page.evaluate(() => innerWidth), 900);
+    await page.locator("#metrics-close").click();
+    assert.equal(await page.evaluate(() => innerWidth), 900);
+  }
+  await page.close();
 }
 
 async function validateBluetoothUnavailable(app) {
@@ -122,7 +204,7 @@ async function validateBatteryWindow(app) {
     await page.setViewportSize({ width, height: app.height });
     await page.locator('#battery-percent[data-text-fit="fit"]').waitFor();
     await assertBatteryTitlebar(page);
-    await assertNoOverflow(page);
+    await assertNoHorizontalOverflow(page);
   }
   await page.setViewportSize({ width: 388, height: app.height });
   for (const theme of ["light", "dark"]) {
@@ -290,7 +372,7 @@ async function validateNormalWindow(app) {
     ];
     await page.locator("#metrics-button").click();
     assert.equal(await page.locator("#metrics-dialog").isVisible(), true);
-    assert.equal(await page.evaluate(() => window.__miniCalls.includes("set_metrics_dialog_open")), true);
+    assert.equal(await page.evaluate(() => window.__miniCalls.includes("set_metrics_dialog_open")), false);
     await page.setViewportSize({ width: 720, height: 640 });
     await assertNoOverflow(page);
     await page.screenshot({ path: path.join(outputDirectory, "polar-mini-metrics-large.png"), omitBackground: true });
@@ -499,10 +581,12 @@ async function createPage(app, options) {
     ({ app, options }) => {
       const calls = [];
       const saves = [];
+      const resizeCalls = [];
       let eventChannel = null;
       let radioState = options.radioState || "on";
       window.__miniCalls = calls;
       window.__miniSaves = saves;
+      window.__resizeCalls = resizeCalls;
       window.__emitMiniEvent = (event) => eventChannel?.onmessage?.(event);
 
       class Channel {
@@ -630,7 +714,10 @@ async function createPage(app, options) {
 
       window.__TAURI__ = {
         core: { Channel, invoke },
-        window: { getCurrentWindow: () => ({ minimize: async () => {} }) },
+        window: { getCurrentWindow: () => ({
+          minimize: async () => {},
+          startResizeDragging: async (direction) => { resizeCalls.push(direction); },
+        }) },
       };
     },
     { app, options },
@@ -664,4 +751,8 @@ async function assertNoOverflow(page) {
   }
   assert.ok(overflow.horizontal <= 0, `horizontal overflow: ${overflow.horizontal}px`);
   assert.ok(overflow.vertical <= 0, `vertical overflow: ${overflow.vertical}px`);
+}
+
+async function assertNoHorizontalOverflow(page) {
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
 }

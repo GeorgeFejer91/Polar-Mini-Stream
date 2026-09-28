@@ -15,7 +15,9 @@ compact transparent-shell window with its own install, settings, and process.
   applies it to its individual LSL outlet. **Reset metrics** clears optional
   metric selections while keeping raw ECG, ACC, heart rate, RR, and the
   All-in-one choice. **Add more metrics** opens the full Polar Mini selection
-  catalog in an expanded window.
+  catalog over the current window.
+- Resize the applet from any edge or corner. Controls grow and reflow with the
+  window; long status text remains reachable by scrolling.
 - Optional **All-in-one recording stream** adds one sparse fixed-channel LSL
   outlet alongside the individual outlets. Its checkbox is the sole control for
   that extra stream. It includes raw ECG, ACC, heart
