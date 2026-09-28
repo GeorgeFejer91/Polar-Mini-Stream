@@ -16,6 +16,7 @@ const apps = [
     scanLabel: "Polar H10",
     streamName: "Polar-H10-Mini",
     height: 332,
+    minHeight: 320,
     frameColors: ["rgb(255, 255, 255)", "rgb(0, 0, 0)", "rgb(213, 0, 28)"],
   },
   {
@@ -24,6 +25,7 @@ const apps = [
     scanLabel: "Vernier Go Direct",
     streamName: "Vernier-GDX-Mini",
     height: 354,
+    minHeight: 346,
     frameColors: ["rgb(255, 255, 255)", "rgb(245, 154, 47)", "rgb(0, 124, 122)"],
   },
 ];
@@ -54,6 +56,7 @@ async function validateResizeConfig(app) {
   const capability = JSON.parse(await fs.readFile(path.join(appRoot, "capabilities", "default.json"), "utf8"));
   assert.equal(config.app.windows[0].resizable, true);
   assert.equal(config.app.windows[0].minWidth, 320);
+  assert.equal(config.app.windows[0].minHeight, app.minHeight);
   assert.ok(capability.permissions.includes("core:window:allow-start-resize-dragging"));
 }
 
@@ -67,7 +70,7 @@ async function validateResizableWindow(app) {
   }
   assert.deepEqual(await page.evaluate(() => window.__resizeCalls), directions);
 
-  for (const [width, height] of [[320, app.height], [388, app.height], [388, 600], [520, 480], [600, 480], [900, 700]]) {
+  for (const [width, height] of [[320, app.minHeight], [320, app.height], [350, app.minHeight], [351, app.minHeight], [388, app.height], [388, 600], [520, 480], [599, app.minHeight], [599, 480], [600, app.minHeight], [600, app.height], [600, 479], [600, 480], [900, app.minHeight], [900, app.height], [900, 700]]) {
     await page.setViewportSize({ width, height });
     await page.waitForFunction(() => document.querySelector("#device-status")?.dataset.textFit);
     const geometry = await page.locator("#mini-node").evaluate((node) => {
@@ -92,15 +95,31 @@ async function validateResizableWindow(app) {
   await page.evaluate(() => window.__emitMiniEvent({
     kind: "connection", connected: true, deviceName: "Long sensor name Long sensor name Long sensor name",
   }));
-  await page.locator('#device-status[data-text-fit="reflow"]').waitFor();
-  assert.equal(await page.locator("#device-status").evaluate((node) => node.scrollWidth <= node.clientWidth + 1), true);
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.locator('#device-status[data-text-fit="reveal"]').waitFor();
+  assert.equal(await page.locator("#device-status").getAttribute("title"), "Long sensor name Long sensor name Long sensor name");
+  await assertNoOverflow(page);
+  await page.locator("#device-status").click();
+  assert.equal(await page.locator("#text-detail-value").textContent(), "Long sensor name Long sensor name Long sensor name");
+  await page.locator("#text-detail button").click();
   await page.evaluate(() => window.__emitMiniEvent({
     kind: "connection", connected: true, deviceName: "A".repeat(100),
   }));
-  await page.locator('#device-status[data-text-fit="reflow"]').waitFor();
-  assert.equal(await page.locator("#device-status").evaluate((node) => node.scrollWidth <= node.clientWidth + 1), true);
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.waitForFunction(() => document.querySelector("#device-status")?.title === "A".repeat(100));
+  await page.locator('#device-status[data-text-fit="reveal"]').waitFor();
+  assert.equal(await page.locator("#device-status").getAttribute("title"), "A".repeat(100));
+  await assertNoOverflow(page);
+  await page.locator("#device-status").focus();
+  await page.keyboard.press("Enter");
+  assert.equal(await page.locator("#text-detail-value").textContent(), "A".repeat(100));
+  await page.locator("#text-detail button").click();
+  if (app.kind === "vernier") {
+    await page.evaluate(() => window.__emitMiniEvent({ kind: "status", message: "Long diagnostic feedback ".repeat(20) }));
+    await page.locator('#connection-feedback[data-text-fit="reveal"]').waitFor();
+    await assertNoOverflow(page);
+    await page.locator("#connection-feedback").click();
+    assert.match(await page.locator("#text-detail-value").textContent(), /Long diagnostic feedback/);
+    await page.locator("#text-detail button").click();
+  }
   await page.evaluate(() => window.__emitMiniEvent({
     kind: "connection", connected: true, deviceName: "Long sensor name Long sensor name Long sensor name",
   }));
@@ -113,11 +132,8 @@ async function validateResizableWindow(app) {
     node.style.letterSpacing = "0.12em";
     node.style.wordSpacing = "0.16em";
   });
-  await page.locator('#device-status[data-text-fit="reflow"]').waitFor();
-  assert.equal(await page.locator("#device-status").evaluate((node) =>
-    node.scrollWidth <= node.clientWidth + 1 && node.scrollHeight <= node.clientHeight + 1), true);
-  await assertNoHorizontalOverflow(page);
-  await page.locator("#disconnect-button").scrollIntoViewIfNeeded();
+  await page.locator('#device-status[data-text-fit="reveal"]').waitFor();
+  await assertNoOverflow(page);
   await page.setViewportSize({ width: 900, height: 700 });
   if (app.kind === "polar") {
     await page.locator("#metrics-button").click();
@@ -204,7 +220,7 @@ async function validateBatteryWindow(app) {
     await page.setViewportSize({ width, height: app.height });
     await page.locator('#battery-percent[data-text-fit="fit"]').waitFor();
     await assertBatteryTitlebar(page);
-    await assertNoHorizontalOverflow(page);
+    await assertNoOverflow(page);
   }
   await page.setViewportSize({ width: 388, height: app.height });
   for (const theme of ["light", "dark"]) {
@@ -225,10 +241,8 @@ async function validateBatteryWindow(app) {
   assert.equal(await percent.evaluate((node) => node.scrollWidth <= node.clientWidth && node.scrollHeight <= node.clientHeight), true);
   await assertBatteryTitlebar(page);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-  // Enlarged text may grow the applet; controls must remain reachable by scrolling.
-  assert.equal(await page.locator("body").evaluate((node) => getComputedStyle(node).overflowY), "auto");
-  await page.locator("#disconnect-button").scrollIntoViewIfNeeded();
-  assert.ok((await page.locator("#disconnect-button").boundingBox()).y < app.height);
+  assert.equal(await page.locator("body").evaluate((node) => getComputedStyle(node).overflowY), "hidden");
+  await assertNoOverflow(page);
 
   await page.evaluate(() => window.__emitMiniEvent({ kind: "connection", connected: false, batteryPercent: 100 }));
   assert.equal(await percent.textContent(), "—");
@@ -745,14 +759,16 @@ async function assertNoOverflow(page) {
   const overflow = await page.evaluate(() => ({
     horizontal: document.documentElement.scrollWidth - window.innerWidth,
     vertical: document.documentElement.scrollHeight - window.innerHeight,
+    surface: document.querySelector(".node-surface").scrollHeight - document.querySelector(".node-surface").clientHeight,
+    feedback: document.querySelector("#connection-feedback")?.scrollHeight - document.querySelector("#connection-feedback")?.clientHeight || 0,
+    bodyOverflow: getComputedStyle(document.body).overflowY,
   }));
   if (overflow.horizontal > 0 || overflow.vertical > 0) {
     await page.screenshot({ path: path.join(outputDirectory, "mini-overflow.png"), fullPage: true });
   }
   assert.ok(overflow.horizontal <= 0, `horizontal overflow: ${overflow.horizontal}px`);
   assert.ok(overflow.vertical <= 0, `vertical overflow: ${overflow.vertical}px`);
-}
-
-async function assertNoHorizontalOverflow(page) {
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
+  assert.ok(overflow.surface <= 1, `panel content overflow: ${overflow.surface}px`);
+  assert.ok(overflow.feedback <= 1, `feedback content overflow: ${overflow.feedback}px`);
+  assert.equal(overflow.bodyOverflow, "hidden");
 }

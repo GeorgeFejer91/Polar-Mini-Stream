@@ -50,8 +50,8 @@ html[data-theme="dark"] {
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html, body { margin: 0; min-width: 300px; min-height: 100%; background: transparent; color: var(--ink); }
-body { min-height: 100vh; overflow-x: hidden; overflow-y: auto; font-size: 12px; line-height: 1.32; user-select: none; }
+html, body { margin: 0; min-width: 300px; height: 100%; overflow: hidden; background: transparent; color: var(--ink); }
+body { font-size: 12px; line-height: 1.32; user-select: none; }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
 input { user-select: text; }
@@ -67,9 +67,9 @@ select:focus-visible,
 
 .mini-shell {
   width: 100vw;
-  min-height: 100vh;
+  height: 100vh;
   display: grid;
-  align-items: start;
+  align-items: stretch;
   justify-items: stretch;
   padding: 7px 14px 9px;
   background: transparent;
@@ -79,6 +79,7 @@ select:focus-visible,
   --node-accent: var(--line-strong);
   position: relative;
   width: 100%;
+  height: 100%;
   min-width: 0;
   cursor: grab;
   filter: drop-shadow(0 7px 10px rgb(20 35 29 / 18%));
@@ -92,7 +93,7 @@ body[data-mock="true"] .patch-node { --node-accent: var(--mock-accent); }
 .node-surface {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto auto;
-  min-height: calc(100vh - 16px);
+  height: 100%;
   overflow: hidden;
   border: 1px solid var(--frame-inner);
   border-radius: 16px;
@@ -145,14 +146,7 @@ body[data-mock="true"] .node-surface {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.patch-node header #node-phase[data-text-fit="reflow"],
-.readout dd[data-text-fit="reflow"],
-#mock-source[data-text-fit="reflow"] {
-  overflow: visible;
-  overflow-wrap: break-word;
-  text-overflow: clip;
-  white-space: normal;
-}
+#product-name[data-text-fit="reveal"] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .patch-node mark {
   padding: 2px 5px;
   border-radius: 4px;
@@ -367,7 +361,11 @@ body[data-mock="true"] .node-surface {
   white-space: nowrap;
 }
 #device-status { white-space: nowrap; }
-#device-status[data-text-fit="reflow"] { white-space: normal; }
+.readout dd[data-text-fit="reveal"] { pointer-events: auto; cursor: help; }
+.readout dd[data-text-fit="reveal"]:focus-visible,
+#product-name[data-text-fit="reveal"]:focus-visible,
+#node-phase[data-text-fit="reveal"]:focus-visible,
+#mock-source[data-text-fit="reveal"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 #device-battery { display: flex; align-items: center; gap: 3px; flex: none; margin: 0 3px; overflow: visible; color: var(--muted); }
 #device-battery[data-level="low"] .battery-icon { color: var(--battery-low); }
 #device-battery[data-level="medium"] .battery-icon { color: var(--battery-medium); }
@@ -388,15 +386,16 @@ body[data-mock="true"] .patch-node footer { grid-template-columns: repeat(2, min
 }
 .connection-feedback {
   min-height: 27px;
-  max-height: 54px;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 0 9px 8px;
   color: var(--muted);
   font-size: 10px;
   line-height: 13px;
-  overflow-wrap: break-word;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   user-select: text;
 }
+.connection-feedback[data-text-fit="reveal"]:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .patch-node.attention .connection-feedback { color: var(--attention); }
 .patch-node.streaming .connection-feedback { color: var(--brand-strong); }
 
@@ -414,6 +413,23 @@ body[data-mock="true"] .patch-node footer { grid-template-columns: repeat(2, min
   width: 100%;
   text-align: left;
 }
+
+.text-detail-dialog {
+  width: min(420px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  padding: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+.text-detail-dialog::backdrop { background: rgb(0 0 0 / 30%); }
+.text-detail-dialog h2 { margin: 0 0 8px; font-size: 13px; }
+.text-detail-dialog p { margin: 0 0 12px; overflow-wrap: anywhere; user-select: text; }
+.text-detail-dialog form { display: flex; justify-content: flex-end; }
+.text-detail-dialog button { border: 0; border-radius: 5px; padding: 5px 12px; background: var(--primary-bg); color: var(--primary-fg); cursor: pointer; }
 
 .node-source-dialog {
   width: min(374px, calc(100vw - 28px));
@@ -574,7 +590,7 @@ button,
   }
 }
 
-@media (min-width: 600px) {
+@media (min-width: 600px) and (min-height: 480px) {
   .patch-node header { padding: 10px 14px; }
   .patch-node .node-title strong { font-size: 16px; }
   .patch-node header span { font-size: 11px; }
@@ -596,7 +612,6 @@ button,
 
 @media (max-width: 350px), (max-height: 300px) {
   .mini-shell { padding: 6px 10px 8px; }
-  .node-surface { min-height: calc(100vh - 14px); }
   .node-body { gap: 3px; padding: 4px 7px; }
   .node-window-actions button { width: 19px; height: 19px; }
   .patch-node header span,

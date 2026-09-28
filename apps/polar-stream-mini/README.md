@@ -17,7 +17,8 @@ compact transparent-shell window with its own install, settings, and process.
   All-in-one choice. **Add more metrics** opens the full Polar Mini selection
   catalog over the current window.
 - Resize the applet from any edge or corner. Controls grow and reflow with the
-  window; long status text remains reachable by scrolling.
+  window without a main-window scrollbar. An overlong status value can be
+  opened in a full-text dialog by clicking it or pressing Enter while focused.
 - Optional **All-in-one recording stream** adds one sparse fixed-channel LSL
   outlet alongside the individual outlets. Its checkbox is the sole control for
   that extra stream. It includes raw ECG, ACC, heart

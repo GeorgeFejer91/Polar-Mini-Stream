@@ -31,7 +31,12 @@ document.fonts.ready.then(() => {
           const fits = width > 0 && measureLineStats(entry.prepared, width + 1).lineCount === 1
             && measureNaturalWidth(entry.prepared) <= width + 1
             && Number.parseFloat(style.lineHeight) <= height + 1;
-          label.dataset.textFit = fits ? "fit" : "reflow";
+          const canReveal = label.matches("#product-name, #node-phase, #mock-source, .readout dd");
+          label.dataset.textFit = fits ? "fit" : canReveal ? "reveal" : "reflow";
+          if (canReveal) {
+            label.title = fits ? "" : label.textContent;
+            label.tabIndex = fits ? -1 : 0;
+          }
         } catch (_error) {
           label.dataset.textFit = "unavailable";
         }
