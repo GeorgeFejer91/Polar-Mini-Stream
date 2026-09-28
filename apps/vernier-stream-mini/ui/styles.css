@@ -295,6 +295,7 @@ body[data-mock="true"] .node-surface {
   flex-wrap: wrap;
   gap: 4px;
   align-items: center;
+  justify-content: space-between;
 }
 .check-row,
 .metric-row {
@@ -335,7 +336,7 @@ body[data-mock="true"] .node-surface {
 .mini-option-row .check-row input:checked { background: var(--brand); }
 .mini-option-row .check-row input:checked::before { transform: translateX(10px); }
 .mini-option-row .check-row input:disabled { opacity: .5; cursor: not-allowed; }
-.metric-row { margin-left: auto; }
+.metric-row { margin-left: 0; }
 .metric-row span { white-space: nowrap; }
 .readout * { pointer-events: none; }
 .readout {
