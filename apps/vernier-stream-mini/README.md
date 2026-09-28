@@ -5,20 +5,21 @@ intentionally a compact transparent-shell window where the detached Polar
 Stream node card is the visible program outline, not the main controller
 workspace.
 
-All seven output checkboxes sit directly inside the mini window in two compact
-rows. Click the checkbox or its label to select a stream; changes save instantly.
+Eight outlet checkboxes sit directly inside the mini window. The first,
+**Respyra raw**, is checked and locked: Respyra reads Force in newtons from
+this raw device-data outlet. Click any other checkbox or its label to select
+an additional stream; changes save instantly. **All-in-one** is last and has
+a small merging-stream icon.
 
-- Default outputs: `rawVernier`
-  (every advertised numeric belt channel plus recording diagnostics),
-  `rawForce` (optional unfiltered Force-only copy), `vernierBreathing` (our
-  relative 0-1 force normalization), and `signalStatus` (loss/restoration
-  markers). `rawVernier` is mandatory and its **Raw data** checkbox stays
-  checked; other outputs are optional. Choices persist and replace
-  active outlets without restarting Bluetooth.
+- Default outlets: `rawVernier` (every advertised numeric belt channel plus
+  recording diagnostics) and `vernierBreathing` (a relative 0–1 belt-force
+  waveform). The raw outlet is mandatory. Individual force, signal events,
+  steps, step rate, and breaths/min outlets are optional. Choices persist and
+  replace active outlets without restarting Bluetooth.
 - Optional `steps`, `stepRate`, and `respirationRate` checkboxes forward the
   belt's cumulative step count, cadence (steps/min), and respiration estimate
-  (breaths/min) as their own LSL streams, or as columns in Single mode. Together
-  with `rawForce`, all four device signals are individually selectable. They
+  (breaths/min) as their own LSL streams. Together with `rawForce`, all four
+  device signals are individually selectable. They
   publish only when those device channels update. The Mock source includes
   synthetic rate/count updates every 10 seconds.
 - The documented GDX-RB device channels are Force, Respiration Rate, Steps,
@@ -27,12 +28,14 @@ rows. Click the checkbox or its label to select a stream; changes save instantly
   to the box, not air pressure or lung volume. See the
   [Vernier manual](https://www.vernier.com/manuals/GDX-RB) and the
   [Mini signal reference](https://georgefejer91.github.io/Polar-Mini-Stream/#vernier-outputs).
-- Modes: canonical separate LSL streams or one sparse fixed-channel LSL stream.
-- For exact force/breathing sample timing, use separate streams. The single
-  sparse mode preserves acquisition order and clamps overlapping channel
-  timestamps to the next microsecond; it does not add full sample periods or
-  drift into the future.
-- Changing mode or stream name replaces active LSL outlets without disconnecting
+- Optional **All-in-one** opens one additional sparse fixed-channel LSL stream
+  with every device channel, raw diagnostics, the normalized breath wave, and
+  signal events. It is independent of the individual outlet choices and does
+  not duplicate force, steps, or rates as extra columns. Overlapping channel
+  timestamps advance only to the next microsecond; use individual outlets for
+  exact per-signal sample timing. Saved Single-mode preferences migrate to this
+  choice while retaining their selected individual outlets.
+- Changing the output selection or stream name replaces active LSL outlets without disconnecting
   the sensor or pausing its sample worker. If replacement fails, the previous
   healthy outlets continue publishing.
 - Startup: opt-in **Start with PC** registration plus default automatic
@@ -42,7 +45,7 @@ rows. Click the checkbox or its label to select a stream; changes save instantly
   Windows may prompt or deny it. The NSIS installer cannot pregrant it, and
   hardware or policy blocks remain under Windows control.
 - Memory: every output checkbox change saves automatically. The last saved
-  selection, stream name, output mode, reconnect preference, and Vernier device
+  selection, stream name, reconnect preference, and Vernier device
   are loaded when the regular app next opens. No Apply or Save step is required.
   If a save fails, the UI restores the last successfully saved selection.
 - Multi-device use: launch multiple app instances.

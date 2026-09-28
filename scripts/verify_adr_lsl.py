@@ -11,7 +11,7 @@ from pathlib import Path
 from pylsl import StreamInlet, cf_float32, resolve_byprop
 
 parser = argparse.ArgumentParser()
-parser.add_argument("mode", choices=["separate", "single"])
+parser.add_argument("mode", choices=["separate", "single", "both"])
 parser.add_argument("--output", type=Path)
 args = parser.parse_args()
 base = f"adr_acceptance_{args.mode}"
@@ -22,10 +22,13 @@ waveforms = {
     "adrAxisDifferenceMagnitude": "g",
 }
 suffixes = list(waveforms) + ["adrPcaQuality", "adrPcaValid", "adrMovingAverageValid", "adrAxisDifferenceValid"]
-names = [f"{base}_{suffix}" for suffix in suffixes]
-names += [base] if args.mode == "single" else [f"{base}_rawECG", f"{base}_rawACC"]
+individual_suffixes = ["adrPcaWaveform", "adrPcaQuality", "adrPcaValid"] if args.mode == "both" else suffixes
+names = [f"{base}_{suffix}" for suffix in individual_suffixes]
+if args.mode != "single": names += [f"{base}_rawECG", f"{base}_rawACC"]
+if args.mode != "separate": names += [base]
 inlets = {}
 received = {name: [] for name in names}
+combined_labels = []
 try:
     for name in names:
         infos = resolve_byprop("name", name, minimum=1, timeout=5)
@@ -48,6 +51,15 @@ try:
             assert companions and all(companion in names for companion in companions)
         elif suffix in suffixes:
             assert info.type() == "SignalQuality" and info.channel_count() == 1, name
+        elif name == base:
+            assert info.type() == "PolarMini" and info.channel_format() == cf_float32
+            channels = info.desc().child("channels")
+            channel = channels.child("channel")
+            while not channel.empty():
+                combined_labels.append(channel.child_value("label"))
+                channel = channel.next_sibling("channel")
+            assert "raw_ecg_uv" in combined_labels and "acc_x_mg" in combined_labels
+            assert all(suffix in combined_labels for suffix in suffixes), combined_labels
         inlets[name] = inlet
     deadline = time.monotonic() + 17
     while time.monotonic() < deadline:
@@ -71,6 +83,11 @@ try:
             values = [row[1][0] for row in rows]
             assert set(values) <= {0.0, 1.0} and 1.0 in values
         report["streams"][name] = {"samples": len(rows), "duration_s": timestamps[-1] - timestamps[0]}
+    if args.mode == "both":
+        for suffix in waveforms:
+            index = combined_labels.index(suffix)
+            values = [row[index] for _, row in received[base] if math.isfinite(row[index])]
+            assert len(values) >= 20 and max(values) - min(values) > 0.001, suffix
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

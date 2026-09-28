@@ -8,7 +8,7 @@ use tauri::{
 };
 
 const COMPACT_WINDOW_SIZE: (f64, f64) = (388.0, 332.0);
-const METRICS_WINDOW_SIZE: (f64, f64) = (620.0, 602.0);
+const METRICS_WINDOW_SIZE: (f64, f64) = (720.0, 640.0);
 const METRICS_GUIDE_URL: &str = "https://georgefejer91.github.io/Polar-Mini-Stream/";
 
 #[tauri::command]

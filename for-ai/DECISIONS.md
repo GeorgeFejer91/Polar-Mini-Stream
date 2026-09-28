@@ -121,6 +121,27 @@ to rediscover. Source and tests remain the authority for implementation facts.
 - Supersedes: D-0002's preservation of respiratory IDs and D-0006's optional
   full raw Vernier row. Other acquisition and preference decisions remain.
 
+## D-0008 — Keep individual outlets while offering a recording bundle
+
+- Date: 2026-09-28
+- Status: Accepted
+- Context: Feedback consumers need individually timed outlets while an LSL
+  recorder can take one sparse stream. A mode switch forced a choice between
+  those uses.
+- Decision: Offer an independent All-in-one outlet in each mini and remove
+  the mode switch from both UIs. Polar's bundle contains raw H10 signals,
+  signal events, and every available Polar Mini derived metric, including ADR,
+  regardless of individual selections; selected ADR values also keep their
+  individual outlets. Vernier's bundle contains all
+  device channels regardless of individual selections. Keep the mandatory raw
+  outlets, including the Respyra-required Vernier raw Force channel. Migrate
+  saved Single-mode preferences to separate outlets plus All-in-one.
+- Consequences: Sparse bundles use NaN for fields absent on a row. Exact
+  per-signal timing remains on individual outlets; external recorders own file
+  capture. The legacy Single path remains available internally for old tests.
+- Supersedes: D-0007's user-facing Single-mode arrangement. Its raw and ADR
+  outlet requirements remain.
+
 ## Record format
 
 For later decisions, add one compact entry with:

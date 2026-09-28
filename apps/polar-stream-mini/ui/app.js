@@ -51,7 +51,7 @@
       "node-phase",
       "node-kind",
       "stream-name",
-      "stream-mode-toggle",
+      "all-in-one",
       "autostart",
       "auto-connect",
       "device-row",
@@ -112,7 +112,7 @@
   function preferencePayload() {
     return {
       streamName: elements["stream-name"].value.trim(),
-      outputMode: elements["stream-mode-toggle"].checked ? "singleStream" : "separateStreams",
+      outputMode: "separateStreams",
       autoConnect: elements["auto-connect"].checked,
       polarOutputs: [...new Set(state.preferences.polarOutputs || directPolarOutputs)],
     };
@@ -156,16 +156,11 @@
     if (bootstrap.session?.deviceId) {
       state.selectedDeviceId = bootstrap.session.deviceId;
     }
-    renderMode();
     renderDevices();
     renderSignals();
     renderMetricDialog();
     renderConnection(bootstrap.session);
     setStatus(isNative ? "Ready" : "Installed app required", null, !isNative);
-  }
-
-  function renderMode() {
-    elements["stream-mode-toggle"].checked = state.preferences.outputMode === "singleStream";
   }
 
   function renderDevices() {
@@ -197,37 +192,15 @@
   }
 
   function renderSignals() {
-    const list = elements["signal-list"];
-    list.replaceChildren();
-    const chips = [];
-    if (state.kind === "polar") {
-      if (state.preferences.outputMode === "singleStream") {
-        chips.push(state.preferences.polarOutputs?.some((id) => id.startsWith("adr_"))
-          ? "single + ADR LSL" : "single sparse LSL");
-      }
-      const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
-      for (const id of directPolarOutputs) chips.push(streamSuffix(id));
-      const optional = state.metrics.filter((metric) => !metric.direct && selected.has(metric.id));
-      if (optional.length) chips.push(optional[0].streamSuffix || optional[0].id);
-      if (optional.length > 1) chips.push(`+${optional.length - 1} metrics`);
-      const extraCount = optional.length;
-      elements["metrics-button"].title = extraCount
-        ? `${extraCount} optional realtime metrics selected`
-        : "Add optional realtime metrics";
-    } else if (state.preferences.outputMode === "singleStream") {
-      chips.push("single sparse LSL", "raw channels", "breathing");
-    } else {
-      chips.push("rawVernier", "vernierBreathing", "rawForce");
-    }
-    for (const chip of chips) {
-      const span = document.createElement("span");
-      span.textContent = chip;
-      list.append(span);
-    }
-  }
-
-  function streamSuffix(id) {
-    return state.metrics.find((metric) => metric.id === id)?.streamSuffix || id;
+    const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
+    elements["all-in-one"].checked = selected.has("allInOne");
+    const extraCount = state.metrics.filter((metric) => !metric.direct && selected.has(metric.id)).length;
+    elements["metrics-button"].textContent = extraCount
+      ? `+ Add more metrics (${extraCount})`
+      : "+ Add more metrics";
+    elements["metrics-button"].title = extraCount
+      ? `${extraCount} optional metrics selected`
+      : "Add optional Polar metrics";
   }
 
   function renderConnection(session = null) {
@@ -244,6 +217,7 @@
     elements["mock-button"].disabled = state.busy || !isNative;
     elements["device-select"].disabled = state.busy || state.connected || !isNative;
     elements["metrics-button"].disabled = state.busy || !isNative;
+    elements["all-in-one"].disabled = state.busy || !isNative;
     elements["device-status"].textContent = state.connected
       ? session?.deviceName || state.preferences.lastDevice?.name || "Connected"
       : state.mockMode
@@ -291,10 +265,12 @@
 
   function renderMetricDialog() {
     const options = elements["metric-options"];
+    const scrollTop = options.scrollTop;
+    const focusedId = options.contains(document.activeElement) ? document.activeElement.value : null;
     options.replaceChildren();
     if (state.kind !== "polar") return;
     const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
-    elements["reset-metrics"].disabled = ![...selected].some((id) => !directPolarOutputs.includes(id));
+    elements["reset-metrics"].disabled = ![...selected].some((id) => !directPolarOutputs.includes(id) && id !== "allInOne");
     const optionalMetrics = state.metrics.filter((candidate) => !candidate.direct);
     appendMetricGroup(
       options,
@@ -310,6 +286,8 @@
       optionalMetrics.filter(isAccDerivedMetric),
       selected,
     );
+    options.scrollTop = scrollTop;
+    if (focusedId) options.querySelector(`input[value="${focusedId}"]`)?.focus({ preventScroll: true });
   }
 
   function isAccDerivedMetric(metric) {
@@ -404,7 +382,6 @@
         savedPolarOutputs = [...(result.preferences?.polarOutputs || payload.polarOutputs)];
         if (revision === saveRevision) {
           state.preferences = result.preferences || state.preferences;
-          renderMode();
           renderSignals();
           if (!quiet || result.reconnectRequired || result.applied) {
             setStatus(result.message || "Saved", "Config", result.reconnectRequired);
@@ -414,7 +391,6 @@
         if (revision === saveRevision) {
           state.preferences.polarOutputs = [...savedPolarOutputs];
           renderMetricDialog();
-          renderMode();
           renderSignals();
           reportError(error);
         }
@@ -719,7 +695,9 @@
     elements["device-select"].addEventListener("change", () => {
       state.selectedDeviceId = elements["device-select"].value;
     });
-    elements["stream-mode-toggle"].addEventListener("change", () => {
+    elements["all-in-one"].addEventListener("change", () => {
+      updateMetricSelection("allInOne", elements["all-in-one"].checked);
+      renderSignals();
       savePreferences(false);
     });
     elements["scan-button"].addEventListener("click", scanDevices);
@@ -730,7 +708,7 @@
     elements["metrics-guide"].addEventListener("click", openMetricGuide);
     elements["metrics-dialog"].addEventListener("close", restoreCompactWindow);
     elements["reset-metrics"].addEventListener("click", () => {
-      state.preferences.polarOutputs = [...directPolarOutputs];
+      state.preferences.polarOutputs = [...directPolarOutputs, ...(state.preferences.polarOutputs.includes("allInOne") ? ["allInOne"] : [])];
       renderMetricDialog();
       renderSignals();
       savePreferences(false);

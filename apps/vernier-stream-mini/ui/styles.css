@@ -224,72 +224,6 @@ body[data-mock="true"] .node-surface {
   border-color: color-mix(in srgb, var(--node-accent) 24%, transparent);
   background: var(--field-hover);
 }
-.stream-mode-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr);
-  gap: 7px;
-  align-items: center;
-  min-height: 25px;
-}
-.stream-mode-option {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 5px;
-  min-width: 0;
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 700;
-}
-.stream-mode-option.single { justify-content: flex-start; }
-.stream-mode-option img {
-  width: 22px;
-  height: 17px;
-  flex: none;
-}
-.stream-mode-toggle {
-  position: relative;
-  display: block;
-  width: 36px;
-  height: 20px;
-  cursor: pointer;
-}
-.stream-mode-toggle input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-}
-.stream-mode-track {
-  display: block;
-  width: 36px;
-  height: 20px;
-  border: 1px solid var(--line-strong);
-  border-radius: 10px;
-  background: var(--field);
-  transition: background-color 140ms ease, border-color 140ms ease;
-}
-.stream-mode-thumb {
-  display: block;
-  width: 14px;
-  height: 14px;
-  margin: 2px;
-  border-radius: 50%;
-  background: var(--muted);
-  transition: transform 140ms ease, background-color 140ms ease;
-}
-.stream-mode-toggle input:checked + .stream-mode-track {
-  border-color: var(--primary-bg);
-  background: var(--primary-bg);
-}
-.stream-mode-toggle input:checked + .stream-mode-track .stream-mode-thumb {
-  transform: translateX(16px);
-  background: var(--primary-fg);
-}
-.stream-mode-toggle input:focus-visible + .stream-mode-track {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
 .device-row button,
 .patch-node footer button,
 .node-menu button,
@@ -334,7 +268,8 @@ body[data-mock="true"] .node-surface {
 }
 .mini-option-row {
   display: flex;
-  gap: 9px;
+  flex-wrap: wrap;
+  gap: 4px;
   align-items: center;
 }
 .check-row,
@@ -349,6 +284,33 @@ body[data-mock="true"] .node-surface {
 }
 .check-row { justify-content: flex-start; cursor: pointer; }
 .check-row input { width: 15px; height: 15px; accent-color: var(--brand); }
+.mini-option-row .check-row { flex: none; max-width: 100%; gap: 3px; white-space: nowrap; }
+.mini-option-row .check-row > span { min-width: 0; }
+.mini-option-row .check-row > span[data-text-fit="reflow"] { white-space: normal; }
+.mini-option-row .check-row input {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 24px;
+  height: 14px;
+  margin: 0;
+  border-radius: 7px;
+  background: var(--line-strong);
+}
+.mini-option-row .check-row input::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary-fg);
+  transition: transform 140ms ease;
+}
+.mini-option-row .check-row input:checked { background: var(--brand); }
+.mini-option-row .check-row input:checked::before { transform: translateX(10px); }
+.mini-option-row .check-row input:disabled { opacity: .5; cursor: not-allowed; }
 .metric-row { margin-left: auto; }
 .metric-row span { white-space: nowrap; }
 .readout * { pointer-events: none; }
@@ -518,7 +480,7 @@ body[data-mock="true"] .patch-node footer { grid-template-columns: repeat(2, min
 }
 .metric-options {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 2px 4px;
 }
 .metric-options label {
@@ -530,6 +492,12 @@ body[data-mock="true"] .patch-node footer { grid-template-columns: repeat(2, min
   padding: 1px 0;
   cursor: pointer;
 }
+.metric-options label:has(input:disabled) { cursor: default; }
+.metric-options .all-in-one-option {
+  grid-template-columns: 10px 15px minmax(0, 1fr);
+  gap: 3px;
+}
+.all-in-one-option img { width: 15px; height: 12px; }
 .metric-options input {
   width: 10px;
   height: 10px;
@@ -584,7 +552,7 @@ button,
 @media (max-width: 350px), (max-height: 300px) {
   .mini-shell { padding: 6px 10px 8px; }
   .patch-node { width: calc(100vw - 26px); }
-  .node-body { gap: 4px; padding: 6px 7px; }
+  .node-body { gap: 3px; padding: 4px 7px; }
   .node-window-actions button { width: 19px; height: 19px; }
   .patch-node header span,
   .readout dd,

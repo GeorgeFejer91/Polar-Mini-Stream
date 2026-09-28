@@ -4,7 +4,7 @@ Standalone one-device Polar H10 BLE-to-LSL applet. The UI is intentionally a
 compact transparent-shell window with its own install, settings, and process.
 
 - Mandatory outputs when available: raw ECG, raw accelerometer, heart rate,
-  and RR intervals.
+  and RR intervals. The mini window shows these as checked, locked checkboxes.
 - Optional outputs: Polar metrics including Excite-O-Meter and four continuous
   accelerometer-derived respiration (ADR) candidates: signed PCA projection,
   Flowborne-style moving-average difference, signed Phan-window difference,
@@ -12,19 +12,25 @@ compact transparent-shell window with its own install, settings, and process.
   with each candidate. Phase, rate, and dynamics remain separate metrics.
   See [`docs/adr-waveforms.md`](../../docs/adr-waveforms.md).
 - Checking a realtime metric saves it as a default for future launches and
-  applies it to the active LSL output. **Reset metrics** clears all optional
-  selections while keeping raw ECG, ACC, heart rate, and RR.
-- Modes: canonical separate LSL streams or one sparse fixed-channel LSL stream.
-  Selected ADR metrics always have dedicated scalar outlets in either mode.
-- For exact ECG/ACC sample timing, use separate streams. The single sparse mode
-  preserves acquisition order and clamps overlapping channel timestamps to the
-  next microsecond; it does not add full sample periods or drift into the future.
-- Changing mode, stream name, or optional metrics replaces active LSL outlets
+  applies it to its individual LSL outlet. **Reset metrics** clears optional
+  metric selections while keeping raw ECG, ACC, heart rate, RR, and the
+  All-in-one choice. **Add more metrics** opens the full Polar Mini selection
+  catalog in an expanded window.
+- Optional **All-in-one recording stream** adds one sparse fixed-channel LSL
+  outlet alongside the individual outlets. Its checkbox is the sole control for
+  that extra stream. It includes raw ECG, ACC, heart
+  rate, RR, signal events, and every available Polar Mini derived metric,
+  including ADR, independently of the individual metric choices.
+  Missing fields in each row are NaN. Individual outlets retain their own
+  timing for feedback; the combined outlet preserves acquisition order and
+  clamps overlapping timestamps to the next microsecond.
+- Saved Single-mode preferences migrate to separate outlets plus All-in-one.
+- Changing the All-in-one choice, stream name, or optional metrics replaces active LSL outlets
   without disconnecting the H10 or pausing its sample worker. If replacement
   fails, the previous healthy outlets continue publishing.
 - Startup: opt-in **Start with PC** registration plus default automatic
   reconnection to the last successfully connected H10.
-- Memory: app-local stream name, output mode, reconnect preference, selected
+- Memory: app-local stream name, reconnect preference, selected
   metrics, and last H10.
 - Multi-device use: launch multiple app instances.
 - Device battery: a miniature battery icon and percentage in the title bar,
