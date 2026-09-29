@@ -1729,6 +1729,22 @@ fn append_stream_metadata(
                 return false;
             }
         }
+        let respyra_contract = match spec.id {
+            "adr_pca_waveform" => Some("respyra-polar-pca/1"),
+            "adr_axis_mean_difference" => Some("respyra-polar-phan-signed/1"),
+            _ => None,
+        };
+        if let Some(contract) = respyra_contract {
+            for (name, value) in [
+                ("respyra_input_contract", contract),
+                ("respyra_signal_role", "signed_breathing_level"),
+                ("inhale_polarity", "unknown; determine during setup"),
+            ] {
+                if !append_value_checked(append_child_value, description, name, value) {
+                    return false;
+                }
+            }
+        }
     }
     let processing_attached = append_polar_respiration_processing(
         append_child,

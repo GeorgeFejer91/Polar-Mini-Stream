@@ -54,6 +54,13 @@ npm run validate:docs
 cargo run -p polar-h10-metrics --example export_catalog -- docs/metric-catalog.js --check
 ```
 
+Mini UI validation must check width-only and height-only resizing at the
+minimum and large sizes: control groups keep their order while spacing and
+Pretext-checked type scale with both dimensions. Neither main window may show
+a page or status scrollbar, and overlong status values must remain reachable in
+the full-text dialog. The metric picker and device-search dialogs have their
+own layout gate.
+
 ## Gate 3: integrated readiness
 
 For ADR processing/output changes, build `verify_adr_lsl` in

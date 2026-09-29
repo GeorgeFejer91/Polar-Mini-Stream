@@ -12,10 +12,16 @@ function measure(element) {
     letterSpacing: Number.parseFloat(style.letterSpacing) || 0,
   });
   const { lineCount, maxLineWidth } = measureLineStats(prepared, width);
+  if (element.id === "connection-feedback") {
+    const fits = lineCount <= 1 && maxLineWidth <= width + 1;
+    element.dataset.textFit = fits ? "fit" : "reveal";
+    element.title = fits ? "" : element.textContent;
+    element.tabIndex = fits ? -1 : 0;
+    return;
+  }
   const maxHeight = Number.parseFloat(style.maxHeight);
   const needsScroll = Number.isFinite(maxHeight) && lineCount * lineHeight > maxHeight;
   element.dataset.textFit = needsScroll ? "scroll" : maxLineWidth > width + 1 ? "reflow" : "fit";
-  if (element.id === "connection-feedback") element.tabIndex = needsScroll ? 0 : -1;
 }
 
 document.fonts.ready.then(() => {

@@ -55,6 +55,8 @@
       "minimize-button",
       "close-button",
       "mini-node",
+      "text-detail",
+      "text-detail-value",
       "node-phase",
       "node-kind",
       "stream-name",
@@ -622,6 +624,23 @@
     }
   }
 
+  function resizeFromBorder(event) {
+    const grip = event.target.closest("[data-resize-direction]");
+    if (!grip || event.button !== 0 || !nativeWindow?.startResizeDragging) return;
+    event.preventDefault();
+    event.stopPropagation();
+    nativeWindow.startResizeDragging(grip.dataset.resizeDirection).catch(reportError);
+  }
+
+  function revealFullText(event) {
+    if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+    const label = event.target.closest('[data-text-fit="reveal"]');
+    if (!label) return;
+    event.preventDefault();
+    elements["text-detail-value"].textContent = label.textContent;
+    elements["text-detail"].showModal();
+  }
+
   function withBusy(work) {
     state.busy = true;
     renderConnection();
@@ -727,6 +746,9 @@
     elements["theme-toggle"].addEventListener("click", toggleTheme);
     elements["new-node-top"].addEventListener("click", openNewNode);
     elements["minimize-button"].addEventListener("click", minimizeApp);
+    elements["mini-node"].addEventListener("pointerdown", resizeFromBorder);
+    elements["mini-node"].addEventListener("click", revealFullText);
+    elements["mini-node"].addEventListener("keydown", revealFullText);
     elements["close-button"].addEventListener("click", closeApp);
     elements["new-node-menu"].addEventListener("click", openNewNode);
     elements["mock-node-menu"].addEventListener("click", openMockNode);

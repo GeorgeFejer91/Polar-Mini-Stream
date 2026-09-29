@@ -3,12 +3,8 @@ use stream_mini_runtime::{
     MiniPreferencesInput, MiniSaveResult, MiniSessionSnapshot, NewNodeLaunch, graceful_shutdown,
     setup_mini_state,
 };
-use tauri::{
-    AppHandle, LogicalSize, Manager, PhysicalPosition, State, WebviewWindow, ipc::Channel,
-};
+use tauri::{AppHandle, Manager, State, ipc::Channel};
 
-const COMPACT_WINDOW_SIZE: (f64, f64) = (388.0, 332.0);
-const METRICS_WINDOW_SIZE: (f64, f64) = (720.0, 640.0);
 const METRICS_GUIDE_URL: &str = "https://georgefejer91.github.io/Polar-Mini-Stream/";
 
 #[tauri::command]
@@ -74,50 +70,6 @@ fn open_mock_node() -> CommandResult<NewNodeLaunch> {
 #[tauri::command]
 fn close_app(app: AppHandle) {
     stream_mini_runtime::close_app(app);
-}
-
-#[tauri::command]
-fn set_metrics_dialog_open(window: WebviewWindow, open: bool) -> Result<(), String> {
-    let (width, height) = if open {
-        METRICS_WINDOW_SIZE
-    } else {
-        COMPACT_WINDOW_SIZE
-    };
-    let scale = window.scale_factor().map_err(|error| error.to_string())?;
-    let current_size = window.outer_size().map_err(|error| error.to_string())?;
-    let current_position = window.outer_position().map_err(|error| error.to_string())?;
-    let target_width = (width * scale).round() as i32;
-    let target_height = (height * scale).round() as i32;
-    let center_x = i64::from(current_position.x) + i64::from(current_size.width) / 2;
-    let center_y = i64::from(current_position.y) + i64::from(current_size.height) / 2;
-    let mut target_x = (center_x - i64::from(target_width) / 2) as i32;
-    let mut target_y = (center_y - i64::from(target_height) / 2) as i32;
-
-    if let Some(monitor) = window
-        .current_monitor()
-        .map_err(|error| error.to_string())?
-    {
-        let work_area = monitor.work_area();
-        let min_x = work_area.position.x;
-        let min_y = work_area.position.y;
-        let max_x = min_x
-            .saturating_add(work_area.size.width as i32)
-            .saturating_sub(target_width)
-            .max(min_x);
-        let max_y = min_y
-            .saturating_add(work_area.size.height as i32)
-            .saturating_sub(target_height)
-            .max(min_y);
-        target_x = target_x.clamp(min_x, max_x);
-        target_y = target_y.clamp(min_y, max_y);
-    }
-
-    window
-        .set_size(LogicalSize::new(width, height))
-        .map_err(|error| error.to_string())?;
-    window
-        .set_position(PhysicalPosition::new(target_x, target_y))
-        .map_err(|error| error.to_string())
 }
 
 #[cfg(desktop)]
@@ -205,7 +157,6 @@ pub fn run() {
             open_new_node,
             open_mock_node,
             close_app,
-            set_metrics_dialog_open,
             open_metrics_guide,
             get_autostart,
             set_autostart,

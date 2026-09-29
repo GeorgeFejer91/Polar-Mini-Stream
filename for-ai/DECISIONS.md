@@ -124,7 +124,7 @@ to rediscover. Source and tests remain the authority for implementation facts.
 ## D-0008 — Keep individual outlets while offering a recording bundle
 
 - Date: 2026-09-28
-- Status: Accepted
+- Status: Implemented; target bundle composition superseded by D-0009
 - Context: Feedback consumers need individually timed outlets while an LSL
   recorder can take one sparse stream. A mode switch forced a choice between
   those uses.
@@ -141,6 +141,30 @@ to rediscover. Source and tests remain the authority for implementation facts.
   capture. The legacy Single path remains available internally for old tests.
 - Supersedes: D-0007's user-facing Single-mode arrangement. Its raw and ADR
   outlet requirements remain.
+
+## D-0009 — Make scalar outlets primary and bundle the chosen outputs
+
+- Date: 2026-09-29
+- Status: Target contract; implementation pending
+- Context: The two mini apps should expose everything their devices can deliver
+  as easy-to-use, reliable LSL outputs. Users also want one combined stream for
+  the outputs they have chosen. Respyra 2.0 is an external use case for breathing
+  input from Vernier and potentially Polar.
+- Decision: Aim for one single-channel outlet per available device variable,
+  axis, and app metric, with clear identity, units, and source timing. Offer one
+  optional multi-channel All-in-one outlet per app whose channels correspond to
+  the individual outputs selected for publication, including required raw
+  outputs.
+  Investigate a Polar ACC-derived breathing output compatible with Respyra's
+  Vernier input contract; require an explicit transformation and validation
+  before treating the inputs as interchangeable. Respyra remains an external
+  consumer; `PROJECT.md` links its repository.
+- Consequences: The present raw multi-channel outlets and all-metrics bundles
+  remain current implementation, not proof of this target. Future output work
+  must reconcile their topology, selection, metadata, and compatibility without
+  silently changing consumers' existing LSL contracts.
+- Supersedes: D-0008's bundle-content policy as a future target; retains its
+  independent optional bundle and current implementation history.
 
 ## Record format
 

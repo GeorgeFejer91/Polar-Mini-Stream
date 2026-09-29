@@ -16,6 +16,7 @@ const apps = [
     scanLabel: "Polar H10",
     streamName: "Polar-H10-Mini",
     height: 332,
+    minHeight: 320,
     frameColors: ["rgb(255, 255, 255)", "rgb(0, 0, 0)", "rgb(213, 0, 28)"],
   },
   {
@@ -24,6 +25,7 @@ const apps = [
     scanLabel: "Vernier Go Direct",
     streamName: "Vernier-GDX-Mini",
     height: 354,
+    minHeight: 346,
     frameColors: ["rgb(255, 255, 255)", "rgb(245, 154, 47)", "rgb(0, 124, 122)"],
   },
 ];
@@ -31,7 +33,9 @@ const apps = [
 const browser = await chromium.launch({ headless: true, args: ["--allow-file-access-from-files"] });
 try {
   for (const app of apps) {
+    await validateResizeConfig(app);
     await validateNormalWindow(app);
+    await validateResizableWindow(app);
     await validateEarlyRememberedConnection(app);
     await validateBatteryWindow(app);
     if (app.kind === "vernier") {
@@ -44,6 +48,133 @@ try {
   }
 } finally {
   await browser.close();
+}
+
+async function validateResizeConfig(app) {
+  const appRoot = path.join(root, "apps", `${app.kind}-stream-mini`);
+  const config = JSON.parse(await fs.readFile(path.join(appRoot, "tauri.conf.json"), "utf8"));
+  const capability = JSON.parse(await fs.readFile(path.join(appRoot, "capabilities", "default.json"), "utf8"));
+  assert.equal(config.app.windows[0].resizable, true);
+  assert.equal(config.app.windows[0].minWidth, 320);
+  assert.equal(config.app.windows[0].minHeight, app.minHeight);
+  assert.ok(capability.permissions.includes("core:window:allow-start-resize-dragging"));
+}
+
+async function validateResizableWindow(app) {
+  const page = await createPage(app, { mockMode: false, lslHealthy: true });
+  await page.goto(appUrl(app));
+  await page.locator("#node-phase").filter({ hasText: "Ready" }).waitFor();
+  const directions = ["North", "East", "South", "West", "NorthEast", "SouthEast", "SouthWest", "NorthWest"];
+  for (const direction of directions) {
+    await page.locator(`[data-resize-direction="${direction}"]`).click();
+  }
+  assert.deepEqual(await page.evaluate(() => window.__resizeCalls), directions);
+
+  for (const [width, height] of [[320, app.minHeight], [320, app.height], [320, 900], [350, app.minHeight], [351, app.minHeight], [388, app.height], [388, 600], [520, 480], [599, app.minHeight], [599, 480], [600, app.minHeight], [600, app.height], [600, 479], [600, 480], [830, 776], [900, app.minHeight], [900, app.height], [900, 700], [1200, app.minHeight]]) {
+    await page.setViewportSize({ width, height });
+    await page.waitForFunction(() => document.querySelector("#device-status")?.dataset.textFit);
+    const geometry = await page.locator("#mini-node").evaluate((node) => {
+      const frame = node.querySelector(".node-surface").getBoundingClientRect();
+      return {
+        width: frame.width,
+        height: frame.height,
+        clipped: [...node.querySelectorAll("#product-name, #node-phase, .readout dd, .patch-node footer button")]
+          .filter((label) => label.scrollWidth > label.clientWidth + 1 || label.scrollHeight > label.clientHeight + 1)
+          .map((label) => `${label.id}: ${label.scrollWidth}x${label.scrollHeight} > ${label.clientWidth}x${label.clientHeight}`),
+      };
+    });
+    assert.ok(geometry.width >= width - (width <= 350 ? 20 : 28) - 1);
+    assert.ok(geometry.height >= height - (width <= 350 ? 14 : 16) - 1);
+    assert.deepEqual(geometry.clipped, [], `${app.kind} ${width}x${height} clipped default text`);
+    await assertNoOverflow(page);
+    if (width === 320 || width === 900) {
+      await page.screenshot({ path: path.join(outputDirectory, `${app.kind}-resize-${width}.png`), omitBackground: true });
+    }
+    if (width === 830) {
+      await page.evaluate(() => { document.documentElement.dataset.theme = "dark"; });
+      await page.screenshot({ path: path.join(outputDirectory, `${app.kind}-accordion-dark.png`), omitBackground: true });
+      await page.evaluate(() => { document.documentElement.dataset.theme = "light"; });
+    }
+  }
+
+  const spacing = async (width, height) => {
+    await page.setViewportSize({ width, height });
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    return page.evaluate(() => {
+      const groups = [...document.querySelector(".node-body").children]
+        .filter((element) => getComputedStyle(element).display !== "none");
+      const switches = document.querySelectorAll(".mini-option-row .check-row");
+      return {
+        vertical: groups.at(-1).getBoundingClientRect().top - groups.at(-2).getBoundingClientRect().bottom,
+        horizontal: switches[1].getBoundingClientRect().left - switches[0].getBoundingClientRect().left,
+        type: parseFloat(getComputedStyle(document.querySelector(".field-label")).fontSize),
+      };
+    });
+  };
+  const compactHeight = await spacing(900, app.minHeight);
+  const compactWidth = await spacing(388, 700);
+  const expanded = await spacing(900, 700);
+  assert.ok(expanded.vertical > compactHeight.vertical + 40, `${app.kind} vertical spacing did not expand`);
+  assert.ok(expanded.horizontal > compactWidth.horizontal + 40, `${app.kind} horizontal spacing did not expand`);
+  assert.ok(expanded.type >= compactHeight.type + 3 && expanded.type >= compactWidth.type + 3,
+    `${app.kind} type did not respond to both dimensions`);
+  await page.locator("#mock-button").evaluate((button) => { button.textContent = "Open a separate synthetic mock stream"; });
+  await page.waitForFunction(() => parseFloat(document.querySelector(".node-surface").style.getPropertyValue("--accordion-type")) < 15);
+  await assertNoOverflow(page);
+  await page.locator("#mock-button").evaluate((button) => { button.textContent = "Open mock"; });
+  await page.waitForFunction(() => parseFloat(document.querySelector(".node-surface").style.getPropertyValue("--accordion-type")) === 15);
+
+  await page.setViewportSize({ width: 320, height: app.height });
+  await page.evaluate(() => window.__emitMiniEvent({
+    kind: "connection", connected: true, deviceName: "Long sensor name Long sensor name Long sensor name",
+  }));
+  await page.locator('#device-status[data-text-fit="reveal"]').waitFor();
+  assert.equal(await page.locator("#device-status").getAttribute("title"), "Long sensor name Long sensor name Long sensor name");
+  await assertNoOverflow(page);
+  await page.locator("#device-status").click();
+  assert.equal(await page.locator("#text-detail-value").textContent(), "Long sensor name Long sensor name Long sensor name");
+  await page.locator("#text-detail button").click();
+  await page.evaluate(() => window.__emitMiniEvent({
+    kind: "connection", connected: true, deviceName: "A".repeat(100),
+  }));
+  await page.waitForFunction(() => document.querySelector("#device-status")?.title === "A".repeat(100));
+  await page.locator('#device-status[data-text-fit="reveal"]').waitFor();
+  assert.equal(await page.locator("#device-status").getAttribute("title"), "A".repeat(100));
+  await assertNoOverflow(page);
+  await page.locator("#device-status").focus();
+  await page.keyboard.press("Enter");
+  assert.equal(await page.locator("#text-detail-value").textContent(), "A".repeat(100));
+  await page.locator("#text-detail button").click();
+  if (app.kind === "vernier") {
+    await page.evaluate(() => window.__emitMiniEvent({ kind: "status", message: "Long diagnostic feedback ".repeat(20) }));
+    await page.locator('#connection-feedback[data-text-fit="reveal"]').waitFor();
+    await assertNoOverflow(page);
+    await page.locator("#connection-feedback").click();
+    assert.match(await page.locator("#text-detail-value").textContent(), /Long diagnostic feedback/);
+    await page.locator("#text-detail button").click();
+  }
+  await page.evaluate(() => window.__emitMiniEvent({
+    kind: "connection", connected: true, deviceName: "Long sensor name Long sensor name Long sensor name",
+  }));
+  await page.setViewportSize({ width: 900, height: 700 });
+  await page.locator('#device-status[data-text-fit="fit"]').waitFor();
+  await page.setViewportSize({ width: 320, height: app.height });
+  await page.locator("#device-status").evaluate((node) => {
+    node.style.fontSize = "20px";
+    node.style.lineHeight = "30px";
+    node.style.letterSpacing = "0.12em";
+    node.style.wordSpacing = "0.16em";
+  });
+  await page.locator('#device-status[data-text-fit="reveal"]').waitFor();
+  await assertNoOverflow(page);
+  await page.setViewportSize({ width: 900, height: 700 });
+  if (app.kind === "polar") {
+    await page.locator("#metrics-button").click();
+    assert.equal(await page.evaluate(() => innerWidth), 900);
+    await page.locator("#metrics-close").click();
+    assert.equal(await page.evaluate(() => innerWidth), 900);
+  }
+  await page.close();
 }
 
 async function validateBluetoothUnavailable(app) {
@@ -143,10 +274,8 @@ async function validateBatteryWindow(app) {
   assert.equal(await percent.evaluate((node) => node.scrollWidth <= node.clientWidth && node.scrollHeight <= node.clientHeight), true);
   await assertBatteryTitlebar(page);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-  // Enlarged text may grow the applet; controls must remain reachable by scrolling.
-  assert.equal(await page.locator("body").evaluate((node) => getComputedStyle(node).overflowY), "auto");
-  await page.locator("#disconnect-button").scrollIntoViewIfNeeded();
-  assert.ok((await page.locator("#disconnect-button").boundingBox()).y < app.height);
+  assert.equal(await page.locator("body").evaluate((node) => getComputedStyle(node).overflowY), "hidden");
+  await assertNoOverflow(page);
 
   await page.evaluate(() => window.__emitMiniEvent({ kind: "connection", connected: false, batteryPercent: 100 }));
   assert.equal(await percent.textContent(), "—");
@@ -290,7 +419,7 @@ async function validateNormalWindow(app) {
     ];
     await page.locator("#metrics-button").click();
     assert.equal(await page.locator("#metrics-dialog").isVisible(), true);
-    assert.equal(await page.evaluate(() => window.__miniCalls.includes("set_metrics_dialog_open")), true);
+    assert.equal(await page.evaluate(() => window.__miniCalls.includes("set_metrics_dialog_open")), false);
     await page.setViewportSize({ width: 720, height: 640 });
     await assertNoOverflow(page);
     await page.screenshot({ path: path.join(outputDirectory, "polar-mini-metrics-large.png"), omitBackground: true });
@@ -499,10 +628,12 @@ async function createPage(app, options) {
     ({ app, options }) => {
       const calls = [];
       const saves = [];
+      const resizeCalls = [];
       let eventChannel = null;
       let radioState = options.radioState || "on";
       window.__miniCalls = calls;
       window.__miniSaves = saves;
+      window.__resizeCalls = resizeCalls;
       window.__emitMiniEvent = (event) => eventChannel?.onmessage?.(event);
 
       class Channel {
@@ -630,7 +761,10 @@ async function createPage(app, options) {
 
       window.__TAURI__ = {
         core: { Channel, invoke },
-        window: { getCurrentWindow: () => ({ minimize: async () => {} }) },
+        window: { getCurrentWindow: () => ({
+          minimize: async () => {},
+          startResizeDragging: async (direction) => { resizeCalls.push(direction); },
+        }) },
       };
     },
     { app, options },
@@ -658,10 +792,16 @@ async function assertNoOverflow(page) {
   const overflow = await page.evaluate(() => ({
     horizontal: document.documentElement.scrollWidth - window.innerWidth,
     vertical: document.documentElement.scrollHeight - window.innerHeight,
+    surface: document.querySelector(".node-surface").scrollHeight - document.querySelector(".node-surface").clientHeight,
+    feedback: document.querySelector("#connection-feedback")?.scrollHeight - document.querySelector("#connection-feedback")?.clientHeight || 0,
+    bodyOverflow: getComputedStyle(document.body).overflowY,
   }));
   if (overflow.horizontal > 0 || overflow.vertical > 0) {
     await page.screenshot({ path: path.join(outputDirectory, "mini-overflow.png"), fullPage: true });
   }
   assert.ok(overflow.horizontal <= 0, `horizontal overflow: ${overflow.horizontal}px`);
   assert.ok(overflow.vertical <= 0, `vertical overflow: ${overflow.vertical}px`);
+  assert.ok(overflow.surface <= 1, `panel content overflow: ${overflow.surface}px`);
+  assert.ok(overflow.feedback <= 1, `feedback content overflow: ${overflow.feedback}px`);
+  assert.equal(overflow.bodyOverflow, "hidden");
 }
