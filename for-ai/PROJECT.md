@@ -7,9 +7,23 @@ Standalone Polar H10 and Vernier Go Direct mini streamers for low-latency BLE-to
 ## Primary goal
 
 Develop and release two independent desktop mini streamers, Polar Stream Mini
-and Vernier Stream Mini. Keep their raw BLE-to-LSL paths observable and fast;
-keep accelerometer-derived respiration (ADR) candidates explicitly identified
-with readiness/quality companions while retaining finite diagnostic values.
+and Vernier Stream Mini that make it easy and reliable to select and publish
+every available device measurement, axis, and app metric through an
+individually identifiable, single-channel LSL outlet. Each app should also
+offer one optional multi-channel All-in-one outlet that bundles the individual
+outputs the user has chosen to send, including required raw outputs. Keep the
+raw BLE-to-LSL paths observable and fast. Keep accelerometer-derived
+respiration (ADR) candidates explicitly identified with readiness/quality
+companions while retaining finite diagnostic values. This is the product
+goal; the current output topology below is not yet fully aligned with it.
+
+Respyra 2.0 is a downstream use case, not part of this repository. Its present
+study input is Vernier raw Force in newtons. Preserve that compatibility and
+investigate whether a Polar accelerometer-derived breathing signal can meet
+the same consumer contract for units, channel metadata, sample format, and
+timing. Do not present raw acceleration as Vernier Force or claim
+interchangeability before a defined conversion and validation. Reference:
+[Respyra 2.0](https://github.com/GeorgeFejer91/respyra-2.0).
 
 ## Non-goals
 
@@ -43,9 +57,9 @@ groups retain their order while spacing and type scale with width and height;
 Pretext checks the type fit. Main windows have no scrollbars. Overlong status
 values open in a full-text dialog instead of enlarging the panel.
 The Polar metric picker overlays the current window without changing its size.
-Vernier publishes its raw numeric row continuously and offers optional individual
-outlets plus an independent all-in-one sparse outlet; the latter can coexist
-with any individual selection.
+Currently, Vernier publishes its raw numeric row continuously and offers
+optional individual outlets plus an independent all-in-one sparse outlet; the
+latter can coexist with any individual selection.
 Polar keeps its raw outlets and selected derived metric outlets, and offers an
 independent all-in-one sparse outlet containing raw values and every available
 Polar Mini metric, regardless of individual outlet selections.
