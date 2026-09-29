@@ -29,6 +29,13 @@ learning, so they are correlated algorithm variants rather than independent
 sensors. PCA sign is initially chosen mathematically, not from inhale labels.
 Polarity and participant range belong in later Respira calibration.
 
+The PCA and signed axis-mean outlets are also advertised as separate optional
+Respyra input contracts: `respyra-polar-pca/1` and
+`respyra-polar-phan-signed/1`. Select either candidate under **+ Realtime
+metrics -> ACC derived** to publish its one-channel LSL outlet and validity
+companions. The metadata declares inhale polarity unknown; Respyra must set
+direction and calibrate the selected waveform before using it for a study.
+
 The existing 0–1 PCA output is named `adr_pca_relative_amplitude`; phase, rate,
 and dynamics use the corresponding `adr_*` names. They are distinct from these
 four primary waveforms. Former respiratory IDs/suffixes are removed without
@@ -81,12 +88,18 @@ that produced each live signal.
 
 ## Study workflow and software evidence
 
-1. Connect Polar and Vernier; select all four ADR candidates in Polar Mini.
-2. Run Respira from the existing Vernier input for the initial experiment.
-3. In the external LSL recorder, include raw Polar ECG/ACC, Vernier raw force,
-   the four ADR waveforms, their companion streams, and experiment markers.
-4. Evaluate paired timing, waveform shape, holds, polarity, posture, and motion
-   artifacts before choosing future Respira candidate inputs.
+1. In Polar Mini, enable `adr_pca_waveform` or
+   `adr_axis_mean_difference` under **Realtime metrics → ACC derived**. Their
+   required validity outlets are selected automatically.
+2. In Respyra 2.0, select that exact Polar outlet as the breathing input and
+   choose whether inhalation raises or lowers the waveform. The two input
+   contracts are `respyra-polar-pca/1` and `respyra-polar-phan-signed/1`;
+   Respyra calibrates in native g and publishes its own normalized breathing
+   stream. Its bundled recorder captures the selected input, derived stream and
+   markers. See [Respyra's input details](https://github.com/GeorgeFejer91/respyra-2.0/blob/main/docs/polar-input-contracts.md).
+3. For later paired evaluation, also record Vernier raw Force, raw Polar ACC,
+   both candidate waveforms and their validity companions. Compare timing,
+   shape, polarity, posture and motion artifacts before claiming equivalence.
 
 The producer below feeds wall-clock-paced synthetic 200 Hz ACC through the real
 metric engine and LSL output. The independent official `pylsl` inlet checks
@@ -99,9 +112,9 @@ target/debug/examples/verify_adr_lsl.exe apps/polar-stream-mini/resources/lsl.dl
 python scripts/verify_adr_lsl.py separate --output .for-ai-local/adr-separate.json
 ```
 
-Repeat with `single` for both commands. This establishes live software
+Repeat with `single` and `both` for both commands. This establishes live software
 production and LSL readback; paired participant recordings establish respiratory
-agreement. Respira and recorder implementations are separate projects.
+agreement. Respyra and the Mini streamers are separate projects.
 
 ## Method sources
 

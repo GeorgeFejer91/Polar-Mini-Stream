@@ -22,7 +22,9 @@ waveforms = {
     "adrAxisDifferenceMagnitude": "g",
 }
 suffixes = list(waveforms) + ["adrPcaQuality", "adrPcaValid", "adrMovingAverageValid", "adrAxisDifferenceValid"]
-individual_suffixes = ["adrPcaWaveform", "adrPcaQuality", "adrPcaValid"] if args.mode == "both" else suffixes
+individual_suffixes = ([] if args.mode == "single" else
+                       ["adrPcaWaveform", "adrPcaQuality", "adrPcaValid"]
+                       if args.mode == "both" else suffixes)
 names = [f"{base}_{suffix}" for suffix in individual_suffixes]
 if args.mode != "single": names += [f"{base}_rawECG", f"{base}_rawACC"]
 if args.mode != "separate": names += [base]
@@ -49,6 +51,14 @@ try:
             assert processing.child_value("formula")
             companions = info.desc().child_value("companion_streams").split(",")
             assert companions and all(companion in names for companion in companions)
+            expected_contract = {
+                "adrPcaWaveform": "respyra-polar-pca/1",
+                "adrAxisMeanDifference": "respyra-polar-phan-signed/1",
+            }.get(suffix)
+            if expected_contract:
+                assert info.desc().child_value("respyra_input_contract") == expected_contract
+                assert info.desc().child_value("respyra_signal_role") == "signed_breathing_level"
+                assert info.desc().child_value("inhale_polarity").startswith("unknown")
         elif suffix in suffixes:
             assert info.type() == "SignalQuality" and info.channel_count() == 1, name
         elif name == base:
