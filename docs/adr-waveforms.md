@@ -116,6 +116,27 @@ Repeat with `single` and `both` for both commands. This establishes live softwar
 production and LSL readback; paired participant recordings establish respiratory
 agreement. Respyra and the Mini streamers are separate projects.
 
+For an end-to-end Respyra mock study, `polar-stream-mini.exe --mock` forces
+separate outlets for both signed candidates and their three validity/quality
+companions, irrespective of saved UI selections. Mock ACC is deterministic at
+200 Hz; each 10 ms notification produces one value per candidate and companion.
+Its source timestamps advance by exactly 10 ms per notification, independently
+of scheduler jitter. The standalone reference replays the same raw ACC sequence
+through the metric engine without LSL or a recorder:
+
+```powershell
+cargo build -p polar-stream-mini -p vernier-stream-mini --locked
+cargo build -p polar-h10-metrics --example mini_mock_reference --locked
+target/debug/examples/mini_mock_reference.exe 30000 > reference.csv
+```
+
+The CSV contains `tick,metric_id,value`. Tick zero has two ACC samples at
+−5 and 0 ms relative to the first notification. Compare every recorded raw ACC
+sample, candidate, validity flag, quality value and timestamp with this reference
+using Respyra's `scripts/audit_polar_mock_xdf.py`. The mock and recorded-study
+verification receipt is in Respyra's `for-ai/VERIFIED.md`. This checks the
+software transport and study recording; physical H10 behavior is separate.
+
 ## Method sources
 
 - [Phan's original phone algorithm](https://github.com/lynphan/Mobile-Phone-Breathing-Detection/blob/main/BreathingDetection/Assets/MobilePhoneBreathingDetection.cs)

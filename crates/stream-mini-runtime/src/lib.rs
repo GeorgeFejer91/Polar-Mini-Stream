@@ -252,6 +252,13 @@ impl PreferencesStore {
 
     fn mock_from(path: &Path, kind: MiniAppKind) -> Self {
         let mut snapshot = Self::read_snapshot(path, kind);
+        if kind == MiniAppKind::Polar {
+            snapshot.output_mode = MiniOutputMode::SeparateStreams;
+            snapshot.polar_outputs = normalize_polar_outputs(Some(vec![
+                "adr_pca_waveform".into(),
+                "adr_axis_mean_difference".into(),
+            ]));
+        }
         let candidate = format!("{}-Mock-{}", snapshot.stream_name, process::id());
         snapshot.stream_name = normalize_stream_base(&candidate)
             .unwrap_or_else(|_| format!("{}-Mock-{}", kind.default_stream_name(), process::id()));
@@ -1791,6 +1798,8 @@ async fn run_polar_mock(
     let mut ecg_index = 0_u64;
     let mut acc_index = 0_u64;
     let mut tick = 0_u64;
+    // The first two ACC samples need a full 5 ms backfill at tick zero.
+    let source_start_ns = monotonic_now_ns().saturating_add(1_000_000_000);
 
     loop {
         interval.tick().await;
@@ -1799,7 +1808,9 @@ async fn run_polar_mock(
             metrics_engine.apply_selection(settings_rx.borrow_and_update().selection);
         }
 
-        let host_receive_timestamp_ns = monotonic_now_ns().max(1);
+        // Keep the metric engine's source timeline independent of scheduler jitter.
+        let host_receive_timestamp_ns =
+            source_start_ns.saturating_add(tick.saturating_mul(POLAR_MOCK_TICK.as_nanos() as u64));
         let ecg_samples_this_tick = (tick + 1) * 13 / 10 - tick * 13 / 10;
         let ecg = (0..ecg_samples_this_tick)
             .map(|offset| {
@@ -3266,5 +3277,27 @@ mod tests {
         assert!(force.iter().all(|value| (9.0..=15.0).contains(value)));
         assert!(ecg.windows(2).any(|pair| pair[0] != pair[1]));
         assert!(force.windows(2).any(|pair| pair[0] != pair[1]));
+    }
+
+    #[test]
+    fn polar_mock_publishes_both_respyra_candidates_and_validity() {
+        let snapshot = PreferencesStore::mock_from(
+            Path::new("missing-polar-mock-preferences.json"),
+            MiniAppKind::Polar,
+        )
+        .snapshot();
+        for id in [
+            "adr_pca_waveform",
+            "adr_axis_mean_difference",
+            "adr_pca_valid",
+            "adr_axis_difference_valid",
+            "adr_pca_quality",
+        ] {
+            assert!(
+                snapshot.polar_outputs.iter().any(|selected| selected == id),
+                "{id}"
+            );
+        }
+        assert_eq!(snapshot.output_mode, MiniOutputMode::SeparateStreams);
     }
 }
