@@ -29,10 +29,11 @@ are retained so installed applets can be upgraded without changing identity.
   [signal reference](https://georgefejer91.github.io/Polar-Mini-Stream/#vernier-outputs)
   distinguishes device values from app processing.
 
-Both apps can publish separate LSL outlets or one sparse combined outlet.
-Selected ADR waveforms and their diagnostics always use dedicated outlets,
-including in Single mode. These apps create streams; recording belongs to an
-external LSL recorder.
+Both apps publish individual LSL outlets and can add one sparse All-in-one
+outlet alongside them. Polar starts with its direct H10 signals, all breathing
+metrics, and All-in-one selected on a fresh profile. Selected ADR waveforms and
+their diagnostics retain dedicated outlets. These apps create streams;
+recording belongs to an external LSL recorder.
 Their **Mock** windows publish clearly labeled synthetic data through the
 production output path. Derived breathing metrics are research estimates;
 physical validation against a respiratory reference remains open.

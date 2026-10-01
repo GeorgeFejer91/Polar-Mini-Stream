@@ -4,11 +4,20 @@ use polar_h10_core::AccSample;
 use polar_h10_metrics::{MetricEngine, MetricSelection, TimedAccBatch};
 
 fn sample(index: u64) -> AccSample {
-    let phase = index as f64 * std::f64::consts::TAU * 0.22 / 200.0;
+    let phase = (index % 3_200) as f64 / 800.0;
+    let breath = if phase < 1.0 {
+        2.0 * phase - 1.0
+    } else if phase < 2.0 {
+        1.0
+    } else if phase < 3.0 {
+        5.0 - 2.0 * phase
+    } else {
+        -1.0
+    };
     AccSample {
-        x_mg: (26.0 * phase.sin()).round() as i16,
-        y_mg: (18.0 * (phase + 0.8).sin()).round() as i16,
-        z_mg: (1_000.0 + 42.0 * phase.sin()).round() as i16,
+        x_mg: (26.0 * breath).round() as i16,
+        y_mg: (18.0 * breath).round() as i16,
+        z_mg: (1_000.0 + 42.0 * breath).round() as i16,
     }
 }
 

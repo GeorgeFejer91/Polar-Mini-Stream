@@ -52,9 +52,8 @@ not a claimed 200 Hz output rate. No interpolation or acceleration-to-position
 integration is performed.
 
 Selected ADR values have dedicated scalar outlets. The optional Polar
-All-in-one outlet also includes all available ADR values as sparse columns
-alongside raw ECG, ACC, heart rate, RR, and other available metrics, even when
-their individual outlets are off. Use individual outlets
+All-in-one outlet includes the selected ADR values as sparse columns alongside
+raw ECG, ACC, heart rate, and RR. Use individual outlets
 for exact per-signal timing. Changing names or selections replaces outlets;
 recorder discovery must follow the selected names and metadata.
 
@@ -116,10 +115,11 @@ Repeat with `single` and `both` for both commands. This establishes live softwar
 production and LSL readback; paired participant recordings establish respiratory
 agreement. Respyra and the Mini streamers are separate projects.
 
-For an end-to-end Respyra mock study, `polar-stream-mini.exe --mock` forces
-separate outlets for both signed candidates and their three validity/quality
-companions, irrespective of saved UI selections. Mock ACC is deterministic at
-200 Hz; each 10 ms notification produces one value per candidate and companion.
+For an end-to-end Respyra mock study, `polar-stream-mini.exe --mock` selects
+all available breathing outputs, their individual outlets, and All-in-one,
+irrespective of saved UI selections. Mock ACC approximates a 4-second inhale,
+4-second hold, 4-second exhale, and 4-second hold at 200 Hz; each 10 ms
+notification produces two raw ACC samples and selected derived values.
 Its source timestamps advance by exactly 10 ms per notification, independently
 of scheduler jitter. The standalone reference replays the same raw ACC sequence
 through the metric engine without LSL or a recorder:

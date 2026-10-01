@@ -69,7 +69,9 @@ try:
                 combined_labels.append(channel.child_value("label"))
                 channel = channel.next_sibling("channel")
             assert "raw_ecg_uv" in combined_labels and "acc_x_mg" in combined_labels
-            assert all(suffix in combined_labels for suffix in suffixes), combined_labels
+            expected = suffixes if args.mode == "single" else individual_suffixes
+            assert all(suffix in combined_labels for suffix in expected), combined_labels
+            assert all(suffix not in combined_labels for suffix in suffixes if suffix not in expected), combined_labels
         inlets[name] = inlet
     deadline = time.monotonic() + 17
     while time.monotonic() < deadline:
@@ -94,7 +96,7 @@ try:
             assert set(values) <= {0.0, 1.0} and 1.0 in values
         report["streams"][name] = {"samples": len(rows), "duration_s": timestamps[-1] - timestamps[0]}
     if args.mode == "both":
-        for suffix in waveforms:
+        for suffix in waveforms.keys() & individual_suffixes:
             index = combined_labels.index(suffix)
             values = [row[index] for _, row in received[base] if math.isfinite(row[index])]
             assert len(values) >= 20 and max(values) - min(values) > 0.001, suffix
