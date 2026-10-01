@@ -9,6 +9,14 @@ Standalone Polar H10 and Vernier Go Direct mini streamers for low-latency BLE-to
 Develop and release two independent desktop mini streamers, Polar Stream Mini
 and Vernier Stream Mini. Keep their raw BLE-to-LSL paths observable and fast;
 keep derived breathing outputs explicitly identified and quality gated.
+Make every published numeric outlet usable by Respyra's downstream BIDS
+physiology or timed behavioral export and MNE analysis: preserve source
+timestamps, stable stream identity, channel order,
+labels, physical units or explicit unitless values, sample format, nominal rate
+(zero when irregular), and processing/validity provenance. The Mini apps publish
+LSL, including identifiable status and marker outlets; Respyra records XDF and
+creates BIDS files and the MNE reader. Missing samples and irregular streams
+must not be presented as continuously sampled physiology.
 
 ## Non-goals
 
