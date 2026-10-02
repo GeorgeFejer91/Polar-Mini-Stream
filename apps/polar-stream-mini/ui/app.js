@@ -216,7 +216,6 @@
   }
 
   let fitFrame = 0;
-  let minimumSignalHeight = 0;
   function scheduleSignalFit() {
     if (!isNative || fitFrame) return;
     fitFrame = requestAnimationFrame(async () => {
@@ -225,7 +224,7 @@
       const body = surface.querySelector(".node-body");
       const style = getComputedStyle(body);
       const visible = [...body.children].filter((child) => !child.hidden);
-      const bodyHeight = visible.reduce((sum, child) => sum + child.offsetHeight, 0)
+      const bodyHeight = visible.reduce((sum, child) => sum + Math.max(child.offsetHeight, child.scrollHeight), 0)
         + Math.max(0, visible.length - 1) * parseFloat(style.rowGap || style.gap || "0")
         + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
       const shell = getComputedStyle(document.querySelector(".mini-shell"));
@@ -234,13 +233,14 @@
         + surface.querySelector(":scope > footer").offsetHeight
         + parseFloat(shell.paddingTop) + parseFloat(shell.paddingBottom) + 2,
       ));
-      const size = new window.__TAURI__.dpi.LogicalSize(window.innerWidth, required);
+      const available = Number.isFinite(screen.availHeight) && screen.availHeight > 0
+        ? Math.max(320, screen.availHeight - 24)
+        : required;
+      const target = Math.min(required, available);
       try {
-        if (required !== minimumSignalHeight) {
-          await nativeWindow.setMinSize(new window.__TAURI__.dpi.LogicalSize(320, required));
-          minimumSignalHeight = required;
+        if (window.innerHeight < target) {
+          await nativeWindow.setSize(new window.__TAURI__.dpi.LogicalSize(window.innerWidth, target));
         }
-        if (window.innerHeight < required) await nativeWindow.setSize(size);
       } catch (error) {
         reportError(error);
       }
@@ -723,7 +723,6 @@
   }
 
   function installHandlers() {
-    window.addEventListener("resize", scheduleSignalFit);
     elements["theme-toggle"].addEventListener("click", toggleTheme);
     elements["new-node-top"].addEventListener("click", openNewNode);
     elements["minimize-button"].addEventListener("click", minimizeApp);

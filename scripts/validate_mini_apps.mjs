@@ -413,6 +413,23 @@ async function validateNormalWindow(app) {
 
   if (app.kind === "polar") {
     await page.waitForFunction((height) => window.__fitCalls.some((call) => call.kind === "size" && call.height > height), app.height);
+    assert.ok((await page.evaluate(() => innerHeight)) <= 744);
+    assert.ok(await page.locator(".node-body").evaluate((body) => body.scrollHeight > body.clientHeight));
+    assert.ok(await page.locator(".signal-list").evaluate((signals) => signals.scrollHeight <= signals.clientHeight + 1));
+    assert.ok(await page.evaluate(() =>
+      document.querySelector(".signal-list").getBoundingClientRect().bottom
+      <= document.querySelector(".readout").getBoundingClientRect().top));
+    await page.screenshot({ path: path.join(outputDirectory, "polar-default-screen-capped.png"), omitBackground: true });
+    await page.locator(".node-body").evaluate((body) => { body.scrollTop = body.scrollHeight; });
+    assert.ok(await page.evaluate(() =>
+      document.querySelector(".readout").getBoundingClientRect().bottom
+      <= document.querySelector(".node-surface > footer").getBoundingClientRect().top));
+    await page.locator(".node-body").evaluate((body) => { body.scrollTop = 0; });
+    await page.setViewportSize({ width: 388, height: app.height });
+    await page.waitForTimeout(80);
+    assert.equal(await page.evaluate(() => innerHeight), app.height);
+    await assertNoOverflow(page);
+    await page.setViewportSize({ width: 388, height: 744 });
     assert.equal(await page.locator("#signal-list .selected-signal").count(), polarBreathingMetrics.length);
     assert.equal(await page.locator("#signal-list .all-in-one-option img").count(), 1);
     assert.ok((await page.evaluate(() => innerHeight)) > app.height);
@@ -655,6 +672,7 @@ async function createPage(app, options) {
   });
   await page.addInitScript(
     ({ app, options, polarBreathingMetrics, polarDefaultOutputs }) => {
+      Object.defineProperty(window.screen, "availHeight", { configurable: true, value: 768 });
       const calls = [];
       const saves = [];
       const resizeCalls = [];
