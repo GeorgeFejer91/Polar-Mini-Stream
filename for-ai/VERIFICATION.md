@@ -67,6 +67,16 @@ metadata. Include raw, derived, quality, and sparse combined outlets. For a
 cross-project compatibility claim, make short Polar and Vernier mock recordings
 with Respyra's bundled recorder in an isolated desktop; retain each XDF, its
 matching BIDS output, producer/recorder revisions, and XDF hash outside Git.
+First run Respyra's `tests/check_xdf_mne_compatibility.py` on each actual XDF
+with `--xdf`, `--resample-hz`, `--require-metadata`,
+`--require-run-metadata`, and `--mnelab`, using the pinned command in
+Respyra's verification contract. This must open
+every nonempty numeric Mini and Respyra stream directly as MNE Raw from XDF,
+check ordered channel labels/units and source timestamps, parse Respyra
+markers as MNE annotations, and open the selected raw stream through MNELAB's
+XDF importer. Irregular streams require an explicit analysis grid; keep their
+exact timestamps in XDF. Do not treat a BIDS-export pass as
+proof that the XDF itself was opened by MNE.
 Run Respyra's `tests/check_bids_compatibility.py` for each XDF and matching
 `_events.tsv` using the exact command in Respyra's `for-ai/VERIFICATION.md`.
 Require zero BIDS validator errors, MNE-BIDS path parsing, and MNE Raw readback
@@ -77,7 +87,9 @@ irregular/sparse samples and status markers identifiable; never claim that an
 unrecorded outlet, missing samples, or an approximate rate is a regular trace.
 Exact large integer values belong to XDF/BIDS tables because MNE Raw stores
 floating-point arrays. The Mini apps do not write participant BIDS files
-themselves. A retained mock XDF may be reused only while its LSL producer and
+themselves; XDF itself is not BIDS-valid or a direct
+`mne_bids.read_raw_bids` input. A retained mock XDF may be reused only while
+its LSL producer and
 Respyra recorder/export contracts are unchanged; physical devices and installed
 apps need separate qualification.
 
