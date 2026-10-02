@@ -71,7 +71,8 @@ async function validateResizeConfig(app) {
 }
 
 async function validateResizableWindow(app) {
-  const page = await createPage(app, { mockMode: false, lslHealthy: true });
+  const page = await createPage(app, { mockMode: false, lslHealthy: true,
+    savedPreferences: app.kind === "polar" ? { polarOutputs: polarDefaultOutputs.slice(0, 4) } : {} });
   await page.goto(appUrl(app));
   await page.locator("#node-phase").filter({ hasText: "Ready" }).waitFor();
   const directions = ["North", "East", "South", "West", "NorthEast", "SouthEast", "SouthWest", "NorthWest"];
@@ -411,6 +412,10 @@ async function validateNormalWindow(app) {
   }
 
   if (app.kind === "polar") {
+    await page.waitForFunction((height) => window.__fitCalls.some((call) => call.kind === "size" && call.height > height), app.height);
+    assert.equal(await page.locator("#signal-list .selected-signal").count(), polarBreathingMetrics.length);
+    assert.equal(await page.locator("#signal-list .all-in-one-option img").count(), 1);
+    assert.ok((await page.evaluate(() => innerHeight)) > app.height);
     assert.equal(await page.locator("#stream-mode-toggle").count(), 0);
     assert.equal(await page.locator("#all-in-one").isChecked(), true);
     assert.equal(await page.locator("#signal-list input").count(), 5);
@@ -436,6 +441,7 @@ async function validateNormalWindow(app) {
     await page.locator("#reset-metrics").click();
     await page.waitForFunction(() => window.__miniSaves.some((save) =>
       save.polarOutputs?.length === 5 && save.polarOutputs.includes("allInOne")));
+    assert.equal(await page.locator("#signal-list .selected-signal").count(), 0);
     await page.setViewportSize({ width: 720, height: 640 });
     await assertNoOverflow(page);
     await page.screenshot({ path: path.join(outputDirectory, "polar-mini-metrics-large.png"), omitBackground: true });
@@ -644,6 +650,9 @@ async function assertInlineOutputs(page) {
 
 async function createPage(app, options) {
   const page = await browser.newPage({ viewport: { width: 388, height: app.height } });
+  await page.exposeBinding("__applyMiniSize", async (_source, size) => {
+    await page.setViewportSize({ width: size.width, height: size.height });
+  });
   await page.addInitScript(
     ({ app, options, polarBreathingMetrics, polarDefaultOutputs }) => {
       const calls = [];
@@ -654,6 +663,7 @@ async function createPage(app, options) {
       window.__miniCalls = calls;
       window.__miniSaves = saves;
       window.__resizeCalls = resizeCalls;
+      window.__fitCalls = [];
       window.__emitMiniEvent = (event) => eventChannel?.onmessage?.(event);
 
       class Channel {
@@ -766,9 +776,15 @@ async function createPage(app, options) {
 
       window.__TAURI__ = {
         core: { Channel, invoke },
+        dpi: { LogicalSize: class LogicalSize { constructor(width, height) { this.width = width; this.height = height; } } },
         window: { getCurrentWindow: () => ({
           minimize: async () => {},
           startResizeDragging: async (direction) => { resizeCalls.push(direction); },
+          setMinSize: async (size) => { window.__fitCalls.push({ kind: "min", ...size }); },
+          setSize: async (size) => {
+            window.__fitCalls.push({ kind: "size", ...size });
+            await window.__applyMiniSize(size);
+          },
         }) },
       };
     },

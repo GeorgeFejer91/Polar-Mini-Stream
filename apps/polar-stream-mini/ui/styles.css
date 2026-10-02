@@ -361,6 +361,8 @@ body[data-mock="true"] .node-surface {
 }
 .signal-option:has(input:disabled) { cursor: default; }
 .signal-option input { width: 11px; height: 11px; flex: none; margin: 0; accent-color: var(--brand); }
+.signal-option img { width: 15px; height: 12px; flex: none; }
+.selected-signal { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; }
 .signal-option span { min-width: 0; white-space: nowrap; }
 .signal-option span[data-text-fit="reflow"] {
   overflow-wrap: anywhere;

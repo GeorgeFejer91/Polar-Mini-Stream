@@ -196,6 +196,15 @@
   function renderSignals() {
     const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
     elements["all-in-one"].checked = selected.has("allInOne");
+    elements["signal-list"].querySelectorAll(".selected-signal").forEach((node) => node.remove());
+    for (const metric of state.metrics) {
+      if (metric.direct || !selected.has(metric.id)) continue;
+      const signal = document.createElement("span");
+      signal.className = "signal-option selected-signal";
+      signal.textContent = metric.label;
+      signal.title = `${metric.label} (${metric.id})`;
+      elements["signal-list"].append(signal);
+    }
     const extraCount = state.metrics.filter((metric) => !metric.direct && selected.has(metric.id)).length;
     elements["metrics-button"].textContent = extraCount
       ? `+ Add more metrics (${extraCount})`
@@ -203,6 +212,39 @@
     elements["metrics-button"].title = extraCount
       ? `${extraCount} optional metrics selected`
       : "Add optional Polar metrics";
+    scheduleSignalFit();
+  }
+
+  let fitFrame = 0;
+  let minimumSignalHeight = 0;
+  function scheduleSignalFit() {
+    if (!isNative || fitFrame) return;
+    fitFrame = requestAnimationFrame(async () => {
+      fitFrame = 0;
+      const surface = elements["mini-node"].querySelector(".node-surface");
+      const body = surface.querySelector(".node-body");
+      const style = getComputedStyle(body);
+      const visible = [...body.children].filter((child) => !child.hidden);
+      const bodyHeight = visible.reduce((sum, child) => sum + child.offsetHeight, 0)
+        + Math.max(0, visible.length - 1) * parseFloat(style.rowGap || style.gap || "0")
+        + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+      const shell = getComputedStyle(document.querySelector(".mini-shell"));
+      const required = Math.max(320, Math.ceil(
+        surface.querySelector(":scope > header").offsetHeight + bodyHeight
+        + surface.querySelector(":scope > footer").offsetHeight
+        + parseFloat(shell.paddingTop) + parseFloat(shell.paddingBottom) + 2,
+      ));
+      const size = new window.__TAURI__.dpi.LogicalSize(window.innerWidth, required);
+      try {
+        if (required !== minimumSignalHeight) {
+          await nativeWindow.setMinSize(new window.__TAURI__.dpi.LogicalSize(320, required));
+          minimumSignalHeight = required;
+        }
+        if (window.innerHeight < required) await nativeWindow.setSize(size);
+      } catch (error) {
+        reportError(error);
+      }
+    });
   }
 
   function renderConnection(session = null) {
@@ -681,6 +723,7 @@
   }
 
   function installHandlers() {
+    window.addEventListener("resize", scheduleSignalFit);
     elements["theme-toggle"].addEventListener("click", toggleTheme);
     elements["new-node-top"].addEventListener("click", openNewNode);
     elements["minimize-button"].addEventListener("click", minimizeApp);
