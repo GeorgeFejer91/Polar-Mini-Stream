@@ -145,7 +145,7 @@ to rediscover. Source and tests remain the authority for implementation facts.
 ## D-0009 — Make scalar outlets primary and bundle the chosen outputs
 
 - Date: 2026-09-29
-- Status: Target contract; implementation pending
+- Status: Partially implemented; scalar raw-axis outlets remain pending
 - Context: The two mini apps should expose everything their devices can deliver
   as easy-to-use, reliable LSL outputs. Users also want one combined stream for
   the outputs they have chosen. Respyra 2.0 is an external use case for breathing
@@ -159,10 +159,10 @@ to rediscover. Source and tests remain the authority for implementation facts.
   Vernier input contract; require an explicit transformation and validation
   before treating the inputs as interchangeable. Respyra remains an external
   consumer; `PROJECT.md` links its repository.
-- Consequences: The present raw multi-channel outlets and all-metrics bundles
-  remain current implementation, not proof of this target. Future output work
-  must reconcile their topology, selection, metadata, and compatibility without
-  silently changing consumers' existing LSL contracts.
+- Consequences: Polar's combined derived channels now follow its individual
+  selections, with all breathing metrics and All-in-one selected on first run.
+  Existing saved choices remain authoritative. Raw multi-channel outlets and
+  Vernier's all-metrics bundle still need reconciliation with this target.
 - Supersedes: D-0008's bundle-content policy as a future target; retains its
   independent optional bundle and current implementation history.
 

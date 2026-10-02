@@ -52,9 +52,8 @@ not a claimed 200 Hz output rate. No interpolation or acceleration-to-position
 integration is performed.
 
 Selected ADR values have dedicated scalar outlets. The optional Polar
-All-in-one outlet also includes all available ADR values as sparse columns
-alongside raw ECG, ACC, heart rate, RR, and other available metrics, even when
-their individual outlets are off. Use individual outlets
+All-in-one outlet includes the selected ADR values as sparse columns alongside
+raw ECG, ACC, heart rate, and RR. Use individual outlets
 for exact per-signal timing. Changing names or selections replaces outlets;
 recorder discovery must follow the selected names and metadata.
 
@@ -115,6 +114,28 @@ python scripts/verify_adr_lsl.py separate --output .for-ai-local/adr-separate.js
 Repeat with `single` and `both` for both commands. This establishes live software
 production and LSL readback; paired participant recordings establish respiratory
 agreement. Respyra and the Mini streamers are separate projects.
+
+For an end-to-end Respyra mock study, `polar-stream-mini.exe --mock` selects
+all available breathing outputs, their individual outlets, and All-in-one,
+irrespective of saved UI selections. Mock ACC approximates a 4-second inhale,
+4-second hold, 4-second exhale, and 4-second hold at 200 Hz; each 10 ms
+notification produces two raw ACC samples and selected derived values.
+Its source timestamps advance by exactly 10 ms per notification, independently
+of scheduler jitter. The standalone reference replays the same raw ACC sequence
+through the metric engine without LSL or a recorder:
+
+```powershell
+cargo build -p polar-stream-mini -p vernier-stream-mini --locked
+cargo build -p polar-h10-metrics --example mini_mock_reference --locked
+target/debug/examples/mini_mock_reference.exe 30000 > reference.csv
+```
+
+The CSV contains `tick,metric_id,value`. Tick zero has two ACC samples at
+−5 and 0 ms relative to the first notification. Compare every recorded raw ACC
+sample, candidate, validity flag, quality value and timestamp with this reference
+using Respyra's `scripts/audit_polar_mock_xdf.py`. The mock and recorded-study
+verification receipt is in Respyra's `for-ai/VERIFIED.md`. This checks the
+software transport and study recording; physical H10 behavior is separate.
 
 ## Method sources
 

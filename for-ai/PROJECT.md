@@ -54,18 +54,25 @@ scalar LSL outlets; old respiratory IDs have no aliases.
 JavaScript is presentation and control, never the authoritative data path.
 Both frameless mini windows resize from their visible panel edges. Their control
 groups retain their order while spacing and type scale with width and height;
-Pretext checks the type fit. Main windows have no scrollbars. Overlong status
+Pretext checks the type fit. The document stays within the window; Polar's
+control area scrolls if its selected metrics exceed the screen or the user
+shrinks the window. Overlong status
 values open in a full-text dialog instead of enlarging the panel.
 The Polar metric picker overlays the current window without changing its size.
 Currently, Vernier publishes its raw numeric row continuously and offers
 optional individual outlets plus an independent all-in-one sparse outlet; the
 latter can coexist with any individual selection.
 Polar keeps its raw outlets and selected derived metric outlets, and offers an
-independent all-in-one sparse outlet containing raw values and every available
-Polar Mini metric, regardless of individual outlet selections.
-Its compact UI shows required raw outlets as checked, locked boxes; the
-All-in-one box controls only the additional combined outlet. The expanded
-picker exposes all Polar Mini-selectable derived metrics.
+independent all-in-one sparse outlet containing raw values and the selected
+derived metrics.
+Its compact UI shows required raw outlets as checked, locked boxes, the
+selected derived streams, and the All-in-one option. The panel grows when
+selected streams need more room, up to the available screen height; manual
+resizing remains possible. The All-in-one box controls only the
+additional combined outlet. The expanded picker exposes all Polar
+Mini-selectable derived metrics. Fresh Polar
+preferences select all Breathing and Breathing dynamics metrics and All-in-one;
+saved choices remain authoritative after an upgrade.
 Saved Single-mode preferences for either app migrate to the additional outlet.
 The Pages metric catalog is generated from Rust definitions; the site documents
 the separate Vernier force-to-waveform path alongside the Polar catalog.

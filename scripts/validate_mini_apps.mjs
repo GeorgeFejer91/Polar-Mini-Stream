@@ -8,6 +8,16 @@ import { chromium } from "playwright";
 const root = process.cwd();
 const outputDirectory = path.join(root, "target", "ui-qa");
 await fs.mkdir(outputDirectory, { recursive: true });
+const catalogSource = await fs.readFile(path.join(root, "docs", "metric-catalog.js"), "utf8");
+const catalog = JSON.parse(catalogSource.slice(catalogSource.indexOf("["), catalogSource.lastIndexOf("]") + 1));
+const polarBreathingMetrics = catalog
+  .filter((metric) => ["Breathing", "Breathing dynamics"].includes(metric.category))
+  .map(({ id, streamSuffix, label, detail, category }) => ({ id, streamSuffix, label, detail, category, direct: false }));
+const polarDefaultOutputs = [
+  "raw_ecg", "raw_acc", "heart_rate", "rr_interval",
+  ...polarBreathingMetrics.map((metric) => metric.id),
+  "allInOne",
+];
 
 const apps = [
   {
@@ -61,7 +71,8 @@ async function validateResizeConfig(app) {
 }
 
 async function validateResizableWindow(app) {
-  const page = await createPage(app, { mockMode: false, lslHealthy: true });
+  const page = await createPage(app, { mockMode: false, lslHealthy: true,
+    savedPreferences: app.kind === "polar" ? { polarOutputs: polarDefaultOutputs.slice(0, 4) } : {} });
   await page.goto(appUrl(app));
   await page.locator("#node-phase").filter({ hasText: "Ready" }).waitFor();
   const directions = ["North", "East", "South", "West", "NorthEast", "SouthEast", "SouthWest", "NorthWest"];
@@ -401,8 +412,29 @@ async function validateNormalWindow(app) {
   }
 
   if (app.kind === "polar") {
+    await page.waitForFunction((height) => window.__fitCalls.some((call) => call.kind === "size" && call.height > height), app.height);
+    assert.ok((await page.evaluate(() => innerHeight)) <= 744);
+    assert.ok(await page.locator(".node-body").evaluate((body) => body.scrollHeight > body.clientHeight));
+    assert.ok(await page.locator(".signal-list").evaluate((signals) => signals.scrollHeight <= signals.clientHeight + 1));
+    assert.ok(await page.evaluate(() =>
+      document.querySelector(".signal-list").getBoundingClientRect().bottom
+      <= document.querySelector(".readout").getBoundingClientRect().top));
+    await page.screenshot({ path: path.join(outputDirectory, "polar-default-screen-capped.png"), omitBackground: true });
+    await page.locator(".node-body").evaluate((body) => { body.scrollTop = body.scrollHeight; });
+    assert.ok(await page.evaluate(() =>
+      document.querySelector(".readout").getBoundingClientRect().bottom
+      <= document.querySelector(".node-surface > footer").getBoundingClientRect().top));
+    await page.locator(".node-body").evaluate((body) => { body.scrollTop = 0; });
+    await page.setViewportSize({ width: 388, height: app.height });
+    await page.waitForTimeout(80);
+    assert.equal(await page.evaluate(() => innerHeight), app.height);
+    await assertNoOverflow(page);
+    await page.setViewportSize({ width: 388, height: 744 });
+    assert.equal(await page.locator("#signal-list .selected-signal").count(), polarBreathingMetrics.length);
+    assert.equal(await page.locator("#signal-list .all-in-one-option img").count(), 1);
+    assert.ok((await page.evaluate(() => innerHeight)) > app.height);
     assert.equal(await page.locator("#stream-mode-toggle").count(), 0);
-    assert.equal(await page.locator("#all-in-one").isChecked(), false);
+    assert.equal(await page.locator("#all-in-one").isChecked(), true);
     assert.equal(await page.locator("#signal-list input").count(), 5);
     for (const id of ["raw_ecg", "raw_acc", "heart_rate", "rr_interval"]) {
       const raw = page.locator(`#signal-list input[value="${id}"]`);
@@ -410,7 +442,7 @@ async function validateNormalWindow(app) {
       assert.equal(await raw.isDisabled(), true);
     }
     assert.equal(await page.locator("#all-in-one").isEnabled(), true);
-    assert.equal(await page.locator("#metrics-button").textContent(), "+ Add more metrics");
+    assert.equal(await page.locator("#metrics-button").textContent(), `+ Add more metrics (${polarBreathingMetrics.length})`);
     const accIds = [
       "adr_pca_waveform", "adr_pca_phase", "adr_pca_rate",
       "adr_interval_mean", "adr_axis_difference_event", "adr_axis_difference_rate",
@@ -420,6 +452,13 @@ async function validateNormalWindow(app) {
     await page.locator("#metrics-button").click();
     assert.equal(await page.locator("#metrics-dialog").isVisible(), true);
     assert.equal(await page.evaluate(() => window.__miniCalls.includes("set_metrics_dialog_open")), false);
+    for (const id of polarBreathingMetrics.map((metric) => metric.id)) {
+      assert.equal(await page.locator(`#metric-options input[value="${id}"]`).isChecked(), true);
+    }
+    await page.locator("#reset-metrics").click();
+    await page.waitForFunction(() => window.__miniSaves.some((save) =>
+      save.polarOutputs?.length === 5 && save.polarOutputs.includes("allInOne")));
+    assert.equal(await page.locator("#signal-list .selected-signal").count(), 0);
     await page.setViewportSize({ width: 720, height: 640 });
     await assertNoOverflow(page);
     await page.screenshot({ path: path.join(outputDirectory, "polar-mini-metrics-large.png"), omitBackground: true });
@@ -453,7 +492,7 @@ async function validateNormalWindow(app) {
     });
     await reopened.locator("#reset-metrics").click();
     await reopened.waitForFunction(() => window.__miniSaves.some((save) =>
-      save.polarOutputs?.length === 4 && !save.polarOutputs.includes("adr_axis_difference_event")));
+      save.polarOutputs?.length === 5 && !save.polarOutputs.includes("adr_axis_difference_event")));
     assert.equal(await reopened.locator("#reset-metrics").isDisabled(), true);
     assert.equal(await reopened.evaluate(() => window.__miniCalls.includes("disconnect_device")), false);
     const resetPreferences = await reopened.evaluate(() => window.__miniSaves.at(-1));
@@ -464,6 +503,8 @@ async function validateNormalWindow(app) {
     assert.equal(await resetReopened.locator('#metric-options input[value="adr_axis_difference_event"]').isChecked(), false);
     await resetReopened.close();
     await page.locator("#metrics-close").click();
+    await page.locator("#all-in-one").uncheck();
+    await page.waitForFunction(() => window.__miniSaves.at(-1) && !window.__miniSaves.at(-1).polarOutputs.includes("allInOne"));
     await page.locator("#all-in-one").check();
     await page.waitForFunction(() => window.__miniSaves.at(-1)?.polarOutputs.includes("allInOne"));
     assert.equal(await page.evaluate(() => window.__miniSaves.at(-1)?.outputMode), "separateStreams");
@@ -517,6 +558,8 @@ async function validateMockWindow(app, lslHealthy) {
   await assertNoOverflow(page);
 
   if (app.kind === "polar") {
+    assert.equal(await page.locator("#all-in-one").isChecked(), true);
+    await page.locator("#all-in-one").uncheck();
     await page.locator("#all-in-one").check();
     await page.waitForFunction(() => window.__miniSaves.some((save) => save.polarOutputs.includes("allInOne")));
     assert.equal(await page.locator("#all-in-one").isChecked(), true);
@@ -624,8 +667,12 @@ async function assertInlineOutputs(page) {
 
 async function createPage(app, options) {
   const page = await browser.newPage({ viewport: { width: 388, height: app.height } });
+  await page.exposeBinding("__applyMiniSize", async (_source, size) => {
+    await page.setViewportSize({ width: size.width, height: size.height });
+  });
   await page.addInitScript(
-    ({ app, options }) => {
+    ({ app, options, polarBreathingMetrics, polarDefaultOutputs }) => {
+      Object.defineProperty(window.screen, "availHeight", { configurable: true, value: 768 });
       const calls = [];
       const saves = [];
       const resizeCalls = [];
@@ -634,6 +681,7 @@ async function createPage(app, options) {
       window.__miniCalls = calls;
       window.__miniSaves = saves;
       window.__resizeCalls = resizeCalls;
+      window.__fitCalls = [];
       window.__emitMiniEvent = (event) => eventChannel?.onmessage?.(event);
 
       class Channel {
@@ -645,7 +693,7 @@ async function createPage(app, options) {
         streamName: `${app.streamName}${options.mockMode ? "-Mock-1234" : ""}`,
         outputMode: "separateStreams",
         autoConnect: Boolean(options.remembered),
-        polarOutputs: ["raw_ecg", "raw_acc", "heart_rate", "rr_interval"],
+        polarOutputs: polarDefaultOutputs,
         vernierOutputs: ["rawVernier", "vernierBreathing"],
         lastDevice: options.remembered ? { id: "saved-device", name: `Saved ${app.scanLabel}` } : null,
         ...options.savedPreferences,
@@ -672,22 +720,7 @@ async function createPage(app, options) {
             productName: app.productName,
             scanLabel: app.scanLabel,
             preferences,
-            metrics: app.kind === "polar" ? [
-              { id: "adr_pca_waveform", streamSuffix: "adrPcaWaveform", label: "ADR PCA waveform", detail: "Signed ACC projection", category: "Breathing", direct: false },
-              { id: "adr_pca_quality", streamSuffix: "adrPcaQuality", label: "ADR PCA quality", detail: "Motion quality", category: "Breathing", direct: false },
-              { id: "adr_pca_valid", streamSuffix: "adrPcaValid", label: "ADR PCA validity", detail: "Readiness flag", category: "Breathing", direct: false },
-              { id: "adr_pca_phase", streamSuffix: "adrPcaPhase", label: "Breathing phase", detail: "Three-state classifier", category: "Breathing", direct: false },
-              { id: "adr_pca_rate", streamSuffix: "adrPcaRate", label: "Breathing rate", detail: "Cycle rate", category: "Breathing", direct: false },
-              { id: "adr_interval_mean", streamSuffix: "adrIntervalMean", label: "Breath interval mean", detail: "Cycle interval", category: "Breathing dynamics", direct: false },
-              { id: "adr_axis_difference_event", streamSuffix: "adrAxisDifferenceEvent", label: "Phan ACC breath event", detail: "Detected breath pulse", category: "Breathing", direct: false },
-              { id: "adr_axis_difference_rate", streamSuffix: "adrAxisDifferenceRate", label: "Phan ACC breath count rate", detail: "Rolling count", category: "Breathing", direct: false },
-              { id: "adr_moving_average_phase", streamSuffix: "adrMovingAveragePhase", label: "Flowborne ACC phase", detail: "Four-state classifier", category: "Breathing", direct: false },
-              { id: "adr_moving_average_difference", streamSuffix: "adrMovingAverageDifference", label: "ADR moving-average waveform", detail: "Signed contrast", category: "Breathing", direct: false },
-              { id: "adr_moving_average_valid", streamSuffix: "adrMovingAverageValid", label: "ADR moving-average validity", detail: "Readiness flag", category: "Breathing", direct: false },
-              { id: "adr_axis_mean_difference", streamSuffix: "adrAxisMeanDifference", label: "ADR signed axis-mean difference", detail: "Signed Phan-window adaptation", category: "Breathing", direct: false },
-              { id: "adr_axis_difference_magnitude", streamSuffix: "adrAxisDifferenceMagnitude", label: "ADR rectified axis difference", detail: "Original Phan continuous score", category: "Breathing", direct: false },
-              { id: "adr_axis_difference_valid", streamSuffix: "adrAxisDifferenceValid", label: "ADR axis-difference validity", detail: "Readiness flag", category: "Breathing", direct: false },
-            ] : [],
+            metrics: app.kind === "polar" ? polarBreathingMetrics : [],
             session: null,
             mockMode: options.mockMode,
             lslResourcePresent: true,
@@ -761,13 +794,19 @@ async function createPage(app, options) {
 
       window.__TAURI__ = {
         core: { Channel, invoke },
+        dpi: { LogicalSize: class LogicalSize { constructor(width, height) { this.width = width; this.height = height; } } },
         window: { getCurrentWindow: () => ({
           minimize: async () => {},
           startResizeDragging: async (direction) => { resizeCalls.push(direction); },
+          setMinSize: async (size) => { window.__fitCalls.push({ kind: "min", ...size }); },
+          setSize: async (size) => {
+            window.__fitCalls.push({ kind: "size", ...size });
+            await window.__applyMiniSize(size);
+          },
         }) },
       };
     },
-    { app, options },
+    { app, options, polarBreathingMetrics, polarDefaultOutputs },
   );
   return page;
 }
