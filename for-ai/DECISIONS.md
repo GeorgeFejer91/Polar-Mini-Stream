@@ -99,6 +99,21 @@ to rediscover. Source and tests remain the authority for implementation facts.
 - Supersedes: Extends D-0005's optional output set; its acquisition decisions
   remain in force.
 
+## D-0010 — Qualify direct XDF import with MNE
+
+- Date: 2026-10-02
+- Status: Accepted
+- Context: The experimenter wants recorded Mini streams to be readable from
+  Respyra's XDF itself, not only from a separate BIDS export.
+- Decision: Keep Mini LSL headers self-describing and make direct PyXDF/MNE
+  and MNELAB opening of recorded Polar and Vernier mock XDFs a required cross-project
+  gate. Keep the separate BIDS export and validator as an additional gate.
+- Consequences: XDF preserves native timestamps and sample values. MNE Raw
+  needs an explicit grid for irregular streams; XDF is not a BIDS-valid raw
+  format or a direct `mne_bids.read_raw_bids` input.
+- Supersedes: The separate-export-only interpretation in the prior project
+  goal and verification gate.
+
 ## Record format
 
 For later decisions, add one compact entry with:
