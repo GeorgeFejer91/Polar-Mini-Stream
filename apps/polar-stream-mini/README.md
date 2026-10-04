@@ -3,9 +3,12 @@
 Standalone one-device Polar H10 BLE-to-LSL applet. The UI is intentionally a
 compact transparent-shell window with its own install, settings, and process.
 
-- Mandatory outputs when available: raw ECG, raw accelerometer, heart rate,
-  and RR intervals. The mini window shows these as checked, locked checkboxes.
-- Optional outputs: Polar metrics including Excite-O-Meter and four continuous
+- Raw ECG, raw accelerometer, heart rate, and RR intervals start checked.
+  The mini window lets the operator uncheck them.
+- A fresh installation also selects every Polar Mini Breathing and Breathing
+  dynamics metric plus All-in-one. Saved selections continue to take precedence
+  on later launches and upgrades.
+- Other outputs: Polar metrics including Excite-O-Meter and four continuous
   accelerometer-derived respiration (ADR) candidates: signed PCA projection,
   Flowborne-style moving-average difference, signed Phan-window difference,
   and the original rectified Phan score. Readiness/quality companions are added
@@ -13,8 +16,8 @@ compact transparent-shell window with its own install, settings, and process.
   See [`docs/adr-waveforms.md`](../../docs/adr-waveforms.md).
 - Checking a realtime metric saves it as a default for future launches and
   applies it to its individual LSL outlet. **Reset metrics** clears optional
-  metric selections while keeping raw ECG, ACC, heart rate, RR, and the
-  All-in-one choice. **Add more metrics** opens the full Polar Mini selection
+  metric selections while keeping the operator's direct-output and All-in-one
+  choices. **Add more metrics** opens the full Polar Mini selection
   catalog over the current window.
 - Resize the applet from any edge or corner. Control groups, spacing, and type
   expand or compress with both dimensions without a main-window scrollbar.
@@ -22,9 +25,8 @@ compact transparent-shell window with its own install, settings, and process.
   text in a dialog.
 - Optional **All-in-one recording stream** adds one sparse fixed-channel LSL
   outlet alongside the individual outlets. Its checkbox is the sole control for
-  that extra stream. It includes raw ECG, ACC, heart
-  rate, RR, signal events, and every available Polar Mini derived metric,
-  including ADR, independently of the individual metric choices.
+  that extra stream. It includes raw ECG, ACC, heart rate, RR, signal events,
+  and the derived metrics selected for individual outlets.
   Missing fields in each row are NaN. Individual outlets retain their own
   timing for feedback; the combined outlet preserves acquisition order and
   clamps overlapping timestamps to the next microsecond.
@@ -43,9 +45,12 @@ compact transparent-shell window with its own install, settings, and process.
   `—` means disconnected or unavailable; mock windows hide the indicator.
 - Mocking: **Mock** launches an independent, automatically streaming applet.
   Its 130 Hz ECG replays a bundled, 60-minute NeuroKit2 ECGSYN recording and
-  loops after one hour. ACC (200 Hz), HR/RR, and derived metrics remain
-  synthetic. All mock outputs use real LSL publication; its PID-suffixed
-  stream name and settings are session-only. Regenerate the ECG fixture with
+  loops after one hour. Its 200 Hz raw ACC approximates a 4-second inhale,
+  4-second hold, 4-second exhale, and 4-second hold cycle; HR/RR and derived
+  metrics remain synthetic. Mock mode starts with the same breathing and
+  All-in-one outlet selection as a fresh installation. All mock outputs use
+  real LSL publication; its PID-suffixed stream name and settings are
+  session-only. Regenerate the ECG fixture with
   `python scripts/generate_polar_mini_mock_ecg.py` and NeuroKit2 0.2.13.
 - Without a connected H10, the regular app does not publish invented sensor
   measurements; use the clearly labeled Mock window for synthetic data.

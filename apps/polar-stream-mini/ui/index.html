@@ -63,11 +63,11 @@
             </div>
 
             <div id="signal-list" class="signal-list" role="group" aria-label="Polar LSL streams">
-              <label class="signal-option" title="Raw ECG is always included when available"><input type="checkbox" value="raw_ecg" checked disabled /><span>rawECG</span></label>
-              <label class="signal-option" title="Raw acceleration is always included when available"><input type="checkbox" value="raw_acc" checked disabled /><span>rawACC</span></label>
-              <label class="signal-option" title="Heart rate is always included when available"><input type="checkbox" value="heart_rate" checked disabled /><span>heartRate</span></label>
-              <label class="signal-option" title="RR intervals are always included when available"><input type="checkbox" value="rr_interval" checked disabled /><span>rrInterval</span></label>
-              <label class="signal-option" title="Add one extra LSL stream with all Polar data and metrics; individual streams stay on"><input id="all-in-one" type="checkbox" value="allInOne" aria-description="Adds one extra combined LSL stream; individual streams stay on" /><span>All-in-one</span></label>
+              <label class="signal-option" title="Publish raw ECG as an individual LSL stream"><input type="checkbox" value="raw_ecg" checked /><span>rawECG</span></label>
+              <label class="signal-option" title="Publish raw acceleration as an individual LSL stream"><input type="checkbox" value="raw_acc" checked /><span>rawACC</span></label>
+              <label class="signal-option" title="Publish device heart rate as an individual LSL stream"><input type="checkbox" value="heart_rate" checked /><span>heartRate</span></label>
+              <label class="signal-option" title="Publish device RR intervals as an individual LSL stream"><input type="checkbox" value="rr_interval" checked /><span>rrInterval</span></label>
+              <label class="signal-option all-in-one-option" title="Add an independent combined stream containing raw Polar data and selected metrics"><input id="all-in-one" type="checkbox" value="allInOne" aria-description="Adds an independent stream with raw data and selected metrics" /><img src="icons/all-in-one.svg" alt="" aria-hidden="true" /><span>All-in-one</span></label>
             </div>
 
             <dl class="readout" data-tauri-drag-region>

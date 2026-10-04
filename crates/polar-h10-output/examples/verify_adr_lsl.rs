@@ -35,23 +35,23 @@ async fn main() -> Result<(), String> {
             }
         }
     }
+    let selected_ids = if mode == "both" {
+        std::iter::once("raw_ecg")
+            .chain(std::iter::once("raw_acc"))
+            .chain(std::iter::once(ADR_WAVEFORM_IDS[0]))
+            .chain(adr_companion_ids(ADR_WAVEFORM_IDS[0]).iter().copied())
+            .map(str::to_string)
+            .collect::<Vec<_>>()
+    } else {
+        ids.clone()
+    };
     let router = OutputRouter::with_bundled_lsl(Some(library.clone()));
     if mode != "single" {
-        let individual_ids = if mode == "both" {
-            std::iter::once("raw_ecg")
-                .chain(std::iter::once("raw_acc"))
-                .chain(std::iter::once(ADR_WAVEFORM_IDS[0]))
-                .chain(adr_companion_ids(ADR_WAVEFORM_IDS[0]).iter().copied())
-                .map(str::to_string)
-                .collect()
-        } else {
-            ids.clone()
-        };
         router
             .configure(OutputConfig {
                 stream_name: base.into(),
                 lsl_enabled: true,
-                outputs: individual_ids,
+                outputs: selected_ids.clone(),
                 ..OutputConfig::default()
             })
             .await?;
@@ -61,12 +61,13 @@ async fn main() -> Result<(), String> {
         "both" => Some(MiniCombinedOutput::polar_alongside_individuals(
             Some(library),
             base,
-            &ids,
+            &selected_ids,
         )?),
         _ => None,
     };
-    let mut engine =
-        MetricEngine::with_selection(MetricSelection::from_ids(ids.iter().map(String::as_str)));
+    let mut engine = MetricEngine::with_selection(MetricSelection::from_ids(
+        selected_ids.iter().map(String::as_str),
+    ));
     println!("ADR_LSL_READY {base}");
     thread::sleep(Duration::from_secs(2));
     let origin = Instant::now();

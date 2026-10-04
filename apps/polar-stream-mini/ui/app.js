@@ -195,7 +195,19 @@
 
   function renderSignals() {
     const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
+    for (const checkbox of elements["signal-list"].querySelectorAll('input[value]:not([value="allInOne"])')) {
+      checkbox.checked = selected.has(checkbox.value);
+    }
     elements["all-in-one"].checked = selected.has("allInOne");
+    elements["signal-list"].querySelectorAll(".selected-signal").forEach((node) => node.remove());
+    for (const metric of state.metrics) {
+      if (metric.direct || !selected.has(metric.id)) continue;
+      const signal = document.createElement("span");
+      signal.className = "signal-option selected-signal";
+      signal.textContent = metric.label;
+      signal.title = `${metric.label} (${metric.id})`;
+      elements["signal-list"].append(signal);
+    }
     const extraCount = state.metrics.filter((metric) => !metric.direct && selected.has(metric.id)).length;
     elements["metrics-button"].textContent = extraCount
       ? `+ Add more metrics (${extraCount})`
@@ -203,6 +215,39 @@
     elements["metrics-button"].title = extraCount
       ? `${extraCount} optional metrics selected`
       : "Add optional Polar metrics";
+    scheduleSignalFit();
+  }
+
+  let fitFrame = 0;
+  function scheduleSignalFit() {
+    if (!isNative || fitFrame) return;
+    fitFrame = requestAnimationFrame(async () => {
+      fitFrame = 0;
+      const surface = elements["mini-node"].querySelector(".node-surface");
+      const body = surface.querySelector(".node-body");
+      const style = getComputedStyle(body);
+      const visible = [...body.children].filter((child) => !child.hidden);
+      const bodyHeight = visible.reduce((sum, child) => sum + Math.max(child.offsetHeight, child.scrollHeight), 0)
+        + Math.max(0, visible.length - 1) * parseFloat(style.rowGap || style.gap || "0")
+        + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+      const shell = getComputedStyle(document.querySelector(".mini-shell"));
+      const required = Math.max(320, Math.ceil(
+        surface.querySelector(":scope > header").offsetHeight + bodyHeight
+        + surface.querySelector(":scope > footer").offsetHeight
+        + parseFloat(shell.paddingTop) + parseFloat(shell.paddingBottom) + 2,
+      ));
+      const available = Number.isFinite(screen.availHeight) && screen.availHeight > 0
+        ? Math.max(320, screen.availHeight - 24)
+        : required;
+      const target = Math.min(required, available);
+      try {
+        if (window.innerHeight < target) {
+          await nativeWindow.setSize(new window.__TAURI__.dpi.LogicalSize(window.innerWidth, target));
+        }
+      } catch (error) {
+        reportError(error);
+      }
+    });
   }
 
   function renderConnection(session = null) {
@@ -220,6 +265,9 @@
     elements["device-select"].disabled = state.busy || state.connected || !isNative;
     elements["metrics-button"].disabled = state.busy || !isNative;
     elements["all-in-one"].disabled = state.busy || !isNative;
+    for (const checkbox of elements["signal-list"].querySelectorAll('input[value]:not([value="allInOne"])')) {
+      checkbox.disabled = state.busy || !isNative;
+    }
     elements["device-status"].textContent = state.connected
       ? session?.deviceName || state.preferences.lastDevice?.name || "Connected"
       : state.mockMode
@@ -356,7 +404,6 @@
     for (const waveform of selected) {
       for (const companion of adrCompanions[waveform] || []) selected.add(companion);
     }
-    for (const direct of directPolarOutputs) selected.add(direct);
     state.preferences.polarOutputs = [...selected];
   }
 
@@ -706,6 +753,13 @@
       renderSignals();
       savePreferences(false);
     });
+    for (const checkbox of elements["signal-list"].querySelectorAll('input[value]:not([value="allInOne"])')) {
+      checkbox.addEventListener("change", () => {
+        updateMetricSelection(checkbox.value, checkbox.checked);
+        renderSignals();
+        savePreferences(false);
+      });
+    }
     elements["scan-button"].addEventListener("click", scanDevices);
     elements["mock-button"].addEventListener("click", openMockNode);
     elements["connect-button"].addEventListener("click", connectSelected);
@@ -713,7 +767,7 @@
     elements["metrics-button"].addEventListener("click", openMetricsDialog);
     elements["metrics-guide"].addEventListener("click", openMetricGuide);
     elements["reset-metrics"].addEventListener("click", () => {
-      state.preferences.polarOutputs = [...directPolarOutputs, ...(state.preferences.polarOutputs.includes("allInOne") ? ["allInOne"] : [])];
+      state.preferences.polarOutputs = state.preferences.polarOutputs.filter((id) => directPolarOutputs.includes(id) || id === "allInOne");
       renderMetricDialog();
       renderSignals();
       savePreferences(false);

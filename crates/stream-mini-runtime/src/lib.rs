@@ -174,7 +174,11 @@ impl MiniPreferencesSnapshot {
             stream_name: kind.default_stream_name().into(),
             output_mode: MiniOutputMode::SeparateStreams,
             auto_connect: true,
-            polar_outputs: normalize_polar_outputs(None),
+            polar_outputs: if kind == MiniAppKind::Polar {
+                default_polar_outputs()
+            } else {
+                normalize_polar_outputs(None)
+            },
             vernier_outputs: default_vernier_outputs(),
             last_device: None,
             recent_devices: Vec::new(),
@@ -203,7 +207,10 @@ impl MiniPreferencesSnapshot {
         {
             vernier_outputs.push("allInOne".into());
         }
-        let mut polar_outputs = normalize_polar_outputs(file.polar_outputs);
+        let mut polar_outputs = normalize_polar_outputs(
+            file.polar_outputs
+                .or_else(|| (kind == MiniAppKind::Polar).then(default_polar_outputs)),
+        );
         if kind == MiniAppKind::Polar
             && file.output_mode == Some(MiniOutputMode::SingleStream)
             && !polar_outputs.iter().any(|id| id == "allInOne")
@@ -252,6 +259,10 @@ impl PreferencesStore {
 
     fn mock_from(path: &Path, kind: MiniAppKind) -> Self {
         let mut snapshot = Self::read_snapshot(path, kind);
+        if kind == MiniAppKind::Polar {
+            snapshot.output_mode = MiniOutputMode::SeparateStreams;
+            snapshot.polar_outputs = default_polar_outputs();
+        }
         let candidate = format!("{}-Mock-{}", snapshot.stream_name, process::id());
         snapshot.stream_name = normalize_stream_base(&candidate)
             .unwrap_or_else(|_| format!("{}-Mock-{}", kind.default_stream_name(), process::id()));
@@ -724,12 +735,8 @@ struct PolarMiniSettings {
 
 impl PolarMiniSettings {
     fn from_outputs(outputs: &[String]) -> Self {
-        let mut selected = outputs.to_vec();
-        if outputs.iter().any(|id| id == "allInOne") {
-            selected.extend(polar_combined_outputs());
-        }
         Self {
-            selection: MetricSelection::from_ids(selected.iter().map(String::as_str)),
+            selection: MetricSelection::from_ids(outputs.iter().map(String::as_str)),
         }
     }
 }
@@ -1060,7 +1067,13 @@ async fn save_preferences_inner(
             .map_err(|message| CommandError::new("OUTPUT_RECONFIGURE_FAILED", message, false))?;
     }
     let health = replacement.health();
-    if output.borrow().health().starts_with("Publishing ") && !health.starts_with("Publishing ") {
+    let intentionally_off = state.kind == MiniAppKind::Vernier
+        && snapshot.vernier_outputs.is_empty()
+        && health == "Ready";
+    if output.borrow().health().starts_with("Publishing ")
+        && !health.starts_with("Publishing ")
+        && !intentionally_off
+    {
         return Err(CommandError::new(
             "OUTPUT_RECONFIGURE_FAILED",
             format!("The requested LSL outlets could not be opened: {health}"),
@@ -1533,7 +1546,7 @@ async fn build_output(
                         Some(Arc::new(MiniCombinedOutput::polar_alongside_individuals(
                             bundled_lsl_for_status,
                             &snapshot.stream_name,
-                            &polar_combined_outputs(),
+                            &snapshot.polar_outputs,
                         )?))
                     }
                     MiniAppKind::Vernier
@@ -1791,6 +1804,8 @@ async fn run_polar_mock(
     let mut ecg_index = 0_u64;
     let mut acc_index = 0_u64;
     let mut tick = 0_u64;
+    // The first two ACC samples need a full 5 ms backfill at tick zero.
+    let source_start_ns = monotonic_now_ns().saturating_add(1_000_000_000);
 
     loop {
         interval.tick().await;
@@ -1799,7 +1814,9 @@ async fn run_polar_mock(
             metrics_engine.apply_selection(settings_rx.borrow_and_update().selection);
         }
 
-        let host_receive_timestamp_ns = monotonic_now_ns().max(1);
+        // Keep the metric engine's source timeline independent of scheduler jitter.
+        let host_receive_timestamp_ns =
+            source_start_ns.saturating_add(tick.saturating_mul(POLAR_MOCK_TICK.as_nanos() as u64));
         let ecg_samples_this_tick = (tick + 1) * 13 / 10 - tick * 13 / 10;
         let ecg = (0..ecg_samples_this_tick)
             .map(|offset| {
@@ -1973,11 +1990,21 @@ fn load_mock_ecg(bundled_lsl: Option<&Path>) -> Result<Vec<i16>, &'static str> {
 }
 
 fn mock_acc_sample(index: u64) -> AccSample {
-    let phase = index as f64 * std::f64::consts::TAU * 0.22 / 200.0;
+    // Four seconds each: inhale, hold, exhale, hold at 200 Hz.
+    let phase = (index % 3_200) as f64 / 800.0;
+    let breath = if phase < 1.0 {
+        2.0 * phase - 1.0
+    } else if phase < 2.0 {
+        1.0
+    } else if phase < 3.0 {
+        5.0 - 2.0 * phase
+    } else {
+        -1.0
+    };
     AccSample {
-        x_mg: (26.0 * phase.sin()).round() as i16,
-        y_mg: (18.0 * (phase + 0.8).sin()).round() as i16,
-        z_mg: (1_000.0 + 42.0 * phase.sin()).round() as i16,
+        x_mg: (26.0 * breath).round() as i16,
+        y_mg: (18.0 * breath).round() as i16,
+        z_mg: (1_000.0 + 42.0 * breath).round() as i16,
     }
 }
 
@@ -2627,18 +2654,8 @@ fn polar_metric_options() -> Vec<MiniMetricOption> {
         .collect()
 }
 
-fn polar_combined_outputs() -> Vec<String> {
-    polar_metric_options()
-        .iter()
-        .map(|metric| metric.id.to_string())
-        .collect()
-}
-
 fn normalize_polar_outputs(input: Option<Vec<String>>) -> Vec<String> {
-    let mut outputs = POLAR_DIRECT_OUTPUTS
-        .iter()
-        .map(|id| (*id).to_string())
-        .collect::<Vec<_>>();
+    let mut outputs = Vec::new();
     for id in input.unwrap_or_default() {
         if outputs.iter().any(|known| known == &id) || id == VERNIER_FORCE_OUTPUT {
             continue;
@@ -2653,7 +2670,8 @@ fn normalize_polar_outputs(input: Option<Vec<String>>) -> Vec<String> {
         if matches!(metric.category, "Pedometer" | "Vernier") {
             continue;
         }
-        if metric_selection_tier(metric.id) == MetricSelectionTier::Release
+        if POLAR_DIRECT_OUTPUTS.contains(&metric.id)
+            || metric_selection_tier(metric.id) == MetricSelectionTier::Release
             || POLAR_MINI_ONLY_IDS.contains(&metric.id)
             || matches!(metric.category, "Breathing" | "Breathing dynamics")
         {
@@ -2670,11 +2688,24 @@ fn normalize_polar_outputs(input: Option<Vec<String>>) -> Vec<String> {
     outputs
 }
 
+fn default_polar_outputs() -> Vec<String> {
+    normalize_polar_outputs(Some(
+        POLAR_DIRECT_OUTPUTS
+            .iter()
+            .map(|id| (*id).to_string())
+            .chain(
+                polar_metric_options()
+                    .into_iter()
+                    .filter(|metric| matches!(metric.category, "Breathing" | "Breathing dynamics"))
+                    .map(|metric| metric.id.to_string()),
+            )
+            .chain(std::iter::once("allInOne".into()))
+            .collect(),
+    ))
+}
+
 fn default_vernier_outputs() -> Vec<String> {
-    ["rawVernier", "vernierBreathing"]
-        .iter()
-        .map(|id| (*id).into())
-        .collect()
+    VERNIER_OUTPUT_IDS.iter().map(|id| (*id).into()).collect()
 }
 
 fn validate_vernier_outputs(input: Vec<String>) -> Result<Vec<String>, String> {
@@ -2691,7 +2722,7 @@ fn validate_vernier_outputs(input: Vec<String>) -> Result<Vec<String>, String> {
     }
     Ok(VERNIER_OUTPUT_IDS
         .iter()
-        .filter(|id| **id == "rawVernier" || input.iter().any(|selected| selected == *id))
+        .filter(|id| input.iter().any(|selected| selected == *id))
         .map(|id| (*id).into())
         .collect())
 }
@@ -2803,10 +2834,7 @@ mod tests {
                 .iter()
                 .any(|metric| metric.id == "vernier_respiration_rate")
         );
-        assert_eq!(
-            normalize_polar_outputs(Some(vec!["vernier_steps".into()])).len(),
-            POLAR_DIRECT_OUTPUTS.len()
-        );
+        assert!(normalize_polar_outputs(Some(vec!["vernier_steps".into()])).is_empty());
         let ids = METRIC_CATALOG
             .iter()
             .filter(|metric| matches!(metric.category, "Breathing" | "Breathing dynamics"))
@@ -2824,7 +2852,43 @@ mod tests {
     }
 
     #[test]
-    fn polar_all_in_one_computes_metrics_without_individual_metric_outlets() {
+    fn fresh_polar_preferences_select_breathing_and_combined_outputs() {
+        let defaults = MiniPreferencesSnapshot::default_for(MiniAppKind::Polar);
+        assert_eq!(defaults.output_mode, MiniOutputMode::SeparateStreams);
+        assert!(defaults.polar_outputs.iter().any(|id| id == "allInOne"));
+        for id in POLAR_DIRECT_OUTPUTS {
+            assert!(defaults.polar_outputs.iter().any(|selected| selected == id));
+        }
+        for metric in polar_metric_options()
+            .into_iter()
+            .filter(|metric| matches!(metric.category, "Breathing" | "Breathing dynamics"))
+        {
+            assert!(
+                defaults.polar_outputs.iter().any(|id| id == metric.id),
+                "{}",
+                metric.id
+            );
+        }
+        let first_launch: MiniPreferencesFile = serde_json::from_str("{}").unwrap();
+        assert_eq!(
+            MiniPreferencesSnapshot::from_file(MiniAppKind::Polar, first_launch).polar_outputs,
+            defaults.polar_outputs
+        );
+        let saved: MiniPreferencesFile = serde_json::from_str(
+            r#"{"polarOutputs":["raw_ecg","raw_acc","heart_rate","rr_interval"]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            MiniPreferencesSnapshot::from_file(MiniAppKind::Polar, saved).polar_outputs,
+            POLAR_DIRECT_OUTPUTS
+                .iter()
+                .map(|id| (*id).to_string())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn polar_all_in_one_uses_only_selected_metric_channels() {
         let selected = normalize_polar_outputs(Some(vec!["allInOne".into()]));
         let snapshot = MiniPreferencesSnapshot {
             polar_outputs: selected.clone(),
@@ -2834,7 +2898,7 @@ mod tests {
             mini_output_config(MiniAppKind::Polar, &snapshot)
                 .outputs
                 .len(),
-            4
+            0
         );
         let mut engine =
             MetricEngine::with_selection(PolarMiniSettings::from_outputs(&selected).selection);
@@ -2843,7 +2907,7 @@ mod tests {
             y_mg: 0,
             z_mg: 0,
         }]);
-        assert!(values.iter().any(|value| value.id == "acc_magnitude"));
+        assert!(!values.iter().any(|value| value.id == "acc_magnitude"));
     }
 
     #[cfg(all(target_os = "windows", feature = "liblsl-backend"))]
@@ -3031,6 +3095,7 @@ mod tests {
             let session = start_mock_with_snapshot(&state, initial.clone())
                 .await
                 .unwrap();
+            let initial_lsl = session.lsl.clone();
             assert!(session.lsl.starts_with("Publishing "), "{}", session.lsl);
             assert_ne!(session.lsl, "Publishing 1 stream(s)");
             if kind == MiniAppKind::Polar {
@@ -3058,7 +3123,7 @@ mod tests {
                 assert!(result.applied && !result.reconnect_required);
                 assert_eq!(
                     active_snapshot(&state).await.unwrap().lsl,
-                    "Publishing 6 stream(s)"
+                    "Publishing 2 stream(s)"
                 );
                 assert!(mock_samples(&state).await > first_samples);
             }
@@ -3072,7 +3137,14 @@ mod tests {
             };
             let mut combined_input =
                 input(MiniOutputMode::SingleStream, initial.stream_name.clone());
-            if kind == MiniAppKind::Vernier {
+            if kind == MiniAppKind::Vernier
+                && !combined_input
+                    .vernier_outputs
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .any(|id| id == "allInOne")
+            {
                 combined_input
                     .vernier_outputs
                     .as_mut()
@@ -3082,7 +3154,10 @@ mod tests {
             let combined = save_preferences_inner(&state, combined_input)
                 .await
                 .unwrap();
-            assert!(combined.applied && !combined.reconnect_required);
+            assert!(!combined.reconnect_required);
+            if kind == MiniAppKind::Polar {
+                assert!(combined.applied);
+            }
             let session = active_snapshot(&state).await.unwrap();
             assert_eq!(
                 session.output_mode,
@@ -3103,14 +3178,11 @@ mod tests {
             };
             assert_eq!(
                 session.lsl,
-                format!(
-                    "Publishing {} stream(s)",
-                    if kind == MiniAppKind::Vernier {
-                        3
-                    } else {
-                        1 + dedicated_adr_count
-                    }
-                )
+                if kind == MiniAppKind::Vernier {
+                    initial_lsl
+                } else {
+                    format!("Publishing {} stream(s)", 1 + dedicated_adr_count)
+                }
             );
             let single_samples = mock_samples(&state).await;
             assert!(single_samples > first_samples);
@@ -3139,7 +3211,7 @@ mod tests {
                 assert!(result.applied && !result.reconnect_required);
                 let active = active_snapshot(&state).await.unwrap();
                 assert!(active.connected);
-                assert_eq!(active.lsl, "Publishing 2 stream(s)");
+                assert_eq!(active.lsl, "Publishing 1 stream(s)");
                 assert!(mock_samples(&state).await > single_samples);
                 let marker_only = MiniPreferencesInput {
                     vernier_outputs: Some(vec!["signalStatus".into()]),
@@ -3149,7 +3221,7 @@ mod tests {
                 assert!(result.applied && !result.reconnect_required);
                 assert_eq!(
                     active_snapshot(&state).await.unwrap().lsl,
-                    "Publishing 2 stream(s)"
+                    "Publishing 1 stream(s)"
                 );
                 let all_in_one_only = MiniPreferencesInput {
                     vernier_outputs: Some(vec!["allInOne".into()]),
@@ -3161,9 +3233,16 @@ mod tests {
                 assert!(result.applied && !result.reconnect_required);
                 assert_eq!(
                     active_snapshot(&state).await.unwrap().lsl,
-                    "Publishing 2 stream(s)"
+                    "Publishing 1 stream(s)"
                 );
                 assert!(mock_samples(&state).await > single_samples);
+                let no_outlets = MiniPreferencesInput {
+                    vernier_outputs: Some(Vec::new()),
+                    ..input(MiniOutputMode::SeparateStreams, initial.stream_name.clone())
+                };
+                let result = save_preferences_inner(&state, no_outlets).await.unwrap();
+                assert!(result.applied && !result.reconnect_required);
+                assert_eq!(active_snapshot(&state).await.unwrap().lsl, "Ready");
             }
             let invalid = input(MiniOutputMode::SingleStream, String::new());
             assert!(save_preferences_inner(&state, invalid).await.is_err());
@@ -3179,25 +3258,22 @@ mod tests {
     fn vernier_output_selection_requires_distinct_known_ids() {
         assert_eq!(
             validate_vernier_outputs(vec!["rawForce".into()]).unwrap(),
-            vec!["rawVernier", "rawForce"]
+            vec!["rawForce"]
         );
         assert_eq!(
             validate_vernier_outputs(Vec::new()).unwrap(),
-            vec!["rawVernier"]
+            Vec::<String>::new()
         );
         assert!(validate_vernier_outputs(vec!["rawForce".into(), "rawForce".into()]).is_err());
         assert!(validate_vernier_outputs(vec!["rawAcceleration".into()]).is_err());
-        assert_eq!(
-            default_vernier_outputs(),
-            vec!["rawVernier", "vernierBreathing"]
-        );
+        assert_eq!(default_vernier_outputs(), VERNIER_OUTPUT_IDS.to_vec());
         assert_eq!(
             validate_vernier_outputs(vec!["allInOne".into()]).unwrap(),
-            vec!["rawVernier", "allInOne"]
+            vec!["allInOne"]
         );
         assert_eq!(
             validate_vernier_outputs(vec!["stepRate".into(), "steps".into()]).unwrap(),
-            vec!["rawVernier", "steps", "stepRate"]
+            vec!["steps", "stepRate"]
         );
     }
 
@@ -3253,7 +3329,7 @@ mod tests {
         let bundled_lsl = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../apps/polar-stream-mini/resources/lsl.dll");
         let ecg = load_mock_ecg(Some(&bundled_lsl)).unwrap();
-        let acc = (0..200).map(mock_acc_sample).collect::<Vec<_>>();
+        let acc = (0..3_200).map(mock_acc_sample).collect::<Vec<_>>();
         let force = (0..20).map(mock_force_sample).collect::<Vec<_>>();
 
         assert_eq!(ecg.len(), MOCK_ECG_SAMPLE_COUNT);
@@ -3266,5 +3342,22 @@ mod tests {
         assert!(force.iter().all(|value| (9.0..=15.0).contains(value)));
         assert!(ecg.windows(2).any(|pair| pair[0] != pair[1]));
         assert!(force.windows(2).any(|pair| pair[0] != pair[1]));
+        assert_eq!(acc[0].z_mg, 958);
+        assert_eq!(acc[800].z_mg, 1_042);
+        assert_eq!(acc[1_599].z_mg, 1_042);
+        assert_eq!(acc[2_400].z_mg, 958);
+        assert_eq!(acc[3_199].z_mg, 958);
+        assert_eq!(mock_acc_sample(3_200).z_mg, acc[0].z_mg);
+    }
+
+    #[test]
+    fn polar_mock_selects_all_breathing_outputs_and_combined_stream() {
+        let snapshot = PreferencesStore::mock_from(
+            Path::new("missing-polar-mock-preferences.json"),
+            MiniAppKind::Polar,
+        )
+        .snapshot();
+        assert_eq!(snapshot.polar_outputs, default_polar_outputs());
+        assert_eq!(snapshot.output_mode, MiniOutputMode::SeparateStreams);
     }
 }

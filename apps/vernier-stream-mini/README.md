@@ -6,9 +6,9 @@ Stream node card is the visible program outline, not the main controller
 workspace.
 
 Eight outlet checkboxes sit directly inside the mini window. The first,
-**Respyra raw**, is checked and locked: Respyra reads Force in newtons from
-this raw device-data outlet. Click any other checkbox or its label to select
-an additional stream; changes save instantly. **All-in-one** is last and has
+**Respyra raw**, starts checked: Respyra reads Force in newtons from
+this raw device-data outlet. All eight choices start checked and may be changed;
+changes save instantly. **All-in-one** is last and has
 a small merging-stream icon.
 
 Resize the applet from any edge or corner. Control groups, spacing, and type
@@ -16,10 +16,10 @@ expand or compress with both dimensions without a main-window scrollbar.
 Click an overlong status value, or focus it and press Enter, to read its full
 text in a dialog.
 
-- Default outlets: `rawVernier` (every advertised numeric belt channel plus
-  recording diagnostics) and `vernierBreathing` (a relative 0–1 belt-force
-  waveform). The raw outlet is mandatory. Individual force, signal events,
-  steps, step rate, and breaths/min outlets are optional. Choices persist and
+- Default outlets: all eight, including `rawVernier` (every advertised numeric
+  belt channel plus recording diagnostics), `rawForce`, `vernierBreathing`,
+  `signalStatus`, `steps`, `stepRate`, `respirationRate`, and `allInOne`.
+  Choices persist and
   replace active outlets without restarting Bluetooth.
 - Optional `steps`, `stepRate`, and `respirationRate` checkboxes forward the
   belt's cumulative step count, cadence (steps/min), and respiration estimate

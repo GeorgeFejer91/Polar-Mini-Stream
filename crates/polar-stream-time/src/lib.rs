@@ -10,6 +10,7 @@ const MAX_OBSERVATIONS: usize = 128;
 const MIN_TRACKING_OBSERVATIONS: usize = 8;
 const MIN_TRACKING_SPAN_NS: u64 = 2_000_000_000;
 const MAX_CLOCK_DRIFT: f64 = 500.0 / 1_000_000.0;
+const MAX_MAPPING_CORRECTION_NS: i128 = 50_000;
 const REGRESSION_RESET_NS: u64 = 1_000_000_000;
 
 /// Nanoseconds since the first timing observation in this process.
@@ -132,6 +133,7 @@ impl SourceClockMapper {
         let Some(origin) = self.source_origin_ns else {
             return;
         };
+        let previous_mapping = self.map(source_time_ns);
         self.maximum_source_ns = source_time_ns;
         if self.observations.len() == MAX_OBSERVATIONS {
             self.observations.pop_front();
@@ -141,6 +143,13 @@ impl SourceClockMapper {
             target_delta_seconds: signed_delta_seconds(target_receive_ns, self.target_origin_ns),
         });
         self.refit();
+        // A late first notification can make the warmup offset differ sharply
+        // from the fitted low-delay offset. Converge without a timestamp step.
+        let correction = i128::from(self.map(source_time_ns)) - i128::from(previous_mapping);
+        self.offset_seconds += (correction
+            .clamp(-MAX_MAPPING_CORRECTION_NS, MAX_MAPPING_CORRECTION_NS)
+            - correction) as f64
+            / 1_000_000_000.0;
     }
 
     fn refit(&mut self) {
@@ -272,6 +281,30 @@ mod tests {
         assert!(mapping.uncertainty_ns >= 7_000_000);
         let expected = target_origin + 40 * 100_010_000 + 4_000_000;
         assert!(mapping.mapped_time_ns.abs_diff(expected) < 2_000_000);
+    }
+
+    #[test]
+    fn late_first_observation_does_not_step_recorded_timestamps() {
+        let mut mapper = SourceClockMapper::default();
+        let source_origin = 10_000_000_000_u64;
+        let target_origin = 2_000_000_000_u64;
+        let mut previous = mapper
+            .observe_and_map(source_origin, target_origin + 70_000_000)
+            .mapped_time_ns;
+        for index in 1..=2_000_u64 {
+            let current = mapper
+                .observe_and_map(
+                    source_origin + index * 10_000_000,
+                    target_origin + index * 10_000_000,
+                )
+                .mapped_time_ns;
+            assert!(
+                (9_900_000..=10_100_000).contains(&(current - previous)),
+                "unexpected timestamp step at observation {index}"
+            );
+            previous = current;
+        }
+        assert!(previous.abs_diff(target_origin + 20_000_000_000) < 2_000_000);
     }
 
     #[test]

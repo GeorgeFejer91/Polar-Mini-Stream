@@ -6,8 +6,8 @@
   const isNative = Boolean(core?.invoke && core?.Channel);
   const directPolarOutputs = Object.freeze(["raw_ecg", "raw_acc", "heart_rate", "rr_interval"]);
   const vernierOutputs = Object.freeze([
-    { id: "rawVernier", label: "Respyra raw", detail: "Required VernierRaw stream with Force in newtons and every device channel; Respyra reads Force from this outlet." },
-    { id: "rawForce", label: "Belt force (N)", detail: "Unfiltered belt tension in newtons; also present in the always-on raw data stream." },
+    { id: "rawVernier", label: "Respyra raw", detail: "VernierRaw stream with Force in newtons and every device channel; Respyra can use Force from this outlet." },
+    { id: "rawForce", label: "Belt force (N)", detail: "Unfiltered belt tension in newtons; also present in Raw data and All-in-one when selected." },
     { id: "vernierBreathing", label: "Breath wave (0–1)", detail: "App-normalized belt-force waveform; not lung volume or breaths per minute." },
     { id: "signalStatus", label: "Signal events", detail: "Markers for lost and restored Bluetooth signal." },
     { id: "steps", label: "Steps", detail: "Belt pedometer's cumulative step count, as reported by the device." },
@@ -15,7 +15,7 @@
     { id: "respirationRate", label: "Breaths/min", detail: "Belt's estimated breaths per minute over 30 seconds, updated every 10 seconds." },
     { id: "allInOne", label: "All-in-one", detail: "Separate sparse stream containing every device channel, diagnostics, normalized breath wave, and signal events; independent of the individual choices." },
   ]);
-  const defaultVernierOutputIds = Object.freeze(["rawVernier", "vernierBreathing"]);
+  const defaultVernierOutputIds = Object.freeze(vernierOutputs.map((output) => output.id));
   const state = {
     kind: "vernier",
     productName: "Vernier Stream Mini",
@@ -229,7 +229,7 @@
     elements["device-select"].disabled = state.busy || state.connected || !isNative;
     elements["bluetooth-toggle"].disabled = state.busy || state.radioBusy || state.connected || !["on", "off"].includes(state.radioStatus);
     for (const checkbox of elements["metric-options"].querySelectorAll("input")) {
-      checkbox.disabled = checkbox.value === "rawVernier" || state.busy || !isNative;
+      checkbox.disabled = state.busy || !isNative;
     }
     elements["device-status"].textContent = state.connected
       ? session?.deviceName || state.preferences.lastDevice?.name || "Connected"
@@ -288,14 +288,13 @@
       checkbox.setAttribute("aria-description", `${output.id}: ${output.detail}`);
       checkbox.value = output.id;
       checkbox.checked = selected.has(output.id);
-      checkbox.disabled = output.id === "rawVernier";
-      if (output.id !== "rawVernier") checkbox.addEventListener("change", () => {
+      checkbox.addEventListener("change", () => {
         const current = new Set(state.preferences.vernierOutputs || defaultVernierOutputIds);
         if (checkbox.checked) current.add(output.id);
         else current.delete(output.id);
-        state.preferences.vernierOutputs = ["rawVernier", ...vernierOutputs
-          .filter((candidate) => candidate.id !== "rawVernier" && current.has(candidate.id))
-          .map((candidate) => candidate.id)];
+        state.preferences.vernierOutputs = vernierOutputs
+          .filter((candidate) => current.has(candidate.id))
+          .map((candidate) => candidate.id);
         renderSignals();
         savePreferences(true);
       });

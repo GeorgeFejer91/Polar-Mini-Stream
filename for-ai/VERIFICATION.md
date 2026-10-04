@@ -68,7 +68,7 @@ For ADR processing/output changes, build `verify_adr_lsl` in
 `single`, and `both` modes. Concurrently run `scripts/verify_adr_lsl.py` in the
 matching mode using official pylsl. This observes wall-clock-paced metric
 generation, selected candidate outlets, companion/raw streams, the optional
-combined outlet with unselected metrics alongside individual outlets, metadata,
+combined outlet with selected metrics alongside individual outlets, metadata,
 and source timestamps.
 It does not establish physical respiratory agreement. See
 [`docs/adr-waveforms.md`](../docs/adr-waveforms.md) for commands and contracts.
