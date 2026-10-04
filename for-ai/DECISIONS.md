@@ -166,6 +166,24 @@ to rediscover. Source and tests remain the authority for implementation facts.
 - Supersedes: D-0008's bundle-content policy as a future target; retains its
   independent optional bundle and current implementation history.
 
+## D-0010 — Default to comprehensive publication, allow operator opt-outs
+
+- Date: 2026-10-04
+- Status: Accepted
+- Context: The Respyra suite should capture all available direct sensor and
+  breathing measurements on first launch while letting an experimenter narrow
+  the active LSL outputs. Existing saved preferences remain the user's choice.
+- Decision: Fresh Polar Mini preferences select raw ECG, raw ACC, heart rate,
+  RR intervals, Breathing and Breathing dynamics metrics, and All-in-one.
+  Fresh Vernier Mini preferences select all eight outlets. Every outlet
+  checkbox remains editable. All-in-one is an independent combined outlet,
+  so it must be unchecked separately to remove its raw columns.
+- Consequences: The native output configuration accepts an empty Vernier
+  individual-outlet selection. User preferences survive upgrades and active
+  selection changes reconfigure the publisher without changing BLE acquisition.
+- Supersedes: The mandatory-output policy in D-0007; the rest of D-0007's
+  source timing and ADR readiness contracts remain in force.
+
 ## Record format
 
 For later decisions, add one compact entry with:

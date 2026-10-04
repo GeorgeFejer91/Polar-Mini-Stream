@@ -1,11 +1,11 @@
 # Live accelerometer-derived respiration (ADR)
 
-Polar Stream Mini publishes four optional continuous candidate waveforms from
-the H10's raw X/Y/Z accelerometer. Select them under **+ Realtime metrics → ACC
-derived**. Each selection adds its required readiness/quality companions.
-Raw ECG and ACC remain mandatory outputs whenever samples are available.
-Vernier Mini likewise always includes raw force in **Raw data**
-(`rawVernier`); **Force only** (`rawForce`) is an optional scalar copy.
+Polar Stream Mini publishes four continuous candidate waveforms from the H10's
+raw X/Y/Z accelerometer. Fresh preferences select these and their required
+readiness/quality companions under **+ Realtime metrics → ACC derived**.
+Raw ECG, ACC, heart rate and RR also start checked. Every output can be unchecked.
+Fresh Vernier Mini preferences select its complete **Raw data** row
+(`rawVernier`), **Force only** (`rawForce`) and every other available outlet.
 The applets publish LSL streams. An external recorder owns recording policy.
 
 ## Candidate definitions
@@ -56,6 +56,8 @@ All-in-one outlet includes the selected ADR values as sparse columns alongside
 raw ECG, ACC, heart rate, and RR. Use individual outlets
 for exact per-signal timing. Changing names or selections replaces outlets;
 recorder discovery must follow the selected names and metadata.
+All-in-one is independent of the individual outlet checkboxes: uncheck it too
+if the combined raw columns are not wanted.
 
 | Candidate | Automatically selected companions |
 | --- | --- |

@@ -18,11 +18,11 @@ are retained so installed applets can be upgraded without changing identity.
 
 - [Polar Stream Mini](apps/polar-stream-mini/README.md) publishes raw ECG,
   X/Y/Z acceleration, heart rate, RR intervals, and selected derived metrics.
-  Raw ECG and acceleration are always published when available. Four optional
+  Raw ECG and acceleration start selected on first launch. Four continuous
   [accelerometer-derived respiration (ADR) waveforms](docs/adr-waveforms.md)
   implement PCA, Flowborne-style moving averages, and two Phan-window variants.
-- [Vernier Stream Mini](apps/vernier-stream-mini/README.md) always publishes the
-  belt's numeric channels, including raw force. Optional outputs are a force-only
+- [Vernier Stream Mini](apps/vernier-stream-mini/README.md) starts with the
+  belt's numeric channels, including raw force, selected. Other outputs are a force-only
   copy, app-derived 0–1 breathing waveform, signal-status markers, and individual Steps, Step
   Rate, and Respiration Rate outputs. Every selection change saves automatically
   and becomes the next launch's default. The
@@ -31,7 +31,8 @@ are retained so installed applets can be upgraded without changing identity.
 
 Both apps publish individual LSL outlets and can add one sparse All-in-one
 outlet alongside them. Polar starts with its direct H10 signals, all breathing
-metrics, and All-in-one selected on a fresh profile. Selected ADR waveforms and
+metrics, and All-in-one selected on a fresh profile; Vernier starts with all
+eight outlets selected. Users can uncheck any outlet. Selected ADR waveforms and
 their diagnostics retain dedicated outlets. These apps create streams;
 recording belongs to an external LSL recorder.
 Their **Mock** windows publish clearly labeled synthetic data through the

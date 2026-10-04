@@ -25,7 +25,7 @@
     <section class="intro content-width">
       <p class="eyebrow">Two small apps · one measurement path each</p>
       <h1>Signals in.<br><em>Streams out.</em></h1>
-      <p class="lead">A compact reference for every included Polar metric and the Vernier breathing output. Definitions and formulas below are generated from the Rust catalog used by the apps.</p>
+      <p class="lead">A compact reference for every included Polar metric and the Vernier breathing output. Fresh installs select direct sensor data, breathing outputs, and All-in-one; every outlet remains adjustable. Definitions and formulas below are generated from the Rust catalog used by the apps.</p>
       <div class="intro-actions">
         <a class="button button-primary" href="#catalog">Explore metrics <span aria-hidden="true">↗</span></a>
         <a class="button button-secondary" href="https://github.com/GeorgeFejer91/Polar-Mini-Stream">View source <span aria-hidden="true">↗</span></a>
@@ -58,7 +58,7 @@
           <table>
             <thead><tr><th scope="col">Outlet (UI label)</th><th scope="col">What it contains</th><th scope="col">Origin</th></tr></thead>
             <tbody>
-              <tr><th scope="row">rawVernier (Respyra raw)</th><td>Mandatory: all numeric channels advertised by the connected belt, including raw Force in newtons required by Respyra, plus host receipt, sequence, drop, and decode diagnostics. A missing value in a packet is NaN.</td><td>Device values and app diagnostics.</td></tr>
+              <tr><th scope="row">rawVernier (Respyra raw)</th><td>Selected on first launch and operator-adjustable: all numeric channels advertised by the connected belt, including raw Force in newtons used by Respyra, plus host receipt, sequence, drop, and decode diagnostics. A missing value in a packet is NaN.</td><td>Device values and app diagnostics.</td></tr>
               <tr><th scope="row">rawForce (Belt force (N))</th><td>Optional scalar copy of Force in newtons, without filtering. It reflects belt tension, not pressure or lung volume.</td><td>Device Force value.</td></tr>
               <tr><th scope="row">vernierBreathing (Breath wave (0–1))</th><td>A relative 0-1 force waveform. The app uses a causal 30-second force history, initial observed min/max bounds, then 5th/95th percentile bounds after 20 valid samples, refreshed every five samples.</td><td>App-derived; not respiration rate.</td></tr>
               <tr><th scope="row">signalStatus (Signal events)</th><td>Event code 1 for lost Bluetooth signal and 2 for restored signal. Sensor samples are not fabricated during a gap.</td><td>App-derived continuity marker.</td></tr>

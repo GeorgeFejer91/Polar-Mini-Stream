@@ -195,6 +195,9 @@
 
   function renderSignals() {
     const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
+    for (const checkbox of elements["signal-list"].querySelectorAll('input[value]:not([value="allInOne"])')) {
+      checkbox.checked = selected.has(checkbox.value);
+    }
     elements["all-in-one"].checked = selected.has("allInOne");
     elements["signal-list"].querySelectorAll(".selected-signal").forEach((node) => node.remove());
     for (const metric of state.metrics) {
@@ -262,6 +265,9 @@
     elements["device-select"].disabled = state.busy || state.connected || !isNative;
     elements["metrics-button"].disabled = state.busy || !isNative;
     elements["all-in-one"].disabled = state.busy || !isNative;
+    for (const checkbox of elements["signal-list"].querySelectorAll('input[value]:not([value="allInOne"])')) {
+      checkbox.disabled = state.busy || !isNative;
+    }
     elements["device-status"].textContent = state.connected
       ? session?.deviceName || state.preferences.lastDevice?.name || "Connected"
       : state.mockMode
@@ -398,7 +404,6 @@
     for (const waveform of selected) {
       for (const companion of adrCompanions[waveform] || []) selected.add(companion);
     }
-    for (const direct of directPolarOutputs) selected.add(direct);
     state.preferences.polarOutputs = [...selected];
   }
 
@@ -748,6 +753,13 @@
       renderSignals();
       savePreferences(false);
     });
+    for (const checkbox of elements["signal-list"].querySelectorAll('input[value]:not([value="allInOne"])')) {
+      checkbox.addEventListener("change", () => {
+        updateMetricSelection(checkbox.value, checkbox.checked);
+        renderSignals();
+        savePreferences(false);
+      });
+    }
     elements["scan-button"].addEventListener("click", scanDevices);
     elements["mock-button"].addEventListener("click", openMockNode);
     elements["connect-button"].addEventListener("click", connectSelected);
@@ -755,7 +767,7 @@
     elements["metrics-button"].addEventListener("click", openMetricsDialog);
     elements["metrics-guide"].addEventListener("click", openMetricGuide);
     elements["reset-metrics"].addEventListener("click", () => {
-      state.preferences.polarOutputs = [...directPolarOutputs, ...(state.preferences.polarOutputs.includes("allInOne") ? ["allInOne"] : [])];
+      state.preferences.polarOutputs = state.preferences.polarOutputs.filter((id) => directPolarOutputs.includes(id) || id === "allInOne");
       renderMetricDialog();
       renderSignals();
       savePreferences(false);
