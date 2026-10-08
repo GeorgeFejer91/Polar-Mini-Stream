@@ -5,9 +5,10 @@ compact transparent-shell window with its own install, settings, and process.
 
 - Raw ECG, raw accelerometer, heart rate, and RR intervals start checked.
   The mini window lets the operator uncheck them.
-- A fresh installation also selects every Polar Mini Breathing and Breathing
-  dynamics metric plus All-in-one. Saved selections continue to take precedence
-  on later launches and upgrades.
+- A fresh installation selects **PCA breathing**, **Phan breathing**, and
+  **Flowborne** (breath phase), plus the three required PCA/Phan quality and
+  validity companions. All-in-one and other derived metrics start off. Saved
+  selections continue to take precedence on later launches and upgrades.
 - Other outputs: Polar metrics including Excite-O-Meter and four continuous
   accelerometer-derived respiration (ADR) candidates: signed PCA projection,
   Flowborne-style moving-average difference, signed Phan-window difference,
@@ -15,9 +16,9 @@ compact transparent-shell window with its own install, settings, and process.
   with each candidate. Phase, rate, and dynamics remain separate metrics.
   See [`docs/adr-waveforms.md`](../../docs/adr-waveforms.md).
 - Checking a realtime metric saves it as a default for future launches and
-  applies it to its individual LSL outlet. **Reset metrics** clears optional
-  metric selections while keeping the operator's direct-output and All-in-one
-  choices. **Add more metrics** opens the full Polar Mini selection
+  applies it to its individual LSL outlet. **Use study defaults** explicitly
+  restores the four direct signals, the two study-compatible waveforms, Flowborne
+  and required companions, and turns All-in-one off. **Add more metrics** opens the full Polar Mini selection
   catalog over the current window.
 - Resize the applet from any edge or corner. Control groups, spacing, and type
   expand or compress with both dimensions without a main-window scrollbar.
@@ -47,8 +48,8 @@ compact transparent-shell window with its own install, settings, and process.
   Its 130 Hz ECG replays a bundled, 60-minute NeuroKit2 ECGSYN recording and
   loops after one hour. Its 200 Hz raw ACC approximates a 4-second inhale,
   4-second hold, 4-second exhale, and 4-second hold cycle; HR/RR and derived
-  metrics remain synthetic. Mock mode starts with the same breathing and
-  All-in-one outlet selection as a fresh installation. All mock outputs use
+  metrics remain synthetic. Mock mode starts with the same minimal study
+  selection as a fresh installation. All mock outputs use
   real LSL publication; its PID-suffixed stream name and settings are
   session-only. Regenerate the ECG fixture with
   `python scripts/generate_polar_mini_mock_ecg.py` and NeuroKit2 0.2.13.

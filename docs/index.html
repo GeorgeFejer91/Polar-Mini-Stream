@@ -25,7 +25,7 @@
     <section class="intro content-width">
       <p class="eyebrow">Two small apps · one measurement path each</p>
       <h1>Signals in.<br><em>Streams out.</em></h1>
-      <p class="lead">A compact reference for every included Polar metric and the Vernier breathing output. Fresh installs select direct sensor data, breathing outputs, and All-in-one; every outlet remains adjustable. Definitions and formulas below are generated from the Rust catalog used by the apps.</p>
+      <p class="lead">A compact reference for every included Polar metric and the Vernier breathing output. Fresh Polar installs select ECG, ACC, native HR/RR, PCA breathing, Phan breathing and Flowborne phase, with required quality flags; All-in-one and other metrics are optional. Vernier selects all eight outlets. Definitions and formulas below are generated from the Rust catalog used by the apps.</p>
       <div class="intro-actions">
         <a class="button button-primary" href="#catalog">Explore metrics <span aria-hidden="true">↗</span></a>
         <a class="button button-secondary" href="https://github.com/GeorgeFejer91/Polar-Mini-Stream">View source <span aria-hidden="true">↗</span></a>
@@ -69,7 +69,7 @@
             </tbody>
           </table>
         </div>
-        <p>The checked, locked Respyra raw checkbox appears first; All-in-one with a merging-stream icon appears last. The other six checkboxes control optional individual outlets. A first launch selects only Breath wave alongside raw data. Choices save automatically; changing them replaces outlets without restarting Bluetooth. Device values appear when reported. Mock settings are session-only; an external LSL recorder owns recording.</p>
+        <p>The checked, locked Respyra raw checkbox appears first; All-in-one with a merging-stream icon appears last. The other six checkboxes control optional individual outlets. A first launch selects all eight outputs. Choices save automatically; changing them replaces outlets without restarting Bluetooth. Device values appear when reported. Mock settings are session-only; an external LSL recorder owns recording.</p>
         <h4>Device channels inside rawVernier</h4>
         <p>Channel labels and units come from the connected device's metadata. On the tested GDX-RB firmware 5.3, the channel names and slots were:</p>
         <div class="reference-table-scroll"><table><thead><tr><th scope="col">Device variable</th><th scope="col">Measure and unit</th><th scope="col">Observed slot</th></tr></thead><tbody>

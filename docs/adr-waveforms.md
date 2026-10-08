@@ -1,8 +1,9 @@
 # Live accelerometer-derived respiration (ADR)
 
 Polar Stream Mini publishes four continuous candidate waveforms from the H10's
-raw X/Y/Z accelerometer. Fresh preferences select these and their required
-readiness/quality companions under **+ Realtime metrics → ACC derived**.
+raw X/Y/Z accelerometer. Fresh preferences select **PCA breathing** and
+**Phan breathing**, their required readiness/quality companions, and
+**Flowborne** phase. Other candidates remain optional under **Add more metrics → ACC derived**.
 Raw ECG, ACC, heart rate and RR also start checked. Every output can be unchecked.
 Fresh Vernier Mini preferences select its complete **Raw data** row
 (`rawVernier`), **Force only** (`rawForce`) and every other available outlet.
@@ -16,9 +17,9 @@ projection. All windows are causal and use source timestamps.
 
 | Metric ID / LSL suffix | Formula and unit | Origin and interpretation |
 | --- | --- | --- |
-| `adr_pca_waveform` / `adrPcaWaveform` | `b(t) = dot(EMA(a) − calibration center, u)`, g | Fixed-axis PCA motion waveform. Default axis learning takes 12 s. Retains signed motion and sustained offsets. |
+| `adr_pca_waveform` / `PCA-Breathing` | `b(t) = dot(EMA(a) − calibration center, u)`, g | Fixed-axis PCA motion waveform. Default axis learning takes 12 s. Retains signed motion and sustained offsets. |
 | `adr_moving_average_difference` / `adrMovingAverageDifference` | `(mean_0.267s(b) − mean_2s(b)) / PCA span`, ratio | Flowborne-style two-window contrast applied to the PCA acceleration signal. It approaches zero during a sustained hold. |
-| `adr_axis_mean_difference` / `adrAxisMeanDifference` | `dot(mean_0.2s(a) − mean_200s(a), u)`, g | Signed adaptation of Phan's windows using the shared fixed PCA axis. This signed variant is an app-specific adaptation. |
+| `adr_axis_mean_difference` / `Phan-Breathing` | `dot(mean_0.2s(a) − mean_200s(a), u)`, g | Signed adaptation of Phan's windows using the shared fixed PCA axis. This signed variant is an app-specific adaptation. |
 | `adr_axis_difference_magnitude` / `adrAxisDifferenceMagnitude` | `sum(abs(mean_0.2s(a_i) − mean_200s(a_i)))`, g | The original Phan detector's continuous rectified score before event thresholding. Sign is discarded; both respiratory directions can produce peaks. |
 
 These candidates describe acceleration-related motion, not force in newtons,
@@ -55,7 +56,8 @@ Selected ADR values have dedicated scalar outlets. The optional Polar
 All-in-one outlet includes the selected ADR values as sparse columns alongside
 raw ECG, ACC, heart rate, and RR. Use individual outlets
 for exact per-signal timing. Changing names or selections replaces outlets;
-recorder discovery must follow the selected names and metadata.
+consumers identify compatibility from format, units and waveform metadata,
+while stable source IDs bind subscriptions. Names are display labels.
 All-in-one is independent of the individual outlet checkboxes: uncheck it too
 if the combined raw columns are not wanted.
 
@@ -118,8 +120,9 @@ production and LSL readback; paired participant recordings establish respiratory
 agreement. Respyra and the Mini streamers are separate projects.
 
 For an end-to-end Respyra mock study, `polar-stream-mini.exe --mock` selects
-all available breathing outputs, their individual outlets, and All-in-one,
-irrespective of saved UI selections. Mock ACC approximates a 4-second inhale,
+the four direct signals, PCA breathing, Phan breathing, Flowborne phase and
+required quality/validity companions, irrespective of saved UI selections.
+All-in-one and other derived metrics remain optional. Mock ACC approximates a 4-second inhale,
 4-second hold, 4-second exhale, and 4-second hold at 200 Hz; each 10 ms
 notification produces two raw ACC samples and selected derived values.
 Its source timestamps advance by exactly 10 ms per notification, independently

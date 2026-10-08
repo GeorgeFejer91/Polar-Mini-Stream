@@ -30,8 +30,8 @@ are retained so installed applets can be upgraded without changing identity.
   distinguishes device values from app processing.
 
 Both apps publish individual LSL outlets and can add one sparse All-in-one
-outlet alongside them. Polar starts with its direct H10 signals, all breathing
-metrics, and All-in-one selected on a fresh profile; Vernier starts with all
+outlet alongside them. Polar starts with ECG, ACC, native HR/RR, PCA breathing, Phan breathing,
+Flowborne phase and required quality/validity companions; All-in-one starts off. Vernier starts with all
 eight outlets selected. Users can uncheck any outlet. Selected ADR waveforms and
 their diagnostics retain dedicated outlets. These apps create streams;
 recording belongs to an external LSL recorder.

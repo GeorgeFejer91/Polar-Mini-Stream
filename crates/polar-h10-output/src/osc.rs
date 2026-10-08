@@ -165,7 +165,7 @@ mod tests {
         let name = output_stream_name("participant_07", "raw_ecg").unwrap();
         let mut packet = Vec::new();
         encode_floats_into(&mut packet, &format!("/{name}"), 9, 1, [1.5]);
-        assert!(packet.starts_with(b"/participant_07_rawECG\0"));
+        assert!(packet.starts_with(b"/participant_07_ECG\0"));
     }
 
     #[tokio::test]

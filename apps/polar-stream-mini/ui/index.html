@@ -63,10 +63,10 @@
             </div>
 
             <div id="signal-list" class="signal-list" role="group" aria-label="Polar LSL streams">
-              <label class="signal-option" title="Publish raw ECG as an individual LSL stream"><input type="checkbox" value="raw_ecg" checked /><span>rawECG</span></label>
-              <label class="signal-option" title="Publish raw acceleration as an individual LSL stream"><input type="checkbox" value="raw_acc" checked /><span>rawACC</span></label>
-              <label class="signal-option" title="Publish device heart rate as an individual LSL stream"><input type="checkbox" value="heart_rate" checked /><span>heartRate</span></label>
-              <label class="signal-option" title="Publish device RR intervals as an individual LSL stream"><input type="checkbox" value="rr_interval" checked /><span>rrInterval</span></label>
+              <label class="signal-option" title="Publish raw ECG as an individual LSL stream"><input type="checkbox" value="raw_ecg" checked /><span>ECG</span></label>
+              <label class="signal-option" title="Publish raw acceleration as an individual LSL stream"><input type="checkbox" value="raw_acc" checked /><span>Accelerometer</span></label>
+              <label class="signal-option" title="Publish device heart rate as an individual LSL stream"><input type="checkbox" value="heart_rate" checked /><span>Heart rate</span></label>
+              <label class="signal-option" title="Publish device RR intervals as an individual LSL stream"><input type="checkbox" value="rr_interval" checked /><span>RR intervals</span></label>
               <label class="signal-option all-in-one-option" title="Add an independent combined stream containing raw Polar data and selected metrics"><input id="all-in-one" type="checkbox" value="allInOne" aria-description="Adds an independent stream with raw data and selected metrics" /><img src="icons/all-in-one.svg" alt="" aria-hidden="true" /><span>All-in-one</span></label>
             </div>
 
@@ -118,7 +118,7 @@
           <button id="metrics-guide" class="metrics-guide" type="button">Full metric library</button>
           <div class="dialog-actions">
             <button value="cancel" type="submit">Close</button>
-            <button id="reset-metrics" type="button">Reset metrics</button>
+            <button id="reset-metrics" type="button">Use study defaults</button>
           </div>
         </footer>
       </form>

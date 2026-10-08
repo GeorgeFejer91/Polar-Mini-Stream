@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || undefined, headless: true });
 const url = pathToFileURL(resolve('docs/index.html')).href;
 try {
   for (const width of [320, 375, 1280]) {

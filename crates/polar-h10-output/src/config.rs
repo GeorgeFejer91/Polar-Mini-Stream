@@ -635,8 +635,8 @@ mod tests {
         assert_eq!(normalized.label, "ADR PCA relative amplitude");
         let projection = MetricSpec::for_id("adr_pca_waveform").unwrap();
         assert_eq!(projection.id, "adr_pca_waveform");
-        assert_eq!(projection.suffix(), "adrPcaWaveform");
-        assert_eq!(projection.label, "ADR PCA waveform");
+        assert_eq!(projection.suffix(), "PCA-Breathing");
+        assert_eq!(projection.label, "PCA breathing");
         assert!(MetricSpec::for_id("breathing_volume").is_none());
         assert!(MetricSpec::for_id("flowborne_motion_score").is_none());
     }
@@ -715,7 +715,7 @@ mod tests {
         const EXPECTED: [(&str, &str); 24] = [
             ("adr_axis_difference_event", "adrAxisDifferenceEvent"),
             ("adr_axis_difference_rate", "adrAxisDifferenceRate"),
-            ("adr_moving_average_phase", "adrMovingAveragePhase"),
+            ("adr_moving_average_phase", "Flowborne"),
             ("adr_pca_phase", "adrPcaPhase"),
             ("adr_pca_calibration", "adrPcaCalibration"),
             ("adr_pca_range", "adrPcaRange"),
@@ -1132,15 +1132,15 @@ mod tests {
         assert_eq!(base, "participant_07");
         assert_eq!(
             output_stream_name(&base, "raw_ecg").as_deref(),
-            Some("participant_07_rawECG")
+            Some("participant_07_ECG")
         );
         assert_eq!(
             output_stream_name(&base, "raw_acc").as_deref(),
-            Some("participant_07_rawACC")
+            Some("participant_07_Accelerometer")
         );
         assert_eq!(
             output_stream_name(&base, "heart_rate").as_deref(),
-            Some("participant_07_heartRate")
+            Some("participant_07_Heart-Rate")
         );
         assert_eq!(
             output_stream_name(&base, "excitement_score").as_deref(),

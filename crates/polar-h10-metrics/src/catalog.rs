@@ -403,7 +403,7 @@ fn formula_source_for(id: &str) -> &'static str {
         "vernier_steps" | "vernier_step_rate" => "Vernier pedometer",
         "vernier_respiration_rate" => "Vernier GDX-RB firmware",
         "raw_acc" | "acc_magnitude" => "accelerometer",
-        "heart_rate" => "heartRate",
+        "heart_rate" => "Heart-Rate",
         "rr_interval"
         | "mean_nn"
         | "mean_heart_rate"
@@ -419,7 +419,7 @@ fn formula_source_for(id: &str) -> &'static str {
         | "coherence_peak_power"
         | "coherence_total_power"
         | "excitement_score"
-        | "excitometer" => "rrInterval",
+        | "excitometer" => "RR-Intervals",
         _ => "ecg",
     }
 }
@@ -503,8 +503,8 @@ pub fn metric_citations(metric: MetricDefinition) -> Vec<MetricCitation> {
 pub const METRIC_CATALOG: &[MetricDefinition] = &[
     metric!(
         "raw_ecg",
-        "rawECG",
-        "Raw ECG",
+        "ECG",
+        "ECG",
         "Unfiltered H10 voltage samples · 130 Hz",
         "µV",
         "Raw signals",
@@ -521,8 +521,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "raw_acc",
-        "rawACC",
-        "Raw accelerometer",
+        "Accelerometer",
+        "Accelerometer",
         "X, Y and Z · 200 Hz",
         "mg",
         "Raw signals",
@@ -701,7 +701,7 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "heart_rate",
-        "heartRate",
+        "Heart-Rate",
         "Heart rate",
         "H10 device-derived beat rate",
         "bpm",
@@ -719,7 +719,7 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "rr_interval",
-        "rrInterval",
+        "RR-Intervals",
         "RR interval",
         "Accepted beat-to-beat interval",
         "ms",
@@ -971,8 +971,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "adr_pca_waveform",
-        "adrPcaWaveform",
-        "ADR PCA waveform",
+        "PCA-Breathing",
+        "PCA breathing",
         "Signed principal-axis chest-motion projection",
         "g",
         "Breathing",
@@ -1043,8 +1043,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "adr_moving_average_phase",
-        "adrMovingAveragePhase",
-        "ADR moving-average respiratory phase",
+        "Flowborne",
+        "Flowborne",
         "+1 inhale · −1 exhale · 0 hold · −2 bad signal",
         "class",
         "Breathing",
@@ -1097,8 +1097,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "adr_axis_mean_difference",
-        "adrAxisMeanDifference",
-        "ADR signed axis-mean difference waveform",
+        "Phan-Breathing",
+        "Phan breathing",
         "Phan windows projected onto the calibrated PCA axis",
         "g",
         "Breathing",
@@ -1133,8 +1133,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "adr_axis_difference_valid",
-        "adrAxisDifferenceValid",
-        "ADR axis-difference validity",
+        "Phan-Valid",
+        "Phan validity",
         "At least 0.2 s of contiguous source data",
         "0/1",
         "Breathing",
@@ -1151,8 +1151,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "adr_pca_quality",
-        "adrPcaQuality",
-        "ADR PCA signal quality index",
+        "PCA-Quality",
+        "PCA quality",
         "Calibrated range, motion, and PCA-dominance quality index",
         "0–1",
         "Breathing",
@@ -1169,8 +1169,8 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "adr_pca_valid",
-        "adrPcaValid",
-        "ADR PCA validity",
+        "PCA-Valid",
+        "PCA validity",
         "Calibration, freshness, and motion gate",
         "0/1",
         "Breathing",

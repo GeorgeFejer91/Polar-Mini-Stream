@@ -36,6 +36,11 @@ const MINI_SLOT: &str = "mini-node";
 const PREFERENCE_SCHEMA: &str = "polar.stream.mini.preferences.v1";
 const LIVE_RECONFIGURED_MESSAGE: &str = "Saved and applied to the active LSL outlets.";
 const POLAR_DIRECT_OUTPUTS: &[&str] = &["raw_ecg", "raw_acc", "heart_rate", "rr_interval"];
+const POLAR_STUDY_METRICS: &[&str] = &[
+    "adr_pca_waveform",
+    "adr_axis_mean_difference",
+    "adr_moving_average_phase",
+];
 const VERNIER_FORCE_OUTPUT: &str = "raw_force";
 const VERNIER_OUTPUT_IDS: [&str; 8] = [
     "rawVernier",
@@ -869,7 +874,7 @@ impl MiniMetricOption {
             detail: metric.detail,
             unit: metric.unit,
             category: metric.category,
-            default_included: direct,
+            default_included: default_polar_outputs().iter().any(|id| id == metric.id),
             direct,
             release_tier: metric_selection_tier(metric.id),
         }
@@ -2692,14 +2697,8 @@ fn default_polar_outputs() -> Vec<String> {
     normalize_polar_outputs(Some(
         POLAR_DIRECT_OUTPUTS
             .iter()
+            .chain(POLAR_STUDY_METRICS)
             .map(|id| (*id).to_string())
-            .chain(
-                polar_metric_options()
-                    .into_iter()
-                    .filter(|metric| matches!(metric.category, "Breathing" | "Breathing dynamics"))
-                    .map(|metric| metric.id.to_string()),
-            )
-            .chain(std::iter::once("allInOne".into()))
             .collect(),
     ))
 }
@@ -2852,23 +2851,35 @@ mod tests {
     }
 
     #[test]
-    fn fresh_polar_preferences_select_breathing_and_combined_outputs() {
+    fn fresh_polar_preferences_select_only_study_signals_and_required_companions() {
         let defaults = MiniPreferencesSnapshot::default_for(MiniAppKind::Polar);
         assert_eq!(defaults.output_mode, MiniOutputMode::SeparateStreams);
-        assert!(defaults.polar_outputs.iter().any(|id| id == "allInOne"));
-        for id in POLAR_DIRECT_OUTPUTS {
-            assert!(defaults.polar_outputs.iter().any(|selected| selected == id));
-        }
-        for metric in polar_metric_options()
+        assert_eq!(
+            defaults.polar_outputs,
+            [
+                "raw_ecg",
+                "raw_acc",
+                "heart_rate",
+                "rr_interval",
+                "adr_pca_waveform",
+                "adr_axis_mean_difference",
+                "adr_moving_average_phase",
+                "adr_pca_quality",
+                "adr_pca_valid",
+                "adr_axis_difference_valid",
+            ]
+        );
+        let advertised_defaults = polar_metric_options()
             .into_iter()
-            .filter(|metric| matches!(metric.category, "Breathing" | "Breathing dynamics"))
-        {
-            assert!(
-                defaults.polar_outputs.iter().any(|id| id == metric.id),
-                "{}",
-                metric.id
-            );
-        }
+            .filter(|metric| metric.default_included)
+            .map(|metric| metric.id)
+            .collect::<Vec<_>>();
+        assert_eq!(advertised_defaults.len(), defaults.polar_outputs.len());
+        assert!(
+            advertised_defaults
+                .iter()
+                .all(|id| defaults.polar_outputs.iter().any(|selected| selected == id))
+        );
         let first_launch: MiniPreferencesFile = serde_json::from_str("{}").unwrap();
         assert_eq!(
             MiniPreferencesSnapshot::from_file(MiniAppKind::Polar, first_launch).polar_outputs,
@@ -3351,7 +3362,7 @@ mod tests {
     }
 
     #[test]
-    fn polar_mock_selects_all_breathing_outputs_and_combined_stream() {
+    fn polar_mock_uses_the_same_minimal_study_defaults() {
         let snapshot = PreferencesStore::mock_from(
             Path::new("missing-polar-mock-preferences.json"),
             MiniAppKind::Polar,

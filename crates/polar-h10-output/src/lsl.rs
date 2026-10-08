@@ -1723,6 +1723,25 @@ fn append_stream_metadata(
                     .collect::<Vec<_>>()
                     .join(","),
             ),
+            (
+                "validity_streams",
+                adr_companion_ids(spec.id)
+                    .iter()
+                    .filter(|id| id.ends_with("_valid"))
+                    .filter_map(|id| output_stream_name(base_name, id))
+                    .collect::<Vec<_>>()
+                    .join(","),
+            ),
+            (
+                "validity_source_ids",
+                adr_companion_ids(spec.id)
+                    .iter()
+                    .filter(|id| id.ends_with("_valid"))
+                    .filter_map(|id| output_stream_name(base_name, id))
+                    .map(|name| format!("polar-h10-{name}"))
+                    .collect::<Vec<_>>()
+                    .join(","),
+            ),
             ("interpretation", spec.explainer.to_string()),
         ] {
             if !append_value_checked(append_child_value, description, name, &value) {
@@ -2209,7 +2228,7 @@ mod tests {
         for (id, suffix) in [
             ("adr_axis_difference_event", "adrAxisDifferenceEvent"),
             ("adr_axis_difference_rate", "adrAxisDifferenceRate"),
-            ("adr_moving_average_phase", "adrMovingAveragePhase"),
+            ("adr_moving_average_phase", "Flowborne"),
             (
                 "adr_moving_average_difference",
                 "adrMovingAverageDifference",

@@ -16,17 +16,17 @@ parser.add_argument("--output", type=Path)
 args = parser.parse_args()
 base = f"adr_acceptance_{args.mode}"
 waveforms = {
-    "adrPcaWaveform": "g",
+    "PCA-Breathing": "g",
     "adrMovingAverageDifference": "ratio",
-    "adrAxisMeanDifference": "g",
+    "Phan-Breathing": "g",
     "adrAxisDifferenceMagnitude": "g",
 }
-suffixes = list(waveforms) + ["adrPcaQuality", "adrPcaValid", "adrMovingAverageValid", "adrAxisDifferenceValid"]
+suffixes = list(waveforms) + ["PCA-Quality", "PCA-Valid", "adrMovingAverageValid", "Phan-Valid"]
 individual_suffixes = ([] if args.mode == "single" else
-                       ["adrPcaWaveform", "adrPcaQuality", "adrPcaValid"]
+                       ["PCA-Breathing", "PCA-Quality", "PCA-Valid"]
                        if args.mode == "both" else suffixes)
 names = [f"{base}_{suffix}" for suffix in individual_suffixes]
-if args.mode != "single": names += [f"{base}_rawECG", f"{base}_rawACC"]
+if args.mode != "single": names += [f"{base}_ECG", f"{base}_Accelerometer"]
 if args.mode != "separate": names += [base]
 inlets = {}
 received = {name: [] for name in names}
@@ -52,8 +52,8 @@ try:
             companions = info.desc().child_value("companion_streams").split(",")
             assert companions and all(companion in names for companion in companions)
             expected_contract = {
-                "adrPcaWaveform": "respyra-polar-pca/1",
-                "adrAxisMeanDifference": "respyra-polar-phan-signed/1",
+                "PCA-Breathing": "respyra-polar-pca/1",
+                "Phan-Breathing": "respyra-polar-phan-signed/1",
             }.get(suffix)
             if expected_contract:
                 assert info.desc().child_value("respyra_input_contract") == expected_contract

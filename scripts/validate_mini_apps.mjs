@@ -10,13 +10,19 @@ const outputDirectory = path.join(root, "target", "ui-qa");
 await fs.mkdir(outputDirectory, { recursive: true });
 const catalogSource = await fs.readFile(path.join(root, "docs", "metric-catalog.js"), "utf8");
 const catalog = JSON.parse(catalogSource.slice(catalogSource.indexOf("["), catalogSource.lastIndexOf("]") + 1));
-const polarBreathingMetrics = catalog
-  .filter((metric) => ["Breathing", "Breathing dynamics"].includes(metric.category))
-  .map(({ id, streamSuffix, label, detail, category }) => ({ id, streamSuffix, label, detail, category, direct: false }));
 const polarDefaultOutputs = [
   "raw_ecg", "raw_acc", "heart_rate", "rr_interval",
-  ...polarBreathingMetrics.map((metric) => metric.id),
-  "allInOne",
+  "adr_pca_waveform", "adr_axis_mean_difference", "adr_moving_average_phase",
+  "adr_pca_quality", "adr_pca_valid", "adr_axis_difference_valid",
+];
+const polarBreathingMetrics = catalog
+  .filter((metric) => ["Breathing", "Breathing dynamics"].includes(metric.category))
+  .map(({ id, streamSuffix, label, detail, category }) => ({ id, streamSuffix, label, detail, category, direct: false,
+    defaultIncluded: polarDefaultOutputs.includes(id) }));
+const polarMetrics = [
+  ...catalog.filter((metric) => polarDefaultOutputs.slice(0, 4).includes(metric.id))
+    .map((metric) => ({ ...metric, direct: true, defaultIncluded: true })),
+  ...polarBreathingMetrics,
 ];
 
 const apps = [
@@ -40,7 +46,7 @@ const apps = [
   },
 ];
 
-const browser = await chromium.launch({ headless: true, args: ["--allow-file-access-from-files"] });
+const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || undefined, headless: true, args: ["--allow-file-access-from-files"] });
 try {
   for (const app of apps) {
     await validateResizeConfig(app);
@@ -414,9 +420,9 @@ async function validateNormalWindow(app) {
   }
 
   if (app.kind === "polar") {
-    await page.waitForFunction((height) => window.__fitCalls.some((call) => call.kind === "size" && call.height > height), app.height);
+    await page.waitForFunction(() => document.querySelectorAll("#signal-list .selected-signal").length === 3);
     assert.ok((await page.evaluate(() => innerHeight)) <= 744);
-    assert.ok(await page.locator(".node-body").evaluate((body) => body.scrollHeight > body.clientHeight));
+    assert.ok(await page.locator(".node-body").evaluate((body) => body.scrollHeight <= body.clientHeight + 1));
     assert.ok(await page.locator(".signal-list").evaluate((signals) => signals.scrollHeight <= signals.clientHeight + 1));
     assert.ok(await page.evaluate(() =>
       document.querySelector(".signal-list").getBoundingClientRect().bottom
@@ -432,11 +438,11 @@ async function validateNormalWindow(app) {
     assert.equal(await page.evaluate(() => innerHeight), app.height);
     await assertNoOverflow(page);
     await page.setViewportSize({ width: 388, height: 744 });
-    assert.equal(await page.locator("#signal-list .selected-signal").count(), polarBreathingMetrics.length);
+    assert.equal(await page.locator("#signal-list .selected-signal").count(), 3);
     assert.equal(await page.locator("#signal-list .all-in-one-option img").count(), 1);
     assert.ok((await page.evaluate(() => innerHeight)) > app.height);
     assert.equal(await page.locator("#stream-mode-toggle").count(), 0);
-    assert.equal(await page.locator("#all-in-one").isChecked(), true);
+    assert.equal(await page.locator("#all-in-one").isChecked(), false);
     assert.equal(await page.locator("#signal-list input").count(), 5);
     for (const id of ["raw_ecg", "raw_acc", "heart_rate", "rr_interval"]) {
       const raw = page.locator(`#signal-list input[value="${id}"]`);
@@ -444,7 +450,10 @@ async function validateNormalWindow(app) {
       assert.equal(await raw.isEnabled(), true);
     }
     assert.equal(await page.locator("#all-in-one").isEnabled(), true);
-    assert.equal(await page.locator("#metrics-button").textContent(), `+ Add more metrics (${polarBreathingMetrics.length})`);
+    assert.equal(await page.locator("#metrics-button").textContent(), "+ Add more metrics (3)");
+    for (const label of ["PCA breathing", "Phan breathing", "Flowborne"]) {
+      assert.equal(await page.locator("#signal-list .selected-signal").filter({ hasText: label }).count(), 1);
+    }
     const accIds = [
       "adr_pca_waveform", "adr_pca_phase", "adr_pca_rate",
       "adr_interval_mean", "adr_axis_difference_event", "adr_axis_difference_rate",
@@ -455,12 +464,14 @@ async function validateNormalWindow(app) {
     assert.equal(await page.locator("#metrics-dialog").isVisible(), true);
     assert.equal(await page.evaluate(() => window.__miniCalls.includes("set_metrics_dialog_open")), false);
     for (const id of polarBreathingMetrics.map((metric) => metric.id)) {
-      assert.equal(await page.locator(`#metric-options input[value="${id}"]`).isChecked(), true);
+      assert.equal(await page.locator(`#metric-options input[value="${id}"]`).isChecked(), polarDefaultOutputs.includes(id));
     }
+    assert.equal(await page.locator("#reset-metrics").isDisabled(), true);
+    await page.locator('#metric-options input[value="adr_interval_mean"]').check();
     await page.locator("#reset-metrics").click();
     await page.waitForFunction(() => window.__miniSaves.some((save) =>
-      save.polarOutputs?.length === 5 && save.polarOutputs.includes("allInOne")));
-    assert.equal(await page.locator("#signal-list .selected-signal").count(), 0);
+      save.polarOutputs?.length === 10 && !save.polarOutputs.includes("adr_interval_mean")));
+    assert.equal(await page.locator("#signal-list .selected-signal").count(), 3);
     await page.setViewportSize({ width: 720, height: 640 });
     await assertNoOverflow(page);
     await page.screenshot({ path: path.join(outputDirectory, "polar-mini-metrics-large.png"), omitBackground: true });
@@ -494,7 +505,7 @@ async function validateNormalWindow(app) {
     });
     await reopened.locator("#reset-metrics").click();
     await reopened.waitForFunction(() => window.__miniSaves.some((save) =>
-      save.polarOutputs?.length === 5 && !save.polarOutputs.includes("adr_axis_difference_event")));
+      save.polarOutputs?.length === 10 && !save.polarOutputs.includes("adr_axis_difference_event")));
     assert.equal(await reopened.locator("#reset-metrics").isDisabled(), true);
     assert.equal(await reopened.evaluate(() => window.__miniCalls.includes("disconnect_device")), false);
     const resetPreferences = await reopened.evaluate(() => window.__miniSaves.at(-1));
@@ -503,6 +514,17 @@ async function validateNormalWindow(app) {
     await resetReopened.goto(appUrl(app));
     await resetReopened.locator("#metrics-button").click();
     assert.equal(await resetReopened.locator('#metric-options input[value="adr_axis_difference_event"]').isChecked(), false);
+    assert.equal(await resetReopened.locator('#metric-options input[value="adr_moving_average_phase"]').isChecked(), true);
+    // Explicit reset also restores direct signals and removes redundant combined copies.
+    await resetReopened.locator("#metrics-close").click();
+    await resetReopened.locator('#signal-list input[value="raw_ecg"]').uncheck();
+    await resetReopened.locator("#all-in-one").check();
+    await resetReopened.locator("#metrics-button").click();
+    await resetReopened.locator("#reset-metrics").click();
+    await resetReopened.waitForFunction((defaults) => {
+      const saved = window.__miniSaves.at(-1)?.polarOutputs;
+      return saved?.length === defaults.length && defaults.every((id) => saved.includes(id));
+    }, polarDefaultOutputs);
     await resetReopened.close();
     await page.locator("#metrics-close").click();
     await page.locator("#all-in-one").uncheck();
@@ -560,8 +582,7 @@ async function validateMockWindow(app, lslHealthy) {
   await assertNoOverflow(page);
 
   if (app.kind === "polar") {
-    assert.equal(await page.locator("#all-in-one").isChecked(), true);
-    await page.locator("#all-in-one").uncheck();
+    assert.equal(await page.locator("#all-in-one").isChecked(), false);
     await page.locator("#all-in-one").check();
     await page.waitForFunction(() => window.__miniSaves.some((save) => save.polarOutputs.includes("allInOne")));
     assert.equal(await page.locator("#all-in-one").isChecked(), true);
@@ -675,7 +696,7 @@ async function createPage(app, options) {
     await page.setViewportSize({ width: size.width, height: size.height });
   });
   await page.addInitScript(
-    ({ app, options, polarBreathingMetrics, polarDefaultOutputs }) => {
+    ({ app, options, polarMetrics, polarDefaultOutputs }) => {
       Object.defineProperty(window.screen, "availHeight", { configurable: true, value: 768 });
       const calls = [];
       const saves = [];
@@ -724,7 +745,7 @@ async function createPage(app, options) {
             productName: app.productName,
             scanLabel: app.scanLabel,
             preferences,
-            metrics: app.kind === "polar" ? polarBreathingMetrics : [],
+            metrics: app.kind === "polar" ? polarMetrics : [],
             session: null,
             mockMode: options.mockMode,
             lslResourcePresent: true,
@@ -810,7 +831,7 @@ async function createPage(app, options) {
         }) },
       };
     },
-    { app, options, polarBreathingMetrics, polarDefaultOutputs },
+    { app, options, polarMetrics, polarDefaultOutputs },
   );
   return page;
 }

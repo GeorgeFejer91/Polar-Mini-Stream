@@ -195,25 +195,26 @@
 
   function renderSignals() {
     const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
+    const companions = new Set([...selected].flatMap((id) => adrCompanions[id] || []));
     for (const checkbox of elements["signal-list"].querySelectorAll('input[value]:not([value="allInOne"])')) {
       checkbox.checked = selected.has(checkbox.value);
     }
     elements["all-in-one"].checked = selected.has("allInOne");
     elements["signal-list"].querySelectorAll(".selected-signal").forEach((node) => node.remove());
     for (const metric of state.metrics) {
-      if (metric.direct || !selected.has(metric.id)) continue;
+      if (metric.direct || companions.has(metric.id) || !selected.has(metric.id)) continue;
       const signal = document.createElement("span");
       signal.className = "signal-option selected-signal";
       signal.textContent = metric.label;
       signal.title = `${metric.label} (${metric.id})`;
       elements["signal-list"].append(signal);
     }
-    const extraCount = state.metrics.filter((metric) => !metric.direct && selected.has(metric.id)).length;
+    const extraCount = state.metrics.filter((metric) => !metric.direct && !companions.has(metric.id) && selected.has(metric.id)).length;
     elements["metrics-button"].textContent = extraCount
       ? `+ Add more metrics (${extraCount})`
       : "+ Add more metrics";
     elements["metrics-button"].title = extraCount
-      ? `${extraCount} optional metrics selected`
+      ? `${extraCount} metrics selected; ${companions.size} required quality flags also published`
       : "Add optional Polar metrics";
     scheduleSignalFit();
   }
@@ -320,7 +321,9 @@
     options.replaceChildren();
     if (state.kind !== "polar") return;
     const selected = new Set(state.preferences.polarOutputs || directPolarOutputs);
-    elements["reset-metrics"].disabled = ![...selected].some((id) => !directPolarOutputs.includes(id) && id !== "allInOne");
+    const defaults = studyDefaultOutputs();
+    elements["reset-metrics"].disabled = selected.size === defaults.length
+      && defaults.every((id) => selected.has(id));
     const optionalMetrics = state.metrics.filter((candidate) => !candidate.direct);
     appendMetricGroup(
       options,
@@ -338,6 +341,10 @@
     );
     options.scrollTop = scrollTop;
     if (focusedId) options.querySelector(`input[value="${focusedId}"]`)?.focus({ preventScroll: true });
+  }
+
+  function studyDefaultOutputs() {
+    return state.metrics.filter((metric) => metric.defaultIncluded).map((metric) => metric.id);
   }
 
   function isAccDerivedMetric(metric) {
@@ -767,7 +774,7 @@
     elements["metrics-button"].addEventListener("click", openMetricsDialog);
     elements["metrics-guide"].addEventListener("click", openMetricGuide);
     elements["reset-metrics"].addEventListener("click", () => {
-      state.preferences.polarOutputs = state.preferences.polarOutputs.filter((id) => directPolarOutputs.includes(id) || id === "allInOne");
+      state.preferences.polarOutputs = studyDefaultOutputs();
       renderMetricDialog();
       renderSignals();
       savePreferences(false);
