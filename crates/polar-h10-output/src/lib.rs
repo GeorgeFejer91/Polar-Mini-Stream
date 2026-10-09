@@ -25,8 +25,8 @@ pub use config::{
     BreathingPresentationMode, BreathingPresentationSettings, CustomFormulaConfig, FormulaHealth,
     FormulaSource, MetricOutputOptions, MetricPresentationOptions, MetricProcessingOptions,
     MetricSpec, NormalizationMode, OutputConfig, OutputHealth, SourcePalette, SourcePaletteColors,
-    custom_output_stream_name, normalize_stream_base, output_stream_name, source_palette,
-    source_palette_catalog,
+    custom_output_stream_name, normalize_stream_base, output_stream_name, output_stream_source_id,
+    source_palette, source_palette_catalog,
 };
 use csv::CsvPublisher;
 #[cfg(feature = "liblsl-backend")]

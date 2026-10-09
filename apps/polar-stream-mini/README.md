@@ -5,7 +5,7 @@ compact transparent-shell window with its own install, settings, and process.
 
 - Raw ECG, raw accelerometer, heart rate, and RR intervals start checked.
   The mini window lets the operator uncheck them.
-- A fresh installation selects **PCA breathing**, **Phan breathing**, and
+- A fresh installation selects **Chest Motion**, **Chest Motion DT**, and
   **Flowborne** (breath phase), plus the three required PCA/Phan quality and
   validity companions. All-in-one and other derived metrics start off. Saved
   selections continue to take precedence on later launches and upgrades.

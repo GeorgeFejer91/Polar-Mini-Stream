@@ -451,8 +451,8 @@ async function validateNormalWindow(app) {
     }
     assert.equal(await page.locator("#all-in-one").isEnabled(), true);
     assert.equal(await page.locator("#metrics-button").textContent(), "+ Add more metrics (3)");
-    for (const label of ["PCA breathing", "Phan breathing", "Flowborne"]) {
-      assert.equal(await page.locator("#signal-list .selected-signal").filter({ hasText: label }).count(), 1);
+    for (const label of ["Chest Motion", "Chest Motion DT", "Flowborne"]) {
+      assert.equal(await page.locator("#signal-list .selected-signal").filter({ hasText: new RegExp(`^${label}$`) }).count(), 1);
     }
     const accIds = [
       "adr_pca_waveform", "adr_pca_phase", "adr_pca_rate",

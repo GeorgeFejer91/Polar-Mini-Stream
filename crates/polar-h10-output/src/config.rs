@@ -486,6 +486,18 @@ pub fn output_stream_name(base_name: &str, metric_id: &str) -> Option<String> {
     MetricSpec::for_id(metric_id).map(|spec| format!("{base_name}_{}", spec.suffix()))
 }
 
+/// Keep installed consumers' saved identities across display-name changes.
+pub fn output_stream_source_id(base_name: &str, metric_id: &str) -> Option<String> {
+    MetricSpec::for_id(metric_id).map(|spec| {
+        let identity_suffix = match metric_id {
+            "adr_pca_waveform" => "PCA-Breathing",
+            "adr_axis_mean_difference" => "Phan-Breathing",
+            _ => spec.suffix(),
+        };
+        format!("polar-h10-{base_name}_{identity_suffix}")
+    })
+}
+
 /// Returns the canonical discoverable name for a validated custom formula.
 pub fn custom_output_stream_name(base_name: &str, formula: &CustomFormulaConfig) -> String {
     format!("{base_name}_{}", formula.name)
@@ -635,8 +647,20 @@ mod tests {
         assert_eq!(normalized.label, "ADR PCA relative amplitude");
         let projection = MetricSpec::for_id("adr_pca_waveform").unwrap();
         assert_eq!(projection.id, "adr_pca_waveform");
-        assert_eq!(projection.suffix(), "PCA-Breathing");
-        assert_eq!(projection.label, "PCA breathing");
+        assert_eq!(projection.suffix(), "ChestMotion");
+        assert_eq!(projection.label, "Chest Motion");
+        let detrended = MetricSpec::for_id("adr_axis_mean_difference").unwrap();
+        assert_eq!(detrended.suffix(), "ChestMotion-DT");
+        assert_eq!(detrended.label, "Chest Motion DT");
+        for (id, suffix) in [
+            (projection.id, "PCA-Breathing"),
+            (detrended.id, "Phan-Breathing"),
+        ] {
+            assert_eq!(
+                output_stream_source_id("Polar-H10-Mini", id).unwrap(),
+                format!("polar-h10-Polar-H10-Mini_{suffix}")
+            );
+        }
         assert!(MetricSpec::for_id("breathing_volume").is_none());
         assert!(MetricSpec::for_id("flowborne_motion_score").is_none());
     }

@@ -11,7 +11,7 @@ use polar_h10_metrics::{ADR_WAVEFORM_IDS, BreathingSettings, adr_companion_ids};
 use crate::{
     CustomFormulaConfig, MetricSpec, SourcePalette, VERNIER_BREATHING_OUTLET_KEY,
     VERNIER_RAW_OUTLET_KEY, VernierMiniSelection, VernierStreamSchema, custom_output_stream_name,
-    encode_vernier_raw_rows, output_stream_name,
+    encode_vernier_raw_rows, output_stream_name, output_stream_source_id,
     provenance::{PolarRespirationProvenance, VernierBreathingProvenance, adr_candidate_fields},
     vernier_breathing_stream_name, vernier_raw_stream_name,
 };
@@ -262,7 +262,10 @@ impl LslPublisher {
         let Ok(stream_type) = CString::new(spec.stream_type) else {
             return;
         };
-        let Ok(source) = CString::new(format!("polar-h10-{output_name}")) else {
+        let Some(source_id) = output_stream_source_id(base_name, spec.id) else {
+            return;
+        };
+        let Ok(source) = CString::new(source_id) else {
             return;
         };
         // cf_float32 == 1 in the public lsl_channel_format_t enum.
@@ -1737,8 +1740,7 @@ fn append_stream_metadata(
                 adr_companion_ids(spec.id)
                     .iter()
                     .filter(|id| id.ends_with("_valid"))
-                    .filter_map(|id| output_stream_name(base_name, id))
-                    .map(|name| format!("polar-h10-{name}"))
+                    .filter_map(|id| output_stream_source_id(base_name, id))
                     .collect::<Vec<_>>()
                     .join(","),
             ),

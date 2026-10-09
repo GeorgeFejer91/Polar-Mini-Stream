@@ -75,7 +75,7 @@ selected streams need more room, up to the available screen height; manual
 resizing remains possible. The All-in-one box controls only the
 additional combined outlet. The expanded picker exposes all Polar
 Mini-selectable derived metrics. Fresh Polar
-preferences select the four direct SDK outputs, PCA breathing, Phan breathing,
+preferences select the four direct SDK outputs, Chest Motion, Chest Motion DT,
 Flowborne phase and their required companions; All-in-one and other derived
 metrics start off. The picker's Use study defaults action explicitly restores
 this selection; fresh Vernier preferences select every available outlet;

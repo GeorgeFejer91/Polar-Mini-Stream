@@ -16,14 +16,14 @@ parser.add_argument("--output", type=Path)
 args = parser.parse_args()
 base = f"adr_acceptance_{args.mode}"
 waveforms = {
-    "PCA-Breathing": "g",
+    "ChestMotion": "g",
     "adrMovingAverageDifference": "ratio",
-    "Phan-Breathing": "g",
+    "ChestMotion-DT": "g",
     "adrAxisDifferenceMagnitude": "g",
 }
 suffixes = list(waveforms) + ["PCA-Quality", "PCA-Valid", "adrMovingAverageValid", "Phan-Valid"]
 individual_suffixes = ([] if args.mode == "single" else
-                       ["PCA-Breathing", "PCA-Quality", "PCA-Valid"]
+                       ["ChestMotion", "PCA-Quality", "PCA-Valid"]
                        if args.mode == "both" else suffixes)
 names = [f"{base}_{suffix}" for suffix in individual_suffixes]
 if args.mode != "single": names += [f"{base}_ECG", f"{base}_Accelerometer"]
@@ -52,11 +52,13 @@ try:
             companions = info.desc().child_value("companion_streams").split(",")
             assert companions and all(companion in names for companion in companions)
             expected_contract = {
-                "PCA-Breathing": "respyra-polar-pca/1",
-                "Phan-Breathing": "respyra-polar-phan-signed/1",
+                "ChestMotion": "respyra-polar-pca/1",
+                "ChestMotion-DT": "respyra-polar-phan-signed/1",
             }.get(suffix)
             if expected_contract:
                 assert info.desc().child_value("respyra_input_contract") == expected_contract
+                legacy_suffix = {"ChestMotion": "PCA-Breathing", "ChestMotion-DT": "Phan-Breathing"}[suffix]
+                assert info.source_id() == f"polar-h10-{base}_{legacy_suffix}"
                 assert info.desc().child_value("respyra_signal_role") == "signed_breathing_level"
                 assert info.desc().child_value("inhale_polarity").startswith("unknown")
         elif suffix in suffixes:

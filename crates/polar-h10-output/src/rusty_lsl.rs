@@ -29,7 +29,7 @@ use rusty_lsl::{
 
 use crate::{
     CustomFormulaConfig, MetricSpec, SourcePalette, custom_output_stream_name, output_stream_name,
-    provenance::PolarRespirationProvenance,
+    output_stream_source_id, provenance::PolarRespirationProvenance,
 };
 
 const RUSTY_LSL_REVISION: &str = "8b6b2a6cd0c0e5147b7e1cc076a116ef226cddbd";
@@ -215,7 +215,8 @@ impl RustyLslPublisher {
             .ok_or_else(|| format!("Invalid channel count for {}", spec.label))?;
         self.try_add_stream(
             output_name.clone(),
-            format!("polar-h10-{output_name}"),
+            output_stream_source_id(base_name, spec.id)
+                .ok_or_else(|| format!("Unknown output module: {}", spec.id))?,
             outlet_key,
             spec.stream_type.into(),
             spec.rate_hz,
