@@ -13,7 +13,8 @@ individually identifiable, single-channel LSL outlet. Each app should also
 offer one optional multi-channel All-in-one outlet that bundles the individual
 outputs the user has chosen to send. Fresh Polar preferences select direct ECG/ACC/HR/RR, the two Respyra-compatible
 PCA and signed Phan waveforms, Flowborne phase and required validity/quality
-companions, without All-in-one; Vernier keeps every outlet selected. Respect
+companions, without All-in-one; Vernier selects raw device data and connection
+events only. Respect
 later user opt-outs. Keep the
 raw BLE-to-LSL paths observable and fast. Keep accelerometer-derived
 respiration (ADR) candidates explicitly identified with readiness/quality
@@ -78,8 +79,9 @@ Mini-selectable derived metrics. Fresh Polar
 preferences select the four direct SDK outputs, Chest Motion, Chest Motion DT,
 Flowborne phase and their required companions; All-in-one and other derived
 metrics start off. The picker's Use study defaults action explicitly restores
-this selection; fresh Vernier preferences select every available outlet;
-saved choices remain authoritative after an upgrade.
+this selection; fresh Vernier preferences select `rawVernier` and `signalStatus`.
+The other six outputs remain optional. Standalone Mini upgrades preserve saved
+choices; the Respyra suite installer resets output choices to study defaults.
 Saved Single-mode preferences for either app migrate to the additional outlet.
 The Pages metric catalog is generated from Rust definitions; the site documents
 the separate Vernier force-to-waveform path alongside the Polar catalog.

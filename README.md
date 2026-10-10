@@ -31,8 +31,10 @@ are retained so installed applets can be upgraded without changing identity.
 
 Both apps publish individual LSL outlets and can add one sparse All-in-one
 outlet alongside them. Polar starts with ECG, ACC, native HR/RR, PCA breathing, Phan breathing,
-Flowborne phase and required quality/validity companions; All-in-one starts off. Vernier starts with all
-eight outlets selected. Users can uncheck any outlet. Selected ADR waveforms and
+Flowborne phase and required quality/validity companions; All-in-one starts off. Vernier starts with
+two outlets: raw device data (including Force in N) and connection-event markers.
+The separate force copy, normalized breath waveform, device rates/counts and
+All-in-one outlet start off. Users can change any selection. Selected ADR waveforms and
 their diagnostics retain dedicated outlets. These apps create streams;
 recording belongs to an external LSL recorder.
 Their **Mock** windows publish clearly labeled synthetic data through the

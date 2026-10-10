@@ -15,7 +15,7 @@
     { id: "respirationRate", label: "Breaths/min", detail: "Belt's estimated breaths per minute over 30 seconds, updated every 10 seconds." },
     { id: "allInOne", label: "All-in-one", detail: "Separate sparse stream containing every device channel, diagnostics, normalized breath wave, and signal events; independent of the individual choices." },
   ]);
-  const defaultVernierOutputIds = Object.freeze(vernierOutputs.map((output) => output.id));
+  const defaultVernierOutputIds = Object.freeze(["rawVernier", "signalStatus"]);
   const state = {
     kind: "vernier",
     productName: "Vernier Stream Mini",

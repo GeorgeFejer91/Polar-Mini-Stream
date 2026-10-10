@@ -2704,7 +2704,10 @@ fn default_polar_outputs() -> Vec<String> {
 }
 
 fn default_vernier_outputs() -> Vec<String> {
-    VERNIER_OUTPUT_IDS.iter().map(|id| (*id).into()).collect()
+    ["rawVernier", "signalStatus"]
+        .into_iter()
+        .map(String::from)
+        .collect()
 }
 
 fn validate_vernier_outputs(input: Vec<String>) -> Result<Vec<String>, String> {
@@ -3106,7 +3109,6 @@ mod tests {
             let session = start_mock_with_snapshot(&state, initial.clone())
                 .await
                 .unwrap();
-            let initial_lsl = session.lsl.clone();
             assert!(session.lsl.starts_with("Publishing "), "{}", session.lsl);
             assert_ne!(session.lsl, "Publishing 1 stream(s)");
             if kind == MiniAppKind::Polar {
@@ -3190,7 +3192,7 @@ mod tests {
             assert_eq!(
                 session.lsl,
                 if kind == MiniAppKind::Vernier {
-                    initial_lsl
+                    format!("Publishing {} stream(s)", initial.vernier_outputs.len() + 1)
                 } else {
                     format!("Publishing {} stream(s)", 1 + dedicated_adr_count)
                 }
@@ -3277,7 +3279,10 @@ mod tests {
         );
         assert!(validate_vernier_outputs(vec!["rawForce".into(), "rawForce".into()]).is_err());
         assert!(validate_vernier_outputs(vec!["rawAcceleration".into()]).is_err());
-        assert_eq!(default_vernier_outputs(), VERNIER_OUTPUT_IDS.to_vec());
+        assert_eq!(
+            default_vernier_outputs(),
+            vec!["rawVernier", "signalStatus"]
+        );
         assert_eq!(
             validate_vernier_outputs(vec!["allInOne".into()]).unwrap(),
             vec!["allInOne"]
@@ -3333,6 +3338,26 @@ mod tests {
         assert!(sensors[0].is_respiration_force());
         assert_eq!(sensors[0].minimum_period_us, VERNIER_PERIOD_US);
         assert_eq!(sensors[0].typical_period_us, VERNIER_PERIOD_US);
+    }
+
+    #[test]
+    fn fresh_and_mock_vernier_preferences_use_minimal_study_outputs() {
+        let expected = vec!["rawVernier", "signalStatus"];
+        assert_eq!(
+            MiniPreferencesSnapshot::default_for(MiniAppKind::Vernier).vernier_outputs,
+            expected
+        );
+        let saved: MiniPreferencesFile = serde_json::from_str("{}").unwrap();
+        assert_eq!(
+            MiniPreferencesSnapshot::from_file(MiniAppKind::Vernier, saved).vernier_outputs,
+            expected
+        );
+        let mock = PreferencesStore::mock_from(
+            Path::new("missing-vernier-mock-preferences.json"),
+            MiniAppKind::Vernier,
+        )
+        .snapshot();
+        assert_eq!(mock.vernier_outputs, expected);
     }
 
     #[test]

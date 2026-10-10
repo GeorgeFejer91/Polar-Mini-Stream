@@ -16,10 +16,11 @@ expand or compress with both dimensions without a main-window scrollbar.
 Click an overlong status value, or focus it and press Enter, to read its full
 text in a dialog.
 
-- Default outlets: all eight, including `rawVernier` (every advertised numeric
-  belt channel plus recording diagnostics), `rawForce`, `vernierBreathing`,
-  `signalStatus`, `steps`, `stepRate`, `respirationRate`, and `allInOne`.
-  Choices persist and
+- Default outlets: `rawVernier` (every advertised numeric belt channel,
+  including Force in N, plus recording diagnostics) and `signalStatus`
+  (connection events). Respyra reads Force from `rawVernier`; it does not need
+  the optional `rawForce`, `vernierBreathing`, `steps`, `stepRate`,
+  `respirationRate`, or `allInOne` outlets for feedback. Choices persist and
   replace active outlets without restarting Bluetooth.
 - Optional `steps`, `stepRate`, and `respirationRate` checkboxes forward the
   belt's cumulative step count, cadence (steps/min), and respiration estimate
