@@ -169,7 +169,7 @@ to rediscover. Source and tests remain the authority for implementation facts.
 ## D-0010 — Default to comprehensive publication, allow operator opt-outs
 
 - Date: 2026-10-04
-- Status: Accepted
+- Status: Superseded in part by D-0011 (2026-10-11)
 - Context: The Respyra suite should capture all available direct sensor and
   breathing measurements on first launch while letting an experimenter narrow
   the active LSL outputs. Existing saved preferences remain the user's choice.
@@ -183,6 +183,29 @@ to rediscover. Source and tests remain the authority for implementation facts.
   selection changes reconfigure the publisher without changing BLE acquisition.
 - Supersedes: The mandatory-output policy in D-0007; the rest of D-0007's
   source timing and ADR readiness contracts remain in force.
+
+## D-0011 — Essential suite outputs and concise measure names
+
+- Date: 2026-10-11
+- Status: Accepted
+- Context: The Respyra user confirmed the essential selection and requested
+  short, descriptive scientific stream names in the downloaded suite.
+- Decision: Fresh Polar selects ECG/ACC/HR/RR, signed PCA chest motion,
+  detrended chest motion and estimated breath phase, with three required
+  quality/validity companions; connection markers publish separately. Fresh
+  Vernier selects raw device rows and connection markers. Other metrics and
+  All-in-one remain opt-in. Standalone saved choices remain authoritative;
+  Respyra suite installation restores these defaults with a preference backup.
+- Naming: Prefer the shortest unambiguous measure/construct name and established
+  scientific abbreviations. Publish H10/Vernier source prefixes; document exact
+  names, abbreviations, units, channels and transform/validation limits. Keep
+  method detail in metadata. A quality or validity flag is not physiological
+  validation; chest projections are not measured lung volume or airflow.
+- Consequences: Mini 0.6.10 migrates known factory prefixes to H10/Vernier;
+  custom prefixes survive. Short display suffixes retain historical source IDs,
+  metric IDs, units and processing, so consumers must discover by metadata.
+- Supersedes: D-0010's comprehensive fresh selection and D-0009's broad default
+  selection target, retaining operator opt-outs and independent combined outlets.
 
 ## Record format
 

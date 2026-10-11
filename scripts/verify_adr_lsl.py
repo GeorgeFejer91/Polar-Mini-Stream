@@ -13,20 +13,21 @@ from pylsl import StreamInlet, cf_float32, resolve_byprop
 parser = argparse.ArgumentParser()
 parser.add_argument("mode", choices=["separate", "single", "both"])
 parser.add_argument("--output", type=Path)
+parser.add_argument("--base")
 args = parser.parse_args()
-base = f"adr_acceptance_{args.mode}"
+base = args.base or f"adr_acceptance_{args.mode}"
 waveforms = {
-    "ChestMotion": "g",
+    "ChestPCA": "g",
     "adrMovingAverageDifference": "ratio",
-    "ChestMotion-DT": "g",
+    "ChestDT": "g",
     "adrAxisDifferenceMagnitude": "g",
 }
-suffixes = list(waveforms) + ["PCA-Quality", "PCA-Valid", "adrMovingAverageValid", "Phan-Valid"]
+suffixes = list(waveforms) + ["PCAQuality", "PCAValid", "adrMovingAverageValid", "DTValid"]
 individual_suffixes = ([] if args.mode == "single" else
-                       ["ChestMotion", "PCA-Quality", "PCA-Valid"]
+                       ["ChestPCA", "PCAQuality", "PCAValid"]
                        if args.mode == "both" else suffixes)
 names = [f"{base}_{suffix}" for suffix in individual_suffixes]
-if args.mode != "single": names += [f"{base}_ECG", f"{base}_Accelerometer"]
+if args.mode != "single": names += [f"{base}_ECG", f"{base}_ACC"]
 if args.mode != "separate": names += [base]
 inlets = {}
 received = {name: [] for name in names}
@@ -52,13 +53,14 @@ try:
             companions = info.desc().child_value("companion_streams").split(",")
             assert companions and all(companion in names for companion in companions)
             expected_contract = {
-                "ChestMotion": "respyra-polar-pca/1",
-                "ChestMotion-DT": "respyra-polar-phan-signed/1",
+                "ChestPCA": "respyra-polar-pca/1",
+                "ChestDT": "respyra-polar-phan-signed/1",
             }.get(suffix)
             if expected_contract:
                 assert info.desc().child_value("respyra_input_contract") == expected_contract
-                legacy_suffix = {"ChestMotion": "PCA-Breathing", "ChestMotion-DT": "Phan-Breathing"}[suffix]
-                assert info.source_id() == f"polar-h10-{base}_{legacy_suffix}"
+                legacy_suffix = {"ChestPCA": "PCA-Breathing", "ChestDT": "Phan-Breathing"}[suffix]
+                identity_base = "Polar-H10-Mini" if base == "H10" else base
+                assert info.source_id() == f"polar-h10-{identity_base}_{legacy_suffix}"
                 assert info.desc().child_value("respyra_signal_role") == "signed_breathing_level"
                 assert info.desc().child_value("inhale_polarity").startswith("unknown")
         elif suffix in suffixes:

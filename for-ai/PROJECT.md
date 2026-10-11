@@ -109,3 +109,5 @@ are retained to preserve installed-user continuity.
 
 Git and runnable checks are the authority for branch, revision, and behavior.
 Do not turn this section into a second status ledger.
+
+Factory stream prefixes are H10 and Vernier. D-0011 fixes the essential default selection and the short descriptive/scientific naming rule. Display names change in 0.6.10 while metric IDs, source IDs and measures stay stable; custom prefixes are retained.

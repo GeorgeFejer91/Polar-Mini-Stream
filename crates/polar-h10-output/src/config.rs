@@ -490,12 +490,29 @@ pub fn output_stream_name(base_name: &str, metric_id: &str) -> Option<String> {
 pub fn output_stream_source_id(base_name: &str, metric_id: &str) -> Option<String> {
     MetricSpec::for_id(metric_id).map(|spec| {
         let identity_suffix = match metric_id {
+            "raw_acc" => "Accelerometer",
+            "heart_rate" => "Heart-Rate",
+            "rr_interval" => "RR-Intervals",
             "adr_pca_waveform" => "PCA-Breathing",
             "adr_axis_mean_difference" => "Phan-Breathing",
+            "adr_moving_average_phase" => "Flowborne",
+            "adr_pca_quality" => "PCA-Quality",
+            "adr_pca_valid" => "PCA-Valid",
+            "adr_axis_difference_valid" => "Phan-Valid",
             _ => spec.suffix(),
         };
+        let base_name = stream_identity_base(base_name);
         format!("polar-h10-{base_name}_{identity_suffix}")
     })
+}
+
+// Factory prefixes were shortened; persisted source IDs retain their old bases.
+pub(crate) fn stream_identity_base(base_name: &str) -> &str {
+    match base_name {
+        "H10" => "Polar-H10-Mini",
+        "Vernier" => "Vernier-GDX-Mini",
+        _ => base_name,
+    }
 }
 
 /// Returns the canonical discoverable name for a validated custom formula.
@@ -647,10 +664,10 @@ mod tests {
         assert_eq!(normalized.label, "ADR PCA relative amplitude");
         let projection = MetricSpec::for_id("adr_pca_waveform").unwrap();
         assert_eq!(projection.id, "adr_pca_waveform");
-        assert_eq!(projection.suffix(), "ChestMotion");
+        assert_eq!(projection.suffix(), "ChestPCA");
         assert_eq!(projection.label, "Chest Motion");
         let detrended = MetricSpec::for_id("adr_axis_mean_difference").unwrap();
-        assert_eq!(detrended.suffix(), "ChestMotion-DT");
+        assert_eq!(detrended.suffix(), "ChestDT");
         assert_eq!(detrended.label, "Chest Motion DT");
         for (id, suffix) in [
             (projection.id, "PCA-Breathing"),
@@ -739,7 +756,7 @@ mod tests {
         const EXPECTED: [(&str, &str); 24] = [
             ("adr_axis_difference_event", "adrAxisDifferenceEvent"),
             ("adr_axis_difference_rate", "adrAxisDifferenceRate"),
-            ("adr_moving_average_phase", "Flowborne"),
+            ("adr_moving_average_phase", "BreathPhase"),
             ("adr_pca_phase", "adrPcaPhase"),
             ("adr_pca_calibration", "adrPcaCalibration"),
             ("adr_pca_range", "adrPcaRange"),
@@ -1160,15 +1177,39 @@ mod tests {
         );
         assert_eq!(
             output_stream_name(&base, "raw_acc").as_deref(),
-            Some("participant_07_Accelerometer")
+            Some("participant_07_ACC")
         );
         assert_eq!(
             output_stream_name(&base, "heart_rate").as_deref(),
-            Some("participant_07_Heart-Rate")
+            Some("participant_07_HR")
         );
         assert_eq!(
             output_stream_name(&base, "excitement_score").as_deref(),
             Some("participant_07_excitementScore")
         );
+    }
+
+    #[test]
+    fn short_factory_names_preserve_installed_source_identities() {
+        for (id, suffix, legacy_suffix) in [
+            ("raw_ecg", "ECG", "ECG"),
+            ("raw_acc", "ACC", "Accelerometer"),
+            ("heart_rate", "HR", "Heart-Rate"),
+            ("rr_interval", "RR", "RR-Intervals"),
+            ("adr_pca_waveform", "ChestPCA", "PCA-Breathing"),
+            ("adr_axis_mean_difference", "ChestDT", "Phan-Breathing"),
+            ("adr_moving_average_phase", "BreathPhase", "Flowborne"),
+            ("adr_pca_quality", "PCAQuality", "PCA-Quality"),
+            ("adr_pca_valid", "PCAValid", "PCA-Valid"),
+            ("adr_axis_difference_valid", "DTValid", "Phan-Valid"),
+        ] {
+            assert_eq!(output_stream_name("H10", id), Some(format!("H10_{suffix}")));
+            assert_eq!(
+                output_stream_source_id("H10", id),
+                Some(format!("polar-h10-Polar-H10-Mini_{legacy_suffix}"))
+            );
+        }
+        assert_eq!(stream_identity_base("Vernier"), "Vernier-GDX-Mini");
+        assert_eq!(stream_identity_base("StudyBelt"), "StudyBelt");
     }
 }

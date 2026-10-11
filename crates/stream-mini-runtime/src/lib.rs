@@ -100,8 +100,8 @@ impl MiniAppKind {
 
     fn default_stream_name(self) -> &'static str {
         match self {
-            Self::Polar => "Polar-H10-Mini",
-            Self::Vernier => "Vernier-GDX-Mini",
+            Self::Polar => "H10",
+            Self::Vernier => "Vernier",
         }
     }
 
@@ -224,11 +224,14 @@ impl MiniPreferencesSnapshot {
         }
         Self {
             schema: PREFERENCE_SCHEMA.into(),
-            stream_name: normalize_stream_base(
-                file.stream_name
-                    .as_deref()
-                    .unwrap_or(kind.default_stream_name()),
-            )
+            stream_name: normalize_stream_base(match file.stream_name.as_deref() {
+                Some("Polar-H10-Mini") if kind == MiniAppKind::Polar => kind.default_stream_name(),
+                Some("Vernier-GDX-Mini") if kind == MiniAppKind::Vernier => {
+                    kind.default_stream_name()
+                }
+                Some(name) => name,
+                None => kind.default_stream_name(),
+            })
             .unwrap_or(fallback.stream_name),
             output_mode: if kind == MiniAppKind::Vernier
                 || file.output_mode == Some(MiniOutputMode::SingleStream)
@@ -2857,6 +2860,7 @@ mod tests {
     fn fresh_polar_preferences_select_only_study_signals_and_required_companions() {
         let defaults = MiniPreferencesSnapshot::default_for(MiniAppKind::Polar);
         assert_eq!(defaults.output_mode, MiniOutputMode::SeparateStreams);
+        assert_eq!(defaults.stream_name, "H10");
         assert_eq!(
             defaults.polar_outputs,
             [
@@ -2899,6 +2903,26 @@ mod tests {
                 .map(|id| (*id).to_string())
                 .collect::<Vec<_>>()
         );
+    }
+
+    #[test]
+    fn factory_stream_prefixes_migrate_but_custom_names_are_retained() {
+        for (kind, old, short) in [
+            (MiniAppKind::Polar, "Polar-H10-Mini", "H10"),
+            (MiniAppKind::Vernier, "Vernier-GDX-Mini", "Vernier"),
+        ] {
+            let saved = serde_json::from_value(serde_json::json!({"streamName": old})).unwrap();
+            assert_eq!(
+                MiniPreferencesSnapshot::from_file(kind, saved).stream_name,
+                short
+            );
+            let saved =
+                serde_json::from_value(serde_json::json!({"streamName": "StudyBelt"})).unwrap();
+            assert_eq!(
+                MiniPreferencesSnapshot::from_file(kind, saved).stream_name,
+                "StudyBelt"
+            );
+        }
     }
 
     #[test]
@@ -3067,14 +3091,27 @@ mod tests {
     #[cfg(all(target_os = "windows", feature = "liblsl-backend"))]
     async fn mock_samples(state: &MiniAppState) -> u64 {
         tokio::time::sleep(Duration::from_millis(320)).await;
-        let display = state.display.state.lock().unwrap();
-        match display.samples_snapshot.as_ref().unwrap() {
-            MiniEvent::Samples {
-                ecg_samples,
-                vernier_rows,
-                ..
-            } => ecg_samples + vernier_rows,
-            _ => panic!("expected a sample event"),
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(3);
+        loop {
+            let samples = {
+                let display = state.display.state.lock().unwrap();
+                match display.samples_snapshot.as_ref() {
+                    Some(MiniEvent::Samples {
+                        ecg_samples,
+                        vernier_rows,
+                        ..
+                    }) => Some(ecg_samples + vernier_rows),
+                    _ => None,
+                }
+            };
+            if let Some(samples) = samples {
+                return samples;
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "mock source did not emit a sample event"
+            );
+            tokio::time::sleep(Duration::from_millis(20)).await;
         }
     }
 

@@ -521,7 +521,7 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "raw_acc",
-        "Accelerometer",
+        "ACC",
         "Accelerometer",
         "X, Y and Z · 200 Hz",
         "mg",
@@ -701,7 +701,7 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "heart_rate",
-        "Heart-Rate",
+        "HR",
         "Heart rate",
         "H10 device-derived beat rate",
         "bpm",
@@ -719,7 +719,7 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "rr_interval",
-        "RR-Intervals",
+        "RR",
         "RR interval",
         "Accepted beat-to-beat interval",
         "ms",
@@ -971,7 +971,7 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "adr_pca_waveform",
-        "ChestMotion",
+        "ChestPCA",
         "Chest Motion",
         "Signed principal-axis chest-motion projection",
         "g",
@@ -1043,7 +1043,7 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "adr_moving_average_phase",
-        "Flowborne",
+        "BreathPhase",
         "Flowborne",
         "+1 inhale · −1 exhale · 0 hold · −2 bad signal",
         "class",
@@ -1097,7 +1097,7 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "adr_axis_mean_difference",
-        "ChestMotion-DT",
+        "ChestDT",
         "Chest Motion DT",
         "Detrended chest acceleration on the shared PCA axis",
         "g",
@@ -1133,7 +1133,7 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "adr_axis_difference_valid",
-        "Phan-Valid",
+        "DTValid",
         "Phan validity",
         "At least 0.2 s of contiguous source data",
         "0/1",
@@ -1151,7 +1151,7 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "adr_pca_quality",
-        "PCA-Quality",
+        "PCAQuality",
         "PCA quality",
         "Calibrated range, motion, and PCA-dominance quality index",
         "0–1",
@@ -1169,7 +1169,7 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "adr_pca_valid",
-        "PCA-Valid",
+        "PCAValid",
         "PCA validity",
         "Calibration, freshness, and motion gate",
         "0/1",

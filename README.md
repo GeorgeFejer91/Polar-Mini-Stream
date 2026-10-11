@@ -76,3 +76,5 @@ cargo run -p polar-h10-metrics --example export_catalog -- docs/metric-catalog.j
 The site is published from `docs/` on `main`; installer binaries are GitHub
 Release assets, not Git blobs. Agent context starts at
 [for-ai/README.md](for-ai/README.md).
+
+Default stream prefixes are `H10` and `Vernier`. Essential H10 outlets use ECG, ACC, HR, RR, ChestPCA, ChestDT, BreathPhase, PCAQuality, PCAValid and DTValid suffixes, plus H10_Link. Vernier defaults are Vernier_Raw and Vernier_Link. Existing factory prefixes migrate; custom prefixes and historical source IDs are retained. Use short, unambiguous measure names and established scientific abbreviations; method qualifiers distinguish estimates, while units and provenance belong in metadata. See the [suite naming reference](https://github.com/GeorgeFejer91/respyra-2.0/blob/v2.3.14/docs/stream-names.md).

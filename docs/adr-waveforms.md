@@ -21,9 +21,9 @@ projection. All windows are causal and use source timestamps.
 
 | Metric ID / LSL suffix | Formula and unit | Origin and interpretation |
 | --- | --- | --- |
-| `adr_pca_waveform` / `ChestMotion` | `b(t) = dot(EMA(a) − calibration center, u)`, g | Fixed-axis PCA motion waveform. Default axis learning takes 12 s. Retains signed motion and sustained offsets. |
+| `adr_pca_waveform` / `ChestPCA` | `b(t) = dot(EMA(a) − calibration center, u)`, g | Fixed-axis PCA motion waveform. Default axis learning takes 12 s. Retains signed motion and sustained offsets. |
 | `adr_moving_average_difference` / `adrMovingAverageDifference` | `(mean_0.267s(b) − mean_2s(b)) / PCA span`, ratio | Flowborne-style two-window contrast applied to the PCA acceleration signal. It approaches zero during a sustained hold. |
-| `adr_axis_mean_difference` / `ChestMotion-DT` | `dot(mean_0.2s(a) − mean_200s(a), u)`, g | Signed adaptation of Phan's windows using the shared fixed PCA axis. This signed variant is an app-specific adaptation. |
+| `adr_axis_mean_difference` / `ChestDT` | `dot(mean_0.2s(a) − mean_200s(a), u)`, g | Signed adaptation of Phan's windows using the shared fixed PCA axis. This signed variant is an app-specific adaptation. |
 | `adr_axis_difference_magnitude` / `adrAxisDifferenceMagnitude` | `sum(abs(mean_0.2s(a_i) − mean_200s(a_i)))`, g | The original Phan detector's continuous rectified score before event thresholding. Sign is discarded; both respiratory directions can produce peaks. |
 
 These candidates describe acceleration-related motion, not force in newtons,

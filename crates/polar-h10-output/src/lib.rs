@@ -47,7 +47,7 @@ use vernier_gdx_core::{SampleEncoding, SensorInfo, SensorSamples};
 #[cfg(feature = "liblsl-backend")]
 const VERNIER_RAW_OUTLET_KEY: &str = "__vernier_raw";
 const VERNIER_BREATHING_OUTLET_KEY: &str = "__vernier_breathing";
-pub const VERNIER_RAW_STREAM_SUFFIX: &str = "rawVernier";
+pub const VERNIER_RAW_STREAM_SUFFIX: &str = "Raw";
 pub const VERNIER_BREATHING_STREAM_SUFFIX: &str = "vernierBreathing";
 pub const VERNIER_BREATHING_RECORDING_ID: &str = "vernier_breathing";
 pub const VERNIER_STEPS_OUTPUT: &str = "vernier_steps";
@@ -1669,7 +1669,7 @@ mod normalization_tests {
     fn vernier_stream_names_are_stable_and_distinguish_raw_from_derived() {
         assert_eq!(
             vernier_raw_stream_name("participant_source-2"),
-            "participant_source-2_rawVernier"
+            "participant_source-2_Raw"
         );
         assert_eq!(
             vernier_breathing_stream_name("participant_source-2"),

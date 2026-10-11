@@ -411,7 +411,10 @@ impl LslPublisher {
         let (Ok(name), Ok(stream_type), Ok(source)) = (
             CString::new(output_name.as_str()),
             CString::new("VernierRaw"),
-            CString::new(format!("polar-stream-vernier-raw-{output_name}")),
+            CString::new(format!(
+                "polar-stream-vernier-raw-{}_rawVernier",
+                crate::config::stream_identity_base(base_name)
+            )),
         ) else {
             return;
         };
@@ -463,7 +466,11 @@ impl LslPublisher {
         let (Ok(name), Ok(stream_type), Ok(source)) = (
             CString::new(output_name.as_str()),
             CString::new("Respiration"),
-            CString::new(format!("polar-stream-vernier-breathing-{output_name}")),
+            CString::new(format!(
+                "polar-stream-vernier-breathing-{}_{}",
+                crate::config::stream_identity_base(base_name),
+                crate::VERNIER_BREATHING_STREAM_SUFFIX
+            )),
         ) else {
             return;
         };
@@ -854,14 +861,14 @@ impl MiniStatusOutput {
     ) -> Result<Self, String> {
         let stream_name = crate::normalize_stream_base(stream_name)?;
         let mut lsl = LslPublisher::new(bundled_library);
-        let name = format!("{stream_name}-signalStatus");
+        let name = format!("{stream_name}_Link");
         lsl.add_combined_outlet(
             MiniCombinedOutletDescriptor {
                 key: MINI_STATUS_KEY,
                 name: &name,
                 stream_type: "Markers",
                 channel_format: 1,
-                source_id: &format!("{}-{stream_name}-signal-status", if polar { "polar-mini" } else { "vernier-mini" }),
+                source_id: &format!("{}-{}-signal-status", if polar { "polar-mini" } else { "vernier-mini" }, crate::config::stream_identity_base(&stream_name)),
                 application: if polar { "Polar Stream Mini" } else { "Vernier Stream Mini" },
                 manufacturer: if polar { "Polar" } else { "Vernier" },
                 model: if polar { "H10" } else { "Go Direct" },
@@ -977,7 +984,10 @@ impl MiniCombinedOutput {
                 name: &stream_name,
                 stream_type: "PolarMini",
                 channel_format: 1,
-                source_id: &format!("polar-stream-mini-{stream_name}"),
+                source_id: &format!(
+                    "polar-stream-mini-{}",
+                    crate::config::stream_identity_base(&stream_name)
+                ),
                 application: "Polar Stream Mini",
                 manufacturer: "Polar",
                 model: "H10",
@@ -1068,7 +1078,10 @@ impl MiniCombinedOutput {
                 name: &inner.stream_name,
                 stream_type: "VernierMini",
                 channel_format: 2,
-                source_id: &format!("polar-stream-vernier-mini-{}", inner.stream_name),
+                source_id: &format!(
+                    "polar-stream-vernier-mini-{}",
+                    crate::config::stream_identity_base(&inner.stream_name)
+                ),
                 application: "Vernier Stream Mini",
                 manufacturer: "Vernier",
                 model: schema.model_code(),
@@ -2230,7 +2243,7 @@ mod tests {
         for (id, suffix) in [
             ("adr_axis_difference_event", "adrAxisDifferenceEvent"),
             ("adr_axis_difference_rate", "adrAxisDifferenceRate"),
-            ("adr_moving_average_phase", "Flowborne"),
+            ("adr_moving_average_phase", "BreathPhase"),
             (
                 "adr_moving_average_difference",
                 "adrMovingAverageDifference",

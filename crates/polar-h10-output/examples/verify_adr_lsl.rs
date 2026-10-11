@@ -21,12 +21,14 @@ async fn main() -> Result<(), String> {
     let mode = env::args()
         .nth(2)
         .ok_or("choose separate, single, or both")?;
-    let base = match mode.as_str() {
+    let default_base = match mode.as_str() {
         "single" => "adr_acceptance_single",
         "separate" => "adr_acceptance_separate",
         "both" => "adr_acceptance_both",
         _ => return Err("choose separate, single, or both".into()),
     };
+    let base_name = env::args().nth(3).unwrap_or_else(|| default_base.into());
+    let base = base_name.as_str();
     let mut ids = vec!["raw_ecg".to_string(), "raw_acc".to_string()];
     for id in ADR_WAVEFORM_IDS {
         for value in std::iter::once(id).chain(adr_companion_ids(id).iter()) {
