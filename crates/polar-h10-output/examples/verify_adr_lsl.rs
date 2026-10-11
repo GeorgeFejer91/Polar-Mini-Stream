@@ -74,7 +74,16 @@ async fn main() -> Result<(), String> {
     thread::sleep(Duration::from_secs(2));
     let origin = Instant::now();
     let mut max_processing_us = 0;
-    for batch in 0..240_u64 {
+    let batch_count = env::args()
+        .nth(4)
+        .map(|value| value.parse::<u64>())
+        .transpose()
+        .map_err(|error| error.to_string())?
+        .unwrap_or(240);
+    if !(1..=6000).contains(&batch_count) {
+        return Err("batch count must be 1..6000".into());
+    }
+    for batch in 0..batch_count {
         let due = Duration::from_millis(batch * 100);
         if let Some(wait) = due.checked_sub(origin.elapsed()) {
             thread::sleep(wait);
