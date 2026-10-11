@@ -17,7 +17,7 @@
       <a href="#signal-flow">Signal flow</a>
       <a href="#methods">Methods</a>
       <a href="#catalog">Metric catalog</a>
-      <a href="https://github.com/GeorgeFejer91/Polar-Mini-Stream/releases/latest">Downloads ↗</a>
+      <a href="https://github.com/GeorgeFejer91/respyra-2.0/releases/tag/v2.3.14">Downloads ↗</a>
     </nav>
   </header>
 
@@ -28,7 +28,7 @@
       <p class="lead">A compact reference for Stream Mini 0.6.10 in Respyra Suite 2.3.14. Polar defaults to ECG, ACC, HR, RR, ChestPCA, ChestDT and BreathPhase, with quality/validity companions and Link events. Vernier defaults to Vernier_Raw and Vernier_Link. All-in-one and other metrics start off. Definitions and formulas below are generated from the apps' Rust catalog.</p>
       <div class="intro-actions">
         <a class="button button-primary" href="#catalog">Explore metrics <span aria-hidden="true">↗</span></a>
-        <a class="button button-secondary" href="https://github.com/GeorgeFejer91/Polar-Mini-Stream">View source <span aria-hidden="true">↗</span></a>
+        <a class="button button-secondary" href="https://github.com/GeorgeFejer91/Polar-Mini-Stream/tree/77286f1cb5481da38449137e0310a7d21c3e32f1">View source <span aria-hidden="true">↗</span></a>
       </div>
       <div class="fact-row" aria-label="Project summary"><span><strong id="metric-total">54</strong> catalog entries</span><span><strong>2</strong> independent applets</span><span><strong>LSL</strong> output</span></div>
     </section>
@@ -101,7 +101,7 @@
         <article class="method-card"><span class="method-index">C / ACC</span><h3>Flowborne adaptation</h3><p>Compare 0.267 s and 2 s means of the signed PCA projection, divided by its calibrated span. Threshold the contrast into inhale (+1), exhale (−1), hold (0), or bad signal (−2).</p><p class="method-output"><code>adr_moving_average_difference</code> · <code>adr_moving_average_phase</code></p><a href="https://www.hsbi.de/publikationsserver/download/6574/6575/muc-2025-mci-174.pdf">Viscereality design publication ↗</a></article>
         <article class="method-card"><span class="method-index">D / FORCE</span><h3>Vernier normalization</h3><p>Forward Go Direct numeric channels unchanged. For the respiration belt's force channel, map each sample into [0, 1] using recent 30 s 5th–95th percentile bounds. Increasing force denotes inhalation.</p><p class="method-output"><code>Vernier_Raw</code> · <code>Vernier_rawForce</code> · <code>vernierBreathing</code> · <code>Vernier_Link</code> · <code>steps</code> · <code>stepRate</code> · <code>respirationRate</code></p><a href="https://www.vernier.com/manuals/GDX-RB">Vernier belt manual ↗</a></article>
       </div>
-      <p class="method-caveat">Four optional ADR candidates use one-channel Respiration streams with method provenance and readiness companions. Finite diagnostic values remain available during poor quality. These software outputs prepare paired reference validation. The cited sources describe origins or related methods; the signed Phan and H10 Flowborne paths are adaptations. Read <a href="https://github.com/GeorgeFejer91/Polar-Mini-Stream/blob/main/docs/adr-waveforms.md">the waveform contract and study workflow</a>.</p>
+      <p class="method-caveat">Four optional ADR candidates use one-channel Respiration streams with method provenance and readiness companions. Finite diagnostic values remain available during poor quality. These software outputs prepare paired reference validation. The cited sources describe origins or related methods; the signed Phan and H10 Flowborne paths are adaptations. Read <a href="https://github.com/GeorgeFejer91/Polar-Mini-Stream/blob/77286f1cb5481da38449137e0310a7d21c3e32f1/docs/adr-waveforms.md">the waveform contract and study workflow</a>.</p>
     </section>
 
     <section class="section catalog-section" id="catalog" aria-labelledby="catalog-title"><div class="content-width">
@@ -112,6 +112,6 @@
       <p class="catalog-footnote"><strong>Reading the citations:</strong> a linked publication may establish a general method rather than validate this exact app calculation. Implementation-specific formulas are identified as such. Polar HRV and coherence use H10-reported RR intervals, not peaks redetected from the exported raw ECG. <code>raw_force</code> is a shared catalog definition; Vernier Mini's live raw stream uses device metadata and can contain more than one numeric channel.</p>
     </div></section>
   </main>
-  <footer class="footer content-width"><span>Polar Mini Stream · research software</span><div><a href="https://github.com/GeorgeFejer91/Polar-Mini-Stream">Source</a><a href="https://github.com/GeorgeFejer91/Polar-Mini-Stream/releases/latest">Installers</a><a href="https://github.com/GeorgeFejer91/Polar-Mini-Stream/blob/main/LICENSE">License</a></div></footer>
+  <footer class="footer content-width"><span>Polar Mini Stream · research software</span><div><a href="https://github.com/GeorgeFejer91/Polar-Mini-Stream/tree/77286f1cb5481da38449137e0310a7d21c3e32f1">Source</a><a href="https://github.com/GeorgeFejer91/respyra-2.0/releases/tag/v2.3.14">Installers</a><a href="https://github.com/GeorgeFejer91/Polar-Mini-Stream/blob/77286f1cb5481da38449137e0310a7d21c3e32f1/LICENSE">License</a></div></footer>
 </body>
 </html>
