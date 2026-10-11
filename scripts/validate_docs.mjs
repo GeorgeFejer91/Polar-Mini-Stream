@@ -8,6 +8,13 @@ try {
   for (const width of [320, 375, 1280]) {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     await page.goto(url);
+    const introduction = await page.locator('.lead').innerText();
+    const vernierReference = await page.locator('#vernier-outputs').innerText();
+    if (!introduction.includes('Vernier defaults to Vernier_Raw and Vernier_Link') ||
+        !vernierReference.includes('A first launch selects only Vernier_Raw and Vernier_Link') ||
+        /selects all eight|locked Respyra raw/.test(vernierReference)) {
+      throw new Error('Vernier documentation disagrees with essential first-launch defaults');
+    }
     const total = await page.locator('.metric-card').count();
     if (total !== 61) throw new Error(`Expected 61 catalog entries, got ${total}`);
     const vernierTables = page.locator('#vernier-outputs table');

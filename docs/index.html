@@ -25,7 +25,7 @@
     <section class="intro content-width">
       <p class="eyebrow">Two small apps · one measurement path each</p>
       <h1>Signals in.<br><em>Streams out.</em></h1>
-      <p class="lead">A compact reference for every included Polar metric and the Vernier breathing output. Fresh Polar installs select ECG, ACC, native HR/RR, Chest Motion, Chest Motion DT and Flowborne phase, with required quality flags; All-in-one and other metrics are optional. Vernier selects all eight outlets. Definitions and formulas below are generated from the Rust catalog used by the apps.</p>
+      <p class="lead">A compact reference for Stream Mini 0.6.10 in Respyra Suite 2.3.14. Polar defaults to ECG, ACC, HR, RR, ChestPCA, ChestDT and BreathPhase, with quality/validity companions and Link events. Vernier defaults to Vernier_Raw and Vernier_Link. All-in-one and other metrics start off. Definitions and formulas below are generated from the apps' Rust catalog.</p>
       <div class="intro-actions">
         <a class="button button-primary" href="#catalog">Explore metrics <span aria-hidden="true">↗</span></a>
         <a class="button button-secondary" href="https://github.com/GeorgeFejer91/Polar-Mini-Stream">View source <span aria-hidden="true">↗</span></a>
@@ -69,7 +69,7 @@
             </tbody>
           </table>
         </div>
-        <p>The checked, locked Respyra raw checkbox appears first; All-in-one with a merging-stream icon appears last. The other six checkboxes control optional individual outlets. A first launch selects all eight outputs. Choices save automatically; changing them replaces outlets without restarting Bluetooth. Device values appear when reported. Mock settings are session-only; an external LSL recorder owns recording.</p>
+        <p>The Respyra raw checkbox appears first; All-in-one with a merging-stream icon appears last. A first launch selects only Vernier_Raw and Vernier_Link; the other six outputs start unchecked. Every output choice is operator-adjustable and saves automatically. Changing choices replaces outlets without restarting Bluetooth. Device values appear when reported. Mock settings are session-only; an external LSL recorder owns recording.</p>
         <p>Factory prefixes are <code>H10</code> and <code>Vernier</code>. Default streams use short descriptive measure names and established abbreviations: ECG, ACC, HR, RR and PCA. Existing factory source IDs remain stable; custom prefixes are retained. <a href="https://github.com/GeorgeFejer91/respyra-2.0/blob/v2.3.14/docs/stream-names.md">Exact default names, units and old-to-new mapping</a>.</p>
         <h4>Device channels inside Vernier_Raw</h4>
         <p>Channel labels and units come from the connected device's metadata. On the tested GDX-RB firmware 5.3, the channel names and slots were:</p>
