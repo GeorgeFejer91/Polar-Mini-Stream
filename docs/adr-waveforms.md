@@ -28,11 +28,11 @@ projection. All windows are causal and use source timestamps.
 
 These candidates describe acceleration-related motion, not force in newtons,
 airflow, displacement, or lung volume. Their common LSL contract makes them
-available for a future Respira input adapter; it does not make their amplitudes
+available to compatible consumers; the two supported signed Respyra inputs do not make their amplitudes
 physically equivalent to Vernier force. The signed candidates share PCA axis
 learning, so they are correlated algorithm variants rather than independent
 sensors. PCA sign is initially chosen mathematically, not from inhale labels.
-Polarity and participant range belong in later Respira calibration.
+Polarity and participant range belong in Respyra calibration.
 
 The PCA and signed axis-mean outlets are also advertised as separate optional
 Respyra input contracts: `respyra-polar-pca/1` and
@@ -102,7 +102,7 @@ that produced each live signal.
    contracts are `respyra-polar-pca/1` and `respyra-polar-phan-signed/1`;
    Respyra calibrates in native g and publishes its own normalized breathing
    stream. Its bundled recorder captures the selected input, derived stream and
-   markers. See [Respyra's input details](https://github.com/GeorgeFejer91/respyra-2.0/blob/codex/recorder-panel/docs/polar-input-contracts.md).
+   markers. See [Respyra's input details](https://github.com/GeorgeFejer91/respyra-2.0/blob/v2.3.15/docs/polar-input-contracts.md).
 3. For later paired evaluation, also record Vernier raw Force, raw Polar ACC,
    both candidate waveforms and their validity companions. Compare timing,
    shape, polarity, posture and motion artifacts before claiming equivalence.
