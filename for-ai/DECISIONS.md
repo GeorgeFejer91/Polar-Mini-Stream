@@ -263,3 +263,22 @@ decision and link both entries.
   ID and rawVernier/rawForce preference keys. No output selection or transform
   changes; old recordings retain old names. A new installer needs qualification.
 - Supersedes: D-0012's Vernier aggregate/scalar suffixes only.
+
+## D-0015 — Qualify direct XDF import with MNE
+
+- Date: 2026-10-02
+- Status: Accepted
+- Context: The experimenter wants recorded Mini streams to be readable from
+  Respyra's XDF itself, not only from a separate BIDS export.
+- Decision: Keep Mini LSL headers self-describing and make direct PyXDF/MNE
+  and MNELAB opening of recorded Polar and Vernier mock XDFs a required cross-project
+  gate. Keep the separate BIDS export and validator as an additional gate.
+- Consequences: XDF preserves native timestamps and sample values. MNE Raw
+  needs an explicit grid for irregular streams; XDF is not a BIDS-valid raw
+  format or a direct `mne_bids.read_raw_bids` input.
+- Supersedes: The separate-export-only interpretation in the prior project
+  goal and verification gate.
+
+
+- Provenance: Imported from origin/main, where this record used D-0010;
+  the local branch already used that identifier for another decision.

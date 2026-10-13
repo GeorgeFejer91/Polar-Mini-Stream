@@ -7,26 +7,25 @@ Standalone Polar H10 and Vernier Go Direct mini streamers for low-latency BLE-to
 ## Primary goal
 
 Develop and release two independent desktop mini streamers, Polar Stream Mini
-and Vernier Stream Mini that make it easy and reliable to select and publish
-every available device measurement, axis, and app metric through an
-individually identifiable LSL variable outlet with same-row supporting channels when needed. Each app should also
-offer one optional multi-channel All-in-one outlet that bundles the individual
-outputs the user has chosen to send. Fresh Polar preferences select direct ECG/ACC/HR/RR, the two Respyra-compatible
-PCA and signed Phan waveforms with bundled validity/quality, and Flowborne phase, without All-in-one; Vernier selects raw device data and connection
-events only. Respect
-later user opt-outs. Keep the
-raw BLE-to-LSL paths observable and fast. Keep accelerometer-derived
-respiration (ADR) candidates explicitly identified with readiness/quality
-companions while retaining finite diagnostic values. This is the product
-goal; the current output topology below is not yet fully aligned with it.
+and Vernier Stream Mini. Publish experimental variables in identifiable LSL
+streams, bundling same-timestamp quality/readiness and acquisition diagnostics.
+Fresh Polar preferences select ECG/ACC/HR/RR, signed PCA and detrended chest
+motion with their intrinsic supporting channels, breath phase and Link events.
+Fresh Vernier preferences select the complete raw measurement row and Link
+events. Other metrics, scalar copies and All-in-one remain optional. Preserve
+operator opt-outs and keep the raw BLE-to-LSL paths observable and fast.
 
-Respyra 2.0 is a downstream use case, not part of this repository. Its present
-study input is Vernier raw Force in newtons. Preserve that compatibility and
-investigate whether a Polar accelerometer-derived breathing signal can meet
-the same consumer contract for units, channel metadata, sample format, and
-timing. Do not present raw acceleration as Vernier Force or claim
-interchangeability before a defined conversion and validation. Reference:
-[Respyra 2.0](https://github.com/GeorgeFejer91/respyra-2.0).
+Respyra 2.0 consumes Vernier Force in newtons or either supported signed Polar
+chest-motion waveform in g. Preserve physical units, source identity and
+processing/readiness metadata; Respyra owns polarity and range calibration.
+Reference: [Respyra 2.0](https://github.com/GeorgeFejer91/respyra-2.0).
+
+Make published numeric outlets usable in Respyra's recorded XDF through PyXDF
+and MNE and through its separate BIDS export. Preserve original timestamps,
+channel order, labels, roles, physical or explicit unitless units, sample format,
+nominal rate (zero when irregular) and processing provenance. XDF is the archive
+and direct MNE import target; separate BIDS files use the export contract. Do
+not invent physiology across missing samples or irregular acquisition.
 
 ## Non-goals
 
