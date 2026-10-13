@@ -79,8 +79,15 @@ impl MetricSelection {
     pub fn from_ids<'a>(ids: impl IntoIterator<Item = &'a str>) -> Self {
         let mut selection = Self::none();
         for id in ids {
-            if let Some(index) = METRIC_CATALOG.iter().position(|metric| metric.id == id) {
-                selection.bits |= 1_u64 << index;
+            let companions = if ADR_WAVEFORM_IDS.contains(&id) {
+                adr_companion_ids(id)
+            } else {
+                &[]
+            };
+            for id in std::iter::once(id).chain(companions.iter().copied()) {
+                if let Some(index) = METRIC_CATALOG.iter().position(|metric| metric.id == id) {
+                    selection.bits |= 1_u64 << index;
+                }
             }
             match id {
                 "ecg_mean" | "ecg_rms" | "ecg_peak_to_peak" | "ecg_sd" => {
@@ -571,7 +578,7 @@ mod tests {
     }
 
     #[test]
-    fn experimental_breathing_outputs_are_independent_scalar_streams() {
+    fn selected_waveform_keeps_its_intrinsic_diagnostics_without_extra_selection() {
         let mut magnitude =
             MetricEngine::with_selection(MetricSelection::from_ids(["adr_pca_waveform"]));
         let mut phase = MetricEngine::with_selection(MetricSelection::from_ids(["adr_pca_phase"]));
@@ -587,8 +594,15 @@ mod tests {
             magnitude_values = magnitude.process_accelerometer(&[sample]);
             phase_values = phase.process_accelerometer(&[sample]);
         }
-        assert_eq!(magnitude_values.len(), 1);
-        assert_eq!(magnitude_values[0].id, "adr_pca_waveform");
+        assert_eq!(
+            magnitude_values
+                .iter()
+                .map(|value| value.id)
+                .collect::<Vec<_>>(),
+            ["adr_pca_quality", "adr_pca_valid", "adr_pca_waveform"]
+        );
+        assert!((0.0..=1.0).contains(&magnitude_values[0].value));
+        assert_eq!(magnitude_values[1].value, 1.0);
         assert_eq!(phase_values.len(), 1);
         assert_eq!(phase_values[0].id, "adr_pca_phase");
         assert!([-1.0, 0.0, 1.0].contains(&phase_values[0].value));
@@ -653,11 +667,16 @@ mod tests {
             );
             if index > 3_000 {
                 for value in values {
-                    let slot = ADR_WAVEFORM_IDS
-                        .iter()
-                        .position(|id| *id == value.id)
-                        .unwrap();
+                    let slot = ADR_WAVEFORM_IDS.iter().position(|id| *id == value.id);
                     assert!(value.value.is_finite());
+                    let Some(slot) = slot else {
+                        if value.id.ends_with("_valid") {
+                            assert!([0.0, 1.0].contains(&value.value));
+                        } else {
+                            assert!((0.0..=1.0).contains(&value.value));
+                        }
+                        continue;
+                    };
                     ranges[slot][0] = ranges[slot][0].min(value.value);
                     ranges[slot][1] = ranges[slot][1].max(value.value);
                 }

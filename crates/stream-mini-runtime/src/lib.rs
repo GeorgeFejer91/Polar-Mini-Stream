@@ -100,7 +100,7 @@ impl MiniAppKind {
 
     fn default_stream_name(self) -> &'static str {
         match self {
-            Self::Polar => "H10",
+            Self::Polar => "Polar",
             Self::Vernier => "Vernier",
         }
     }
@@ -225,7 +225,9 @@ impl MiniPreferencesSnapshot {
         Self {
             schema: PREFERENCE_SCHEMA.into(),
             stream_name: normalize_stream_base(match file.stream_name.as_deref() {
-                Some("Polar-H10-Mini") if kind == MiniAppKind::Polar => kind.default_stream_name(),
+                Some("Polar-H10-Mini" | "H10") if kind == MiniAppKind::Polar => {
+                    kind.default_stream_name()
+                }
                 Some("Vernier-GDX-Mini") if kind == MiniAppKind::Vernier => {
                     kind.default_stream_name()
                 }
@@ -2687,7 +2689,11 @@ fn normalize_polar_outputs(input: Option<Vec<String>>) -> Vec<String> {
         }
     }
     for selected in outputs.clone() {
-        for id in adr_companion_ids(&selected) {
+        for id in if polar_h10_metrics::ADR_WAVEFORM_IDS.contains(&selected.as_str()) {
+            &[][..]
+        } else {
+            adr_companion_ids(&selected)
+        } {
             if !outputs.iter().any(|selected| selected == id) {
                 outputs.push((*id).into());
             }
@@ -2860,7 +2866,7 @@ mod tests {
     fn fresh_polar_preferences_select_only_study_signals_and_required_companions() {
         let defaults = MiniPreferencesSnapshot::default_for(MiniAppKind::Polar);
         assert_eq!(defaults.output_mode, MiniOutputMode::SeparateStreams);
-        assert_eq!(defaults.stream_name, "H10");
+        assert_eq!(defaults.stream_name, "Polar");
         assert_eq!(
             defaults.polar_outputs,
             [
@@ -2871,9 +2877,6 @@ mod tests {
                 "adr_pca_waveform",
                 "adr_axis_mean_difference",
                 "adr_moving_average_phase",
-                "adr_pca_quality",
-                "adr_pca_valid",
-                "adr_axis_difference_valid",
             ]
         );
         let advertised_defaults = polar_metric_options()
@@ -2908,7 +2911,8 @@ mod tests {
     #[test]
     fn factory_stream_prefixes_migrate_but_custom_names_are_retained() {
         for (kind, old, short) in [
-            (MiniAppKind::Polar, "Polar-H10-Mini", "H10"),
+            (MiniAppKind::Polar, "Polar-H10-Mini", "Polar"),
+            (MiniAppKind::Polar, "H10", "Polar"),
             (MiniAppKind::Vernier, "Vernier-GDX-Mini", "Vernier"),
         ] {
             let saved = serde_json::from_value(serde_json::json!({"streamName": old})).unwrap();
@@ -3360,7 +3364,7 @@ mod tests {
                 .any(|id| id == "adr_pca_waveform")
         );
         assert!(
-            restored
+            !restored
                 .polar_outputs
                 .iter()
                 .any(|id| id == "adr_pca_valid")

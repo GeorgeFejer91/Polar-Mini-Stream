@@ -13,7 +13,6 @@ const catalog = JSON.parse(catalogSource.slice(catalogSource.indexOf("["), catal
 const polarDefaultOutputs = [
   "raw_ecg", "raw_acc", "heart_rate", "rr_interval",
   "adr_pca_waveform", "adr_axis_mean_difference", "adr_moving_average_phase",
-  "adr_pca_quality", "adr_pca_valid", "adr_axis_difference_valid",
 ];
 const polarBreathingMetrics = catalog
   .filter((metric) => ["Breathing", "Breathing dynamics"].includes(metric.category))
@@ -49,6 +48,12 @@ const apps = [
 const browser = await chromium.launch({ channel: process.env.PLAYWRIGHT_CHANNEL || undefined, headless: true, args: ["--allow-file-access-from-files"] });
 try {
   for (const app of apps) {
+    if (process.argv.includes('--streams')) {
+      await validateNormalWindow(app);
+      await validateMockWindow(app, true);
+      await validateMockWindow(app, false);
+      continue;
+    }
     await validateResizeConfig(app);
     await validateNormalWindow(app);
     await validateResizableWindow(app);
@@ -471,8 +476,9 @@ async function validateNormalWindow(app) {
     assert.equal(await page.locator("#reset-metrics").isDisabled(), true);
     await page.locator('#metric-options input[value="adr_interval_mean"]').check();
     await page.locator("#reset-metrics").click();
-    await page.waitForFunction(() => window.__miniSaves.some((save) =>
-      save.polarOutputs?.length === 10 && !save.polarOutputs.includes("adr_interval_mean")));
+    await page.waitForFunction(defaultOutputs => window.__miniSaves.some((save) =>
+      save.polarOutputs?.length === defaultOutputs.length &&
+      defaultOutputs.every(id => save.polarOutputs.includes(id))), polarDefaultOutputs);
     assert.equal(await page.locator("#signal-list .selected-signal").count(), 3);
     await page.setViewportSize({ width: 720, height: 640 });
     await assertNoOverflow(page);
@@ -489,8 +495,8 @@ async function validateNormalWindow(app) {
       ["adr_pca_waveform", "adr_pca_phase", "adr_pca_rate", "adr_interval_mean", "adr_axis_difference_event", "adr_axis_difference_rate", "adr_moving_average_phase", "adr_moving_average_difference", "adr_axis_mean_difference", "adr_axis_difference_magnitude"].every((id) => save.polarOutputs?.includes(id))));
     for (const id of ["adr_pca_quality", "adr_pca_valid", "adr_moving_average_valid", "adr_axis_difference_valid"]) {
       const companion = page.locator(`#metric-options input[value="${id}"]`);
-      assert.equal(await companion.isChecked(), true);
-      assert.equal(await companion.isDisabled(), true);
+      assert.equal(await companion.isChecked(), false);
+      assert.equal(await companion.isDisabled(), false);
     }
     const savedPreferences = await page.evaluate(() => window.__miniSaves.at(-1));
     const reopened = await createPage(app, { mockMode: false, lslHealthy: true, savedPreferences });
@@ -506,8 +512,9 @@ async function validateNormalWindow(app) {
       omitBackground: true,
     });
     await reopened.locator("#reset-metrics").click();
-    await reopened.waitForFunction(() => window.__miniSaves.some((save) =>
-      save.polarOutputs?.length === 10 && !save.polarOutputs.includes("adr_axis_difference_event")));
+    await reopened.waitForFunction(defaultOutputs => window.__miniSaves.some((save) =>
+      save.polarOutputs?.length === defaultOutputs.length &&
+      defaultOutputs.every(id => save.polarOutputs.includes(id))), polarDefaultOutputs);
     assert.equal(await reopened.locator("#reset-metrics").isDisabled(), true);
     assert.equal(await reopened.evaluate(() => window.__miniCalls.includes("disconnect_device")), false);
     const resetPreferences = await reopened.evaluate(() => window.__miniSaves.at(-1));
@@ -600,14 +607,15 @@ async function validateMockWindow(app, lslHealthy) {
       path: path.join(outputDirectory, `${app.kind}-stream-mini-mock-live.png`),
       omitBackground: true,
     });
-    await page.waitForTimeout(1500);
+    await page.evaluate(() => clearInterval(window.__miniSampleTimer));
+    await page.waitForFunction(() => !document.querySelector("#mini-node")?.classList.contains("streaming"));
     assert.equal(await page.locator("#mini-node").evaluate((node) => node.classList.contains("streaming")), false);
     await page.evaluate(({ kind, lsl }) => window.__emitMiniEvent({
       kind: "samples",
-      ecgSamples: kind === "polar" ? 78 : 0,
-      accSamples: kind === "polar" ? 120 : 0,
-      vernierRows: kind === "vernier" ? 12 : 0,
-      metricSamples: kind === "vernier" ? 12 : 0,
+      ecgSamples: kind === "polar" ? 39 * (window.__miniSampleTicks + 1) : 0,
+      accSamples: kind === "polar" ? 60 * (window.__miniSampleTicks + 1) : 0,
+      vernierRows: kind === "vernier" ? 6 * (window.__miniSampleTicks + 1) : 0,
+      metricSamples: kind === "vernier" ? 6 * (window.__miniSampleTicks + 1) : 0,
       lsl,
     }), { kind: app.kind, lsl: "Publishing 1 LSL stream" });
     await page.waitForFunction(() => document.querySelector("#mini-node")?.classList.contains("streaming"));
@@ -790,14 +798,16 @@ async function createPage(app, options) {
               message: "Publishing synthetic data",
             });
           }, 0);
-          window.setTimeout(() => {
+          window.__miniSampleTicks = 0;
+          window.__miniSampleTimer = window.setInterval(() => {
+            const sampleTicks = ++window.__miniSampleTicks;
             eventChannel?.onmessage?.({
               kind: "samples",
-              ecgSamples: app.kind === "polar" ? 39 : 0,
-              accSamples: app.kind === "polar" ? 60 : 0,
-              heartRatePackets: app.kind === "polar" ? 1 : 0,
-              metricSamples: app.kind === "vernier" ? 6 : 0,
-              vernierRows: app.kind === "vernier" ? 6 : 0,
+              ecgSamples: app.kind === "polar" ? 39 * sampleTicks : 0,
+              accSamples: app.kind === "polar" ? 60 * sampleTicks : 0,
+              heartRatePackets: app.kind === "polar" ? sampleTicks : 0,
+              metricSamples: app.kind === "vernier" ? 6 * sampleTicks : 0,
+              vernierRows: app.kind === "vernier" ? 6 * sampleTicks : 0,
               droppedBatches: 0,
               queueHighWater: 0,
               lsl,

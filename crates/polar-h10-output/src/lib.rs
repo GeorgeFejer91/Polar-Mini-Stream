@@ -47,7 +47,7 @@ use vernier_gdx_core::{SampleEncoding, SensorInfo, SensorSamples};
 #[cfg(feature = "liblsl-backend")]
 const VERNIER_RAW_OUTLET_KEY: &str = "__vernier_raw";
 const VERNIER_BREATHING_OUTLET_KEY: &str = "__vernier_breathing";
-pub const VERNIER_RAW_STREAM_SUFFIX: &str = "Raw";
+pub const VERNIER_RAW_STREAM_SUFFIX: &str = "rawForce";
 pub const VERNIER_BREATHING_STREAM_SUFFIX: &str = "vernierBreathing";
 pub const VERNIER_BREATHING_RECORDING_ID: &str = "vernier_breathing";
 pub const VERNIER_STEPS_OUTPUT: &str = "vernier_steps";
@@ -120,6 +120,17 @@ impl SensorClockMap {
 pub struct MetricValue<'a> {
     pub id: &'a str,
     pub value: f32,
+}
+
+fn bundled_metric_row(id: &str, waveform: f32, snapshot: &[MetricValue<'_>]) -> Vec<f32> {
+    std::iter::once(waveform)
+        .chain(config::bundled_companion_ids(id).iter().map(|id| {
+            snapshot
+                .iter()
+                .find(|metric| metric.id == *id)
+                .map_or(f32::NAN, |metric| metric.value)
+        }))
+        .collect()
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -215,11 +226,17 @@ impl VernierStreamSchema {
 }
 
 pub fn vernier_raw_stream_name(base_name: &str) -> String {
-    format!("{base_name}_{VERNIER_RAW_STREAM_SUFFIX}")
+    format!(
+        "{}_{VERNIER_RAW_STREAM_SUFFIX}",
+        config::source_stream_base(base_name, "Vernier")
+    )
 }
 
 pub fn vernier_breathing_stream_name(base_name: &str) -> String {
-    format!("{base_name}_{VERNIER_BREATHING_STREAM_SUFFIX}")
+    format!(
+        "{}_{VERNIER_BREATHING_STREAM_SUFFIX}",
+        config::source_stream_base(base_name, "Vernier")
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1066,9 +1083,19 @@ impl OutputRouter {
                 continue;
             }
             let value = inner.transform(metric.id, metric.value);
-            inner
-                .lsl
-                .push_scalar_series_at(metric.id, std::iter::once(value), sensor_timestamp_ns);
+            let companions = config::bundled_companion_ids(metric.id);
+            if companions.is_empty() {
+                inner.lsl.push_scalar_series_at(
+                    metric.id,
+                    std::iter::once(value),
+                    sensor_timestamp_ns,
+                );
+            } else {
+                let row = bundled_metric_row(metric.id, value, values);
+                inner
+                    .lsl
+                    .push_metric_row_at(metric.id, &row, sensor_timestamp_ns);
+            }
             if let Some(osc) = &mut inner.osc {
                 osc.send_series(metric.id, sensor_timestamp_ns, 1, std::iter::once(value));
             }
@@ -1288,6 +1315,7 @@ impl RouterInner {
         }
         #[cfg(feature = "liblsl-backend")]
         let vernier = VernierMiniSelection::from_ids(config.vernier_outputs.as_deref());
+        #[cfg(feature = "liblsl-backend")]
         if let Some(schema) = vernier_schema {
             lsl.add_vernier_outlets(
                 &config.stream_name,
@@ -1297,14 +1325,23 @@ impl RouterInner {
                 vernier.breathing,
             );
         }
+        #[cfg(feature = "liblsl-backend")]
+        let vernier_outlets = usize::from(vernier_schema.is_some())
+            * (usize::from(vernier.raw_vernier) + usize::from(vernier.breathing));
+        #[cfg(feature = "rusty-lsl-backend")]
+        let vernier_outlets = {
+            if vernier_schema.is_some() {
+                return Err("Aggregate Vernier LSL requires the packaged liblsl backend.".into());
+            }
+            0
+        };
         let expected = config.outputs.len()
             + config
                 .custom_formulas
                 .iter()
                 .filter(|formula| formula.enabled)
                 .count()
-            + usize::from(vernier_schema.is_some())
-                * (usize::from(vernier.raw_vernier) + usize::from(vernier.breathing));
+            + vernier_outlets;
         let actual = lsl.outlet_count();
         if fail_after_outlets.is_some_and(|outlets| actual >= outlets) {
             return Err(format!(
@@ -1669,11 +1706,24 @@ mod normalization_tests {
     fn vernier_stream_names_are_stable_and_distinguish_raw_from_derived() {
         assert_eq!(
             vernier_raw_stream_name("participant_source-2"),
-            "participant_source-2_Raw"
+            "Vernier_participant_source-2_rawForce"
+        );
+        assert_eq!(vernier_raw_stream_name("Vernier"), "Vernier_rawForce");
+        assert_eq!(
+            output_stream_name("Vernier", "raw_force").as_deref(),
+            Some("Vernier_rawForceOnly")
+        );
+        assert_eq!(
+            output_stream_name("participant_source-2", "raw_force").as_deref(),
+            Some("Vernier_participant_source-2_rawForceOnly")
+        );
+        assert_eq!(
+            output_stream_source_id("Vernier", "raw_force").as_deref(),
+            Some("polar-h10-Vernier-GDX-Mini_rawForce")
         );
         assert_eq!(
             vernier_breathing_stream_name("participant_source-2"),
-            "participant_source-2_vernierBreathing"
+            "Vernier_participant_source-2_vernierBreathing"
         );
     }
 

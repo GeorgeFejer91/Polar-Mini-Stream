@@ -6,8 +6,8 @@
   const isNative = Boolean(core?.invoke && core?.Channel);
   const directPolarOutputs = Object.freeze(["raw_ecg", "raw_acc", "heart_rate", "rr_interval"]);
   const vernierOutputs = Object.freeze([
-    { id: "rawVernier", label: "Respyra raw", detail: "VernierRaw stream with Force in newtons and every device channel; Respyra can use Force from this outlet." },
-    { id: "rawForce", label: "Belt force (N)", detail: "Unfiltered belt tension in newtons; also present in Raw data and All-in-one when selected." },
+    { id: "rawVernier", label: "Respyra raw", detail: "Vernier_rawForce contains Force in newtons, every device channel and acquisition diagnostics; Respyra uses its Force channel." },
+    { id: "rawForce", label: "Belt force (N)", detail: "Vernier_rawForceOnly is an optional Force-only copy in newtons; the same values are bundled in Vernier_rawForce." },
     { id: "vernierBreathing", label: "Breath wave (0–1)", detail: "App-normalized belt-force waveform; not lung volume or breaths per minute." },
     { id: "signalStatus", label: "Signal events", detail: "Markers for lost and restored Bluetooth signal." },
     { id: "steps", label: "Steps", detail: "Belt pedometer's cumulative step count, as reported by the device." },

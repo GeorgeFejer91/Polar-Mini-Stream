@@ -221,6 +221,46 @@ fn enabled_axes(axes: [bool; 3]) -> String {
         .join(",")
 }
 
+/// Immutable layout of a waveform with its same-timestamp diagnostics.
+pub(crate) fn adr_waveform_fields(spec: MetricDefinition) -> Vec<(&'static str, String)> {
+    if !polar_h10_metrics::ADR_WAVEFORM_IDS.contains(&spec.id) {
+        return Vec::new();
+    }
+    let mut fields = vec![
+        ("schema", "adr-waveform/2".to_string()),
+        ("stream_role", "respiration_candidate".to_string()),
+        ("metric_id", spec.id.to_string()),
+        ("raw_source_metric_id", "raw_acc".to_string()),
+        ("diagnostic_channels", adr_companion_ids(spec.id).join(",")),
+        (
+            "validity_channels",
+            adr_companion_ids(spec.id)
+                .iter()
+                .filter(|id| id.ends_with("_valid"))
+                .copied()
+                .collect::<Vec<_>>()
+                .join(","),
+        ),
+        ("waveform_channel", spec.id.to_string()),
+        ("interpretation", spec.explainer.to_string()),
+    ];
+    let respyra_contract = match spec.id {
+        "adr_pca_waveform" => Some("respyra-polar-pca/1"),
+        "adr_axis_mean_difference" => Some("respyra-polar-phan-signed/1"),
+        _ => None,
+    };
+    if let Some(contract) = respyra_contract {
+        for (name, value) in [
+            ("respyra_input_contract", contract),
+            ("respyra_signal_role", "signed_breathing_level"),
+            ("inhale_polarity", "unknown; determine during setup"),
+        ] {
+            fields.push((name, value.to_string()));
+        }
+    }
+    fields
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

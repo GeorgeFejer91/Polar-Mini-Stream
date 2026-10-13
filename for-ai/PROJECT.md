@@ -9,11 +9,10 @@ Standalone Polar H10 and Vernier Go Direct mini streamers for low-latency BLE-to
 Develop and release two independent desktop mini streamers, Polar Stream Mini
 and Vernier Stream Mini that make it easy and reliable to select and publish
 every available device measurement, axis, and app metric through an
-individually identifiable, single-channel LSL outlet. Each app should also
+individually identifiable LSL variable outlet with same-row supporting channels when needed. Each app should also
 offer one optional multi-channel All-in-one outlet that bundles the individual
 outputs the user has chosen to send. Fresh Polar preferences select direct ECG/ACC/HR/RR, the two Respyra-compatible
-PCA and signed Phan waveforms, Flowborne phase and required validity/quality
-companions, without All-in-one; Vernier selects raw device data and connection
+PCA and signed Phan waveforms with bundled validity/quality, and Flowborne phase, without All-in-one; Vernier selects raw device data and connection
 events only. Respect
 later user opt-outs. Keep the
 raw BLE-to-LSL paths observable and fast. Keep accelerometer-derived
@@ -55,7 +54,7 @@ contracts. Raw sensor publication precedes derived metrics and UI delivery.
 Fresh preferences enable Polar raw ECG/ACC, heart rate and RR, and Vernier's
 complete raw numeric row (including force). Operators can uncheck any outlet.
 Four continuous ADR candidates use dedicated
-scalar LSL outlets; old respiratory IDs have no aliases.
+LSL variable bundles; old respiratory IDs have no aliases.
 JavaScript is presentation and control, never the authoritative data path.
 Both frameless mini windows resize from their visible panel edges. Their control
 groups retain their order while spacing and type scale with width and height;
@@ -77,7 +76,7 @@ resizing remains possible. The All-in-one box controls only the
 additional combined outlet. The expanded picker exposes all Polar
 Mini-selectable derived metrics. Fresh Polar
 preferences select the four direct SDK outputs, Chest Motion, Chest Motion DT,
-Flowborne phase and their required companions; All-in-one and other derived
+Flowborne phase with quality/readiness bundled inside the waveform outlets; All-in-one and other derived
 metrics start off. The picker's Use study defaults action explicitly restores
 this selection; fresh Vernier preferences select `rawVernier` and `signalStatus`.
 The other six outputs remain optional. Standalone Mini upgrades preserve saved
@@ -110,4 +109,4 @@ are retained to preserve installed-user continuity.
 Git and runnable checks are the authority for branch, revision, and behavior.
 Do not turn this section into a second status ledger.
 
-Factory stream prefixes are H10 and Vernier. D-0011 fixes the essential default selection and the short descriptive/scientific naming rule. Display names change in 0.6.10 while metric IDs, source IDs and measures stay stable; custom prefixes are retained.
+Factory stream prefixes in the updated source are Polar and Vernier. D-0011 retains the essential default selection; D-0012 fixes visible producer prefixes, rawECG/rawACC names and custom identifiers after the producer prefix. D-0014 names the full Vernier row rawForce and its optional scalar copy rawForceOnly. Historical factory source IDs and metric IDs stay stable. Mini 0.6.11 is the candidate that ships this naming/bundle contract; verify the exact installed artifact before promotion.

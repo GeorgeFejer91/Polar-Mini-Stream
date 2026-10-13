@@ -31,7 +31,7 @@ are retained so installed applets can be upgraded without changing identity.
 
 Both apps publish individual LSL outlets and can add one sparse All-in-one
 outlet alongside them. Polar starts with ECG, ACC, native HR/RR, PCA breathing, Phan breathing,
-Flowborne phase and required quality/validity companions; All-in-one starts off. Vernier starts with
+Flowborne phase with quality/validity bundled into the waveform streams; All-in-one starts off. Vernier starts with
 two outlets: raw device data (including Force in N) and connection-event markers.
 The separate force copy, normalized breath waveform, device rates/counts and
 All-in-one outlet start off. Users can change any selection. Selected ADR waveforms and
@@ -77,4 +77,4 @@ The site is published from `docs/` on `main`; installer binaries are GitHub
 Release assets, not Git blobs. Agent context starts at
 [for-ai/README.md](for-ai/README.md).
 
-Default stream prefixes are `H10` and `Vernier`. Essential H10 outlets use ECG, ACC, HR, RR, ChestPCA, ChestDT, BreathPhase, PCAQuality, PCAValid and DTValid suffixes, plus H10_Link. Vernier defaults are Vernier_Raw and Vernier_Link. Existing factory prefixes migrate; custom prefixes and historical source IDs are retained. Use short, unambiguous measure names and established scientific abbreviations; method qualifiers distinguish estimates, while units and provenance belong in metadata. See the [suite naming reference](https://github.com/GeorgeFejer91/respyra-2.0/blob/v2.3.14/docs/stream-names.md).
+Default stream prefixes are `Polar` and `Vernier`. Essential Polar outlets use rawECG, rawACC, HR, RR, ChestPCA, ChestDT and BreathPhase suffixes, plus Polar_Link. The two breathing waveforms include their quality/readiness channels; standalone PCAQuality/PCAValid/DTValid copies are optional. Vernier defaults are Vernier_rawForce and Vernier_Link; the optional Force-only copy is Vernier_rawForceOnly. Combined outlets use an AllInOne suffix. Existing factory prefixes migrate; custom identifiers follow the source prefix and historical source IDs are retained. Respyra replaces the source prefix with Respyra and adds _calibrated to every usable recorded feedback input. See the [suite naming reference](https://github.com/GeorgeFejer91/respyra-2.0/blob/main/docs/stream-names.md).

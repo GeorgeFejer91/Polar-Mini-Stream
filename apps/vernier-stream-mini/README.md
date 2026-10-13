@@ -7,7 +7,7 @@ workspace.
 
 Eight outlet checkboxes sit directly inside the mini window. The first,
 **Respyra raw**, starts checked: Respyra reads Force in newtons from
-this raw device-data outlet. All eight choices start checked and may be changed;
+this raw device-data outlet. Raw data and connection events start checked; the six other choices start off;
 changes save instantly. **All-in-one** is last and has
 a small merging-stream icon.
 
@@ -16,15 +16,15 @@ expand or compress with both dimensions without a main-window scrollbar.
 Click an overlong status value, or focus it and press Enter, to read its full
 text in a dialog.
 
-- Default outlets: `rawVernier` (every advertised numeric belt channel,
-  including Force in N, plus recording diagnostics) and `signalStatus`
-  (connection events). Respyra reads Force from `rawVernier`; it does not need
-  the optional `rawForce`, `vernierBreathing`, `steps`, `stepRate`,
+- Default outlets: `Vernier_rawForce` (every advertised numeric belt channel,
+  including Force in N, plus recording diagnostics) and `Vernier_Link`
+  (connection events). Respyra reads Force from `Vernier_rawForce`; it does not need
+  the optional `Vernier_rawForceOnly`, `vernierBreathing`, `steps`, `stepRate`,
   `respirationRate`, or `allInOne` outlets for feedback. Choices persist and
   replace active outlets without restarting Bluetooth.
 - Optional `steps`, `stepRate`, and `respirationRate` checkboxes forward the
   belt's cumulative step count, cadence (steps/min), and respiration estimate
-  (breaths/min) as their own LSL streams. Together with `rawForce`, all four
+  (breaths/min) as their own LSL streams. Together with `Vernier_rawForceOnly`, all four
   device signals are individually selectable. They
   publish only when those device channels update. The Mock source includes
   synthetic rate/count updates every 10 seconds.

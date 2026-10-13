@@ -6,8 +6,9 @@ use std::{
 
 use libloading::Library;
 use polar_h10_core::AccSample;
-use polar_h10_metrics::{ADR_WAVEFORM_IDS, BreathingSettings, adr_companion_ids};
+use polar_h10_metrics::BreathingSettings;
 
+use crate::config::{bundled_companion_ids, lsl_channel_role, lsl_channel_specs};
 use crate::{
     CustomFormulaConfig, MetricSpec, SourcePalette, VERNIER_BREATHING_OUTLET_KEY,
     VERNIER_RAW_OUTLET_KEY, VernierMiniSelection, VernierStreamSchema, custom_output_stream_name,
@@ -274,7 +275,7 @@ impl LslPublisher {
             (api.create_streaminfo)(
                 name.as_ptr(),
                 stream_type.as_ptr(),
-                spec.channels,
+                spec.channels + bundled_companion_ids(spec.id).len() as i32,
                 spec.rate_hz,
                 1,
                 source.as_ptr(),
@@ -741,6 +742,10 @@ impl LslPublisher {
         self.status = format!("Publishing {} stream(s)", self.outlets.len());
     }
 
+    pub(crate) fn push_metric_row_at(&mut self, id: &str, row: &[f32], timestamp_ns: u64) {
+        self.push_float_rows_at_key(id, row, row.len(), Some(timestamp_ns), None);
+    }
+
     fn push_float_rows_at_key(
         &mut self,
         key: &str,
@@ -815,6 +820,7 @@ struct MiniCombinedChannel {
     unit: String,
     stream_type: String,
     detail: String,
+    metric_id: Option<&'static str>,
 }
 
 impl MiniCombinedChannel {
@@ -824,6 +830,7 @@ impl MiniCombinedChannel {
             unit: unit.into(),
             stream_type: stream_type.into(),
             detail: detail.into(),
+            metric_id: None,
         }
     }
 }
@@ -861,7 +868,13 @@ impl MiniStatusOutput {
     ) -> Result<Self, String> {
         let stream_name = crate::normalize_stream_base(stream_name)?;
         let mut lsl = LslPublisher::new(bundled_library);
-        let name = format!("{stream_name}_Link");
+        let name = format!(
+            "{}_Link",
+            crate::config::source_stream_base(
+                &stream_name,
+                if polar { "Polar" } else { "Vernier" }
+            )
+        );
         lsl.add_combined_outlet(
             MiniCombinedOutletDescriptor {
                 key: MINI_STATUS_KEY,
@@ -981,7 +994,10 @@ impl MiniCombinedOutput {
         lsl.add_combined_outlet(
             MiniCombinedOutletDescriptor {
                 key: MINI_POLAR_COMBINED_KEY,
-                name: &stream_name,
+                name: &format!(
+                    "{}_AllInOne",
+                    crate::config::source_stream_base(&stream_name, "Polar")
+                ),
                 stream_type: "PolarMini",
                 channel_format: 1,
                 source_id: &format!(
@@ -1075,7 +1091,10 @@ impl MiniCombinedOutput {
         lsl.add_combined_outlet(
             MiniCombinedOutletDescriptor {
                 key: MINI_VERNIER_COMBINED_KEY,
-                name: &inner.stream_name,
+                name: &format!(
+                    "{}_AllInOne",
+                    crate::config::source_stream_base(&inner.stream_name, "Vernier")
+                ),
                 stream_type: "VernierMini",
                 channel_format: 2,
                 source_id: &format!(
@@ -1194,11 +1213,18 @@ impl MiniCombinedOutput {
             return;
         };
         for value in values.iter().filter(|value| value.id.starts_with("adr_")) {
-            inner.lsl.push_scalar_series_at(
-                value.id,
-                std::iter::once(value.value),
-                sensor_timestamp_ns,
-            );
+            if bundled_companion_ids(value.id).is_empty() {
+                inner.lsl.push_scalar_series_at(
+                    value.id,
+                    std::iter::once(value.value),
+                    sensor_timestamp_ns,
+                );
+            } else {
+                let row = crate::bundled_metric_row(value.id, value.value, values);
+                inner
+                    .lsl
+                    .push_metric_row_at(value.id, &row, sensor_timestamp_ns);
+            }
         }
         if values.is_empty() || inner.polar_metric_ids.is_empty() {
             return;
@@ -1423,6 +1449,13 @@ fn polar_combined_metric_ids(selected_outputs: &[String]) -> Vec<String> {
             ids.push(id.clone());
         }
     }
+    for id in selected_outputs {
+        for companion in bundled_companion_ids(id) {
+            if !ids.iter().any(|id| id == companion) {
+                ids.push((*companion).into());
+            }
+        }
+    }
     ids
 }
 
@@ -1468,12 +1501,14 @@ fn polar_combined_channels(metric_ids: &[String]) -> Vec<MiniCombinedChannel> {
     ];
     for id in metric_ids {
         if let Some(spec) = MetricSpec::for_id(id) {
-            channels.push(MiniCombinedChannel::new(
+            let mut channel = MiniCombinedChannel::new(
                 spec.stream_suffix,
                 spec.unit,
                 spec.stream_type,
                 spec.label,
-            ));
+            );
+            channel.metric_id = Some(spec.id);
+            channels.push(channel);
         }
     }
     channels
@@ -1616,6 +1651,12 @@ fn append_mini_combined_metadata(
     append_value(
         append_child_value,
         description,
+        "stream_protocol",
+        "respyra-stream/1",
+    );
+    append_value(
+        append_child_value,
+        description,
         "manufacturer",
         descriptor.manufacturer,
     );
@@ -1671,6 +1712,31 @@ fn append_mini_combined_metadata(
         append_value(append_child_value, channel, "label", &definition.label);
         append_value(append_child_value, channel, "unit", &definition.unit);
         append_value(append_child_value, channel, "type", &definition.stream_type);
+        if let Some(id) = definition.metric_id {
+            append_value(append_child_value, channel, "metric_id", id);
+            let validity = bundled_companion_ids(id)
+                .iter()
+                .filter(|id| id.ends_with("_valid"))
+                .copied()
+                .collect::<Vec<_>>()
+                .join(",");
+            if !validity.is_empty() {
+                append_value(append_child_value, channel, "validity_channels", &validity);
+            }
+        }
+        let role = definition
+            .metric_id
+            .and_then(MetricSpec::for_id)
+            .map(|spec| lsl_channel_role(spec, spec))
+            .unwrap_or_else(|| match definition.stream_type.as_str() {
+                "Marker" | "Markers" => "event",
+                "RecordingDiagnostics" => "diagnostic",
+                "SignalQuality" if definition.unit == "0/1" => "validity",
+                "SignalQuality" => "quality",
+                "Respiration" => "waveform",
+                _ => "measurement",
+            });
+        append_value(append_child_value, channel, "role", role);
         append_value(
             append_child_value,
             channel,
@@ -1683,7 +1749,7 @@ fn append_mini_combined_metadata(
 fn append_stream_metadata(
     api: &LslApi,
     info: StreamInfo,
-    base_name: &str,
+    _base_name: &str,
     spec: MetricSpec,
     palette: Option<&SourcePalette>,
     respiration_provenance: Option<&PolarRespirationProvenance>,
@@ -1703,6 +1769,12 @@ fn append_stream_metadata(
     if description.is_null() {
         return !processing_required;
     }
+    append_value(
+        append_child_value,
+        description,
+        "stream_protocol",
+        "respyra-stream/1",
+    );
     let (manufacturer, model) = if matches!(
         spec.id,
         "raw_force" | "vernier_steps" | "vernier_step_rate" | "vernier_respiration_rate"
@@ -1725,59 +1797,9 @@ fn append_stream_metadata(
         "Polar Stream",
     );
     append_source_palette(append_child, append_child_value, description, palette);
-    if ADR_WAVEFORM_IDS.contains(&spec.id) {
-        for (name, value) in [
-            ("schema", "adr-waveform/1".to_string()),
-            ("stream_role", "respiration_candidate".to_string()),
-            ("metric_id", spec.id.to_string()),
-            ("raw_source_metric_id", "raw_acc".to_string()),
-            (
-                "companion_streams",
-                adr_companion_ids(spec.id)
-                    .iter()
-                    .filter_map(|id| output_stream_name(base_name, id))
-                    .collect::<Vec<_>>()
-                    .join(","),
-            ),
-            (
-                "validity_streams",
-                adr_companion_ids(spec.id)
-                    .iter()
-                    .filter(|id| id.ends_with("_valid"))
-                    .filter_map(|id| output_stream_name(base_name, id))
-                    .collect::<Vec<_>>()
-                    .join(","),
-            ),
-            (
-                "validity_source_ids",
-                adr_companion_ids(spec.id)
-                    .iter()
-                    .filter(|id| id.ends_with("_valid"))
-                    .filter_map(|id| output_stream_source_id(base_name, id))
-                    .collect::<Vec<_>>()
-                    .join(","),
-            ),
-            ("interpretation", spec.explainer.to_string()),
-        ] {
-            if !append_value_checked(append_child_value, description, name, &value) {
-                return false;
-            }
-        }
-        let respyra_contract = match spec.id {
-            "adr_pca_waveform" => Some("respyra-polar-pca/1"),
-            "adr_axis_mean_difference" => Some("respyra-polar-phan-signed/1"),
-            _ => None,
-        };
-        if let Some(contract) = respyra_contract {
-            for (name, value) in [
-                ("respyra_input_contract", contract),
-                ("respyra_signal_role", "signed_breathing_level"),
-                ("inhale_polarity", "unknown; determine during setup"),
-            ] {
-                if !append_value_checked(append_child_value, description, name, value) {
-                    return false;
-                }
-            }
+    for (name, value) in crate::provenance::adr_waveform_fields(spec) {
+        if !append_value_checked(append_child_value, description, name, &value) {
+            return false;
         }
     }
     let processing_attached = append_polar_respiration_processing(
@@ -1795,17 +1817,42 @@ fn append_stream_metadata(
     if channels.is_null() {
         return processing_attached;
     }
-    for label in channel_labels(spec) {
-        let Ok(channel_name) = CString::new("channel") else {
-            continue;
-        };
-        let channel = unsafe { append_child(channels, channel_name.as_ptr()) };
-        if channel.is_null() {
-            continue;
+    for channel_spec in lsl_channel_specs(spec) {
+        for label in channel_labels(channel_spec) {
+            let Ok(channel_name) = CString::new("channel") else {
+                continue;
+            };
+            let channel = unsafe { append_child(channels, channel_name.as_ptr()) };
+            if channel.is_null() {
+                continue;
+            }
+            append_value(append_child_value, channel, "label", label);
+            append_value(append_child_value, channel, "unit", channel_spec.unit);
+            append_value(
+                append_child_value,
+                channel,
+                "type",
+                channel_spec.stream_type,
+            );
+            append_value(append_child_value, channel, "metric_id", channel_spec.id);
+            append_value(
+                append_child_value,
+                channel,
+                "role",
+                lsl_channel_role(spec, channel_spec),
+            );
+            if channel_spec.id == spec.id {
+                let validity = bundled_companion_ids(spec.id)
+                    .iter()
+                    .filter(|id| id.ends_with("_valid"))
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join(",");
+                if !validity.is_empty() {
+                    append_value(append_child_value, channel, "validity_channels", &validity);
+                }
+            }
         }
-        append_value(append_child_value, channel, "label", label);
-        append_value(append_child_value, channel, "unit", spec.unit);
-        append_value(append_child_value, channel, "type", spec.stream_type);
     }
     processing_attached
 }
@@ -1852,6 +1899,12 @@ fn append_vernier_raw_metadata(
     if description.is_null() {
         return;
     }
+    append_value(
+        append_child_value,
+        description,
+        "stream_protocol",
+        "respyra-stream/1",
+    );
     append_value(append_child_value, description, "manufacturer", "Vernier");
     append_value(
         append_child_value,
@@ -2087,6 +2140,16 @@ fn append_vernier_channel(
     append_value(append_child_value, channel, "label", label);
     append_value(append_child_value, channel, "unit", unit);
     append_value(append_child_value, channel, "type", channel_type);
+    append_value(
+        append_child_value,
+        channel,
+        "role",
+        if channel_type == "RecordingDiagnostics" {
+            "diagnostic"
+        } else {
+            "measurement"
+        },
+    );
     for (name, value) in extra {
         append_value(append_child_value, channel, name, value);
     }

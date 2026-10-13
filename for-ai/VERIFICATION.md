@@ -98,3 +98,13 @@ and the live deployed URL at the published commit.
 
 Report exact commands or observed surfaces, results, untested scope, commit SHA,
 remote synchronization, CI/deployment state, and whether `for-ai/` changed.
+
+## 2026-10-13 suite stream-protocol evidence
+
+The parent Respyra checkout records this change in
+for-ai/verified/stream-protocol-20261013.md: 60 metrics, 47 output and 16 runtime
+library tests; default all-target clippy; three real LSL modes and actual
+Respyra bundled-input readback; private native XDF/BIDS/MNE round trips; and
+headless Chrome --streams default/reset/picker/mock checks. The optional
+Rusty backend compile check passes with an unused provenance-helper warning;
+no live optional-backend, new physical-device or installed-suite claim is made.

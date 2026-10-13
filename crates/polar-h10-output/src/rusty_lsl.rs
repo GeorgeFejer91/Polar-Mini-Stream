@@ -212,7 +212,8 @@ impl RustyLslPublisher {
         let channels = usize::try_from(spec.channels)
             .ok()
             .filter(|channels| *channels > 0)
-            .ok_or_else(|| format!("Invalid channel count for {}", spec.label))?;
+            .ok_or_else(|| format!("Invalid channel count for {}", spec.label))?
+            + crate::config::bundled_companion_ids(spec.id).len();
         self.try_add_stream(
             output_name.clone(),
             output_stream_source_id(base_name, spec.id)
@@ -517,6 +518,16 @@ impl RustyLslPublisher {
         let values = std::mem::take(&mut self.values);
         self.push_values(id, &values, channels, sensor_timestamp_ns, None);
         self.values = values;
+    }
+
+    pub(crate) fn push_metric_row_at(&mut self, id: &str, row: &[f32], timestamp_ns: u64) {
+        self.push_values(
+            id,
+            row,
+            row.len(),
+            (timestamp_ns != 0).then_some(timestamp_ns),
+            None,
+        );
     }
 
     fn push_values(
@@ -866,26 +877,61 @@ fn stream_metadata(
         Some("Polar Stream".into()),
     ));
     nodes.push(MetadataNodeInput::new(Some(0), "channels".into(), None));
-    for label in channel_labels(spec) {
-        let channel = nodes.len();
-        nodes.push(MetadataNodeInput::new(Some(4), "channel".into(), None));
-        nodes.push(MetadataNodeInput::new(
-            Some(channel),
-            "label".into(),
-            Some(label.into()),
-        ));
-        nodes.push(MetadataNodeInput::new(
-            Some(channel),
-            "unit".into(),
-            Some(spec.unit.into()),
-        ));
-        nodes.push(MetadataNodeInput::new(
-            Some(channel),
-            "type".into(),
-            Some(spec.stream_type.into()),
-        ));
+    for channel_spec in crate::config::lsl_channel_specs(spec) {
+        for label in channel_labels(channel_spec) {
+            let channel = nodes.len();
+            nodes.push(MetadataNodeInput::new(Some(4), "channel".into(), None));
+            nodes.push(MetadataNodeInput::new(
+                Some(channel),
+                "label".into(),
+                Some(label.into()),
+            ));
+            nodes.push(MetadataNodeInput::new(
+                Some(channel),
+                "unit".into(),
+                Some(channel_spec.unit.into()),
+            ));
+            nodes.push(MetadataNodeInput::new(
+                Some(channel),
+                "type".into(),
+                Some(channel_spec.stream_type.into()),
+            ));
+            for (key, value) in [
+                ("metric_id", channel_spec.id),
+                ("role", crate::config::lsl_channel_role(spec, channel_spec)),
+            ] {
+                nodes.push(MetadataNodeInput::new(
+                    Some(channel),
+                    key.into(),
+                    Some(value.into()),
+                ));
+            }
+            if channel_spec.id == spec.id {
+                let validity = crate::config::bundled_companion_ids(spec.id)
+                    .iter()
+                    .filter(|id| id.ends_with("_valid"))
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join(",");
+                if !validity.is_empty() {
+                    nodes.push(MetadataNodeInput::new(
+                        Some(channel),
+                        "validity_channels".into(),
+                        Some(validity),
+                    ));
+                }
+            }
+        }
     }
+    nodes.push(MetadataNodeInput::new(
+        Some(0),
+        "stream_protocol".into(),
+        Some("respyra-stream/1".into()),
+    ));
     append_palette_nodes(&mut nodes, palette);
+    for (name, value) in crate::provenance::adr_waveform_fields(spec) {
+        nodes.push(MetadataNodeInput::new(Some(0), name.into(), Some(value)));
+    }
     append_polar_respiration_nodes(&mut nodes, spec, respiration_provenance);
     MetadataTree::new(
         MetadataTreeLimits::new(96, 8, 64, 64, 1024).expect("static metadata limits must be valid"),

@@ -1,9 +1,7 @@
 //! Wall-clock paced synthetic acquisition through the real metric engine and LSL.
 //! Proves online publication, not physical respiratory agreement.
 use polar_h10_core::AccSample;
-use polar_h10_metrics::{
-    ADR_WAVEFORM_IDS, MetricEngine, MetricSelection, TimedAccBatch, adr_companion_ids,
-};
+use polar_h10_metrics::{ADR_WAVEFORM_IDS, MetricEngine, MetricSelection, TimedAccBatch};
 use polar_h10_output::{MetricValue, MiniCombinedOutput, OutputConfig, OutputRouter};
 use std::{
     env,
@@ -31,7 +29,7 @@ async fn main() -> Result<(), String> {
     let base = base_name.as_str();
     let mut ids = vec!["raw_ecg".to_string(), "raw_acc".to_string()];
     for id in ADR_WAVEFORM_IDS {
-        for value in std::iter::once(id).chain(adr_companion_ids(id).iter()) {
+        for value in std::iter::once(id) {
             if !ids.iter().any(|selected| selected == value) {
                 ids.push((*value).into());
             }
@@ -41,7 +39,6 @@ async fn main() -> Result<(), String> {
         std::iter::once("raw_ecg")
             .chain(std::iter::once("raw_acc"))
             .chain(std::iter::once(ADR_WAVEFORM_IDS[0]))
-            .chain(adr_companion_ids(ADR_WAVEFORM_IDS[0]).iter().copied())
             .map(str::to_string)
             .collect::<Vec<_>>()
     } else {

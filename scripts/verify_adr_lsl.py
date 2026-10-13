@@ -7,6 +7,7 @@ import json
 import math
 import time
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 from pylsl import StreamInlet, cf_float32, resolve_byprop
 
@@ -16,6 +17,7 @@ parser.add_argument("--output", type=Path)
 parser.add_argument("--base")
 args = parser.parse_args()
 base = args.base or f"adr_acceptance_{args.mode}"
+display_base = base if base == "Polar" or base.startswith("Polar_") else f"Polar_{base}"
 waveforms = {
     "ChestPCA": "g",
     "adrMovingAverageDifference": "ratio",
@@ -23,12 +25,10 @@ waveforms = {
     "adrAxisDifferenceMagnitude": "g",
 }
 suffixes = list(waveforms) + ["PCAQuality", "PCAValid", "adrMovingAverageValid", "DTValid"]
-individual_suffixes = ([] if args.mode == "single" else
-                       ["ChestPCA", "PCAQuality", "PCAValid"]
-                       if args.mode == "both" else suffixes)
-names = [f"{base}_{suffix}" for suffix in individual_suffixes]
-if args.mode != "single": names += [f"{base}_ECG", f"{base}_ACC"]
-if args.mode != "separate": names += [base]
+individual_suffixes = ["ChestPCA"] if args.mode == "both" else list(waveforms)
+names = [f"{display_base}_{suffix}" for suffix in individual_suffixes]
+if args.mode != "single": names += [f"{display_base}_rawECG", f"{display_base}_rawACC"]
+if args.mode != "separate": names += [display_base + "_AllInOne"]
 inlets = {}
 received = {name: [] for name in names}
 combined_labels = []
@@ -39,19 +39,23 @@ try:
         inlet = StreamInlet(infos[0], max_buflen=30)
         inlet.open_stream(timeout=3)
         info = inlet.info(timeout=3)
-        suffix = name.removeprefix(base + "_")
+        suffix = name.removeprefix(display_base + "_")
         if suffix in waveforms:
-            assert info.type() == "Respiration" and info.channel_count() == 1
+            assert info.type() == "Respiration"
             assert info.channel_format() == cf_float32
             assert info.nominal_srate() == 0
-            assert info.desc().child_value("schema") == "adr-waveform/1"
+            assert info.desc().child_value("schema") == "adr-waveform/2"
             assert info.desc().child_value("stream_role") == "respiration_candidate"
             assert info.desc().child("channels").child("channel").child_value("unit") == waveforms[suffix]
             processing = info.desc().child("processing")
             assert processing.child_value("candidate_method")
             assert processing.child_value("formula")
-            companions = info.desc().child_value("companion_streams").split(",")
-            assert companions and all(companion in names for companion in companions)
+            definitions = ET.fromstring(info.as_xml()).findall("./desc/channels/channel")
+            diagnostic_ids = info.desc().child_value("diagnostic_channels").split(",")
+            assert info.channel_count() == 1 + len(diagnostic_ids)
+            assert [c.findtext("metric_id") for c in definitions[1:]] == diagnostic_ids
+            assert all(c.findtext("role") in {"validity", "quality"} for c in definitions[1:])
+            assert not info.desc().child_value("validity_streams")
             expected_contract = {
                 "ChestPCA": "respyra-polar-pca/1",
                 "ChestDT": "respyra-polar-phan-signed/1",
@@ -59,13 +63,13 @@ try:
             if expected_contract:
                 assert info.desc().child_value("respyra_input_contract") == expected_contract
                 legacy_suffix = {"ChestPCA": "PCA-Breathing", "ChestDT": "Phan-Breathing"}[suffix]
-                identity_base = "Polar-H10-Mini" if base == "H10" else base
+                identity_base = "Polar-H10-Mini" if base in {"Polar", "H10"} else base
                 assert info.source_id() == f"polar-h10-{identity_base}_{legacy_suffix}"
                 assert info.desc().child_value("respyra_signal_role") == "signed_breathing_level"
                 assert info.desc().child_value("inhale_polarity").startswith("unknown")
         elif suffix in suffixes:
             assert info.type() == "SignalQuality" and info.channel_count() == 1, name
-        elif name == base:
+        elif name == display_base + "_AllInOne":
             assert info.type() == "PolarMini" and info.channel_format() == cf_float32
             channels = info.desc().child("channels")
             channel = channels.child("channel")
@@ -73,7 +77,7 @@ try:
                 combined_labels.append(channel.child_value("label"))
                 channel = channel.next_sibling("channel")
             assert "raw_ecg_uv" in combined_labels and "acc_x_mg" in combined_labels
-            expected = suffixes if args.mode == "single" else individual_suffixes
+            expected = suffixes if args.mode == "single" else ["ChestPCA", "PCAQuality", "PCAValid"]
             assert all(suffix in combined_labels for suffix in expected), combined_labels
             assert all(suffix not in combined_labels for suffix in suffixes if suffix not in expected), combined_labels
         inlets[name] = inlet
@@ -88,13 +92,20 @@ try:
         assert len(rows) >= 20, f"Too few samples: {name}: {len(rows)}"
         timestamps = [row[0] for row in rows]
         assert all(b > a for a, b in zip(timestamps, timestamps[1:])), f"Nonmonotonic stream: {name}"
-        suffix = name.removeprefix(base + "_")
+        suffix = name.removeprefix(display_base + "_")
         if suffix in waveforms:
             values = [row[1][0] for row in rows]
             assert all(math.isfinite(value) for value in values)
             assert max(values) - min(values) > 0.001, f"Constant candidate: {name}"
             if suffix == "adrAxisDifferenceMagnitude": assert min(values) >= 0
             else: assert min(values) < 0 < max(values), f"Lost signed polarity: {name}"
+            definitions = ET.fromstring(inlets[name].info().as_xml()).findall("./desc/channels/channel")
+            for index, definition in enumerate(definitions):
+                if definition.findtext("role") == "validity":
+                    flags = {row[1][index] for row in rows}
+                    assert flags <= {0.0, 1.0} and 1.0 in flags
+                elif definition.findtext("role") == "quality":
+                    assert all(0 <= row[1][index] <= 1 for row in rows)
         if suffix.endswith("Valid"):
             values = [row[1][0] for row in rows]
             assert set(values) <= {0.0, 1.0} and 1.0 in values
@@ -102,7 +113,7 @@ try:
     if args.mode == "both":
         for suffix in waveforms.keys() & individual_suffixes:
             index = combined_labels.index(suffix)
-            values = [row[index] for _, row in received[base] if math.isfinite(row[index])]
+            values = [row[index] for _, row in received[display_base + "_AllInOne"] if math.isfinite(row[index])]
             assert len(values) >= 20 and max(values) - min(values) > 0.001, suffix
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

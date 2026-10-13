@@ -2,7 +2,7 @@
 
 Polar Stream Mini publishes four continuous candidate waveforms from the H10's
 raw X/Y/Z accelerometer. Fresh preferences select **Chest Motion** and
-**Chest Motion DT**, their required readiness/quality companions, and
+**Chest Motion DT**, their bundled readiness/quality channels, and
 **Flowborne** phase. Other candidates remain optional under **Add more metrics → ACC derived**.
 Raw ECG, ACC, heart rate and RR also start checked. Every output can be unchecked.
 Chest Motion is the former PCA breathing waveform; Chest Motion DT is the former
@@ -10,7 +10,7 @@ Phan breathing waveform. DT means detrended (a rolling baseline is subtracted).
 Metric IDs, contracts and LSL source identities are unchanged by this rename,
 so saved selections and downstream source memory remain valid.
 Fresh Vernier Mini preferences select its complete **Raw data** row
-(`rawVernier`), **Force only** (`rawForce`) and every other available outlet.
+(`Vernier_rawForce`) and connection events; scalar metric copies and All-in-one are optional.
 The applets publish LSL streams. An external recorder owns recording policy.
 
 ## Candidate definitions
@@ -37,8 +37,7 @@ Polarity and participant range belong in later Respira calibration.
 The PCA and signed axis-mean outlets are also advertised as separate optional
 Respyra input contracts: `respyra-polar-pca/1` and
 `respyra-polar-phan-signed/1`. Select either candidate under **+ Realtime
-metrics -> ACC derived** to publish its one-channel LSL outlet and validity
-companions. The metadata declares inhale polarity unknown; Respyra must set
+metrics -> ACC derived** to publish its waveform LSL bundle with quality and validity channels. The metadata declares inhale polarity unknown; Respyra must set
 direction and calibrate the selected waveform before using it for a study.
 
 The existing 0–1 PCA output is named `adr_pca_relative_amplitude`; phase, rate,
@@ -48,7 +47,7 @@ aliases; previously saved selections of those IDs need to be selected again.
 
 ## LSL contract and readiness
 
-Each primary candidate is a dedicated **one-channel Float32** stream with type
+Each primary candidate is a dedicated **Float32 variable bundle** with type
 `Respiration`, nominal rate `0` (irregular), and name `<base>_<suffix>`.
 It emits one snapshot per accepted ACC notification, timestamped at that
 notification's newest sensor sample. Raw ACC continues at its native sample
@@ -56,7 +55,7 @@ rate, currently 200 Hz. Candidates therefore have notification-level timing,
 not a claimed 200 Hz output rate. No interpolation or acceleration-to-position
 integration is performed.
 
-Selected ADR values have dedicated scalar outlets. The optional Polar
+Selected ADR waveforms have a primary value and same-timestamp supporting channels. Separate diagnostic copies are optional. The optional Polar
 All-in-one outlet includes the selected ADR values as sparse columns alongside
 raw ECG, ACC, heart rate, and RR. Use individual outlets
 for exact per-signal timing. Changing names or selections replaces outlets;
@@ -65,9 +64,9 @@ while stable source IDs bind subscriptions. Names are display labels.
 All-in-one is independent of the individual outlet checkboxes: uncheck it too
 if the combined raw columns are not wanted.
 
-| Candidate | Automatically selected companions |
+| Candidate | Bundled diagnostic metric IDs |
 | --- | --- |
-| PCA waveform / relative amplitude | `adr_pca_quality`, `adr_pca_valid` |
+| PCA waveform | `adr_pca_quality`, `adr_pca_valid` |
 | Moving-average difference | `adr_moving_average_valid`, `adr_pca_quality` |
 | Signed axis-mean difference | `adr_axis_difference_valid`, `adr_pca_valid`, `adr_pca_quality` |
 | Rectified axis difference | `adr_axis_difference_valid` |
@@ -85,9 +84,9 @@ during poor quality are retained with validity zero. Source gaps and clock
 resets reset the relevant windows; absent samples are never invented.
 Consumers should retain the flags when evaluating or calibrating candidates.
 
-Every candidate carries `schema=adr-waveform/1`,
+Every candidate carries `schema=adr-waveform/2`,
 `stream_role=respiration_candidate`, `metric_id`, `raw_source_metric_id=raw_acc`,
-and the full companion stream names. Its processing metadata includes the
+and the full channel metric IDs, roles, and same-row validity references (`adr-waveform/2`). Its processing metadata includes the
 formula, method version, application version, source reference, startup policy,
 and axis/filter configuration. Source identity also distinguishes regular and
 mock app instances. Recording these descriptors preserves the implementation
@@ -97,7 +96,7 @@ that produced each live signal.
 
 1. In Polar Mini, enable `adr_pca_waveform` or
    `adr_axis_mean_difference` under **Realtime metrics → ACC derived**. Their
-   required validity outlets are selected automatically.
+   required validity/quality channels are bundled automatically.
 2. In Respyra 2.0, select that exact Polar outlet as the breathing input and
    choose whether inhalation raises or lowers the waveform. The two input
    contracts are `respyra-polar-pca/1` and `respyra-polar-phan-signed/1`;
@@ -125,7 +124,7 @@ agreement. Respyra and the Mini streamers are separate projects.
 
 For an end-to-end Respyra mock study, `polar-stream-mini.exe --mock` selects
 the four direct signals, Chest Motion, Chest Motion DT, Flowborne phase and
-required quality/validity companions, irrespective of saved UI selections.
+bundled quality/validity channels, irrespective of saved UI selections.
 All-in-one and other derived metrics remain optional. Mock ACC approximates a 4-second inhale,
 4-second hold, 4-second exhale, and 4-second hold at 200 Hz; each 10 ms
 notification produces two raw ACC samples and selected derived values.

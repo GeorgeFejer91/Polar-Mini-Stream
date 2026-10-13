@@ -186,6 +186,8 @@ to rediscover. Source and tests remain the authority for implementation facts.
 
 ## D-0011 — Essential suite outputs and concise measure names
 
+Naming is superseded by D-0012; the output selection remains in force.
+
 - Date: 2026-10-11
 - Status: Accepted
 - Context: The Respyra user confirmed the essential selection and requested
@@ -207,6 +209,19 @@ to rediscover. Source and tests remain the authority for implementation facts.
 - Supersedes: D-0010's comprehensive fresh selection and D-0009's broad default
   selection target, retaining operator opt-outs and independent combined outlets.
 
+## D-0012 — Explicit producer prefixes
+
+- Date: 2026-10-12
+- Status: Accepted
+- Decision: All published names start with Polar or Vernier. Custom identifiers
+  follow the producer prefix. Migrate H10/Polar-H10-Mini factory preferences to
+  Polar while preserving historical factory IDs. Direct Polar waveforms use
+  rawECG/rawACC; Vernier's full row uses rawVernier and its scalar Force copy
+  keeps rawForce. Optional combined outlets use AllInOne. Respyra's consumer
+  replaces the producer prefix and appends _calibrated, keeping source-name/ID
+  provenance. Default output choices and operator opt-outs remain D-0011's.
+- Supersedes: D-0011's naming and prefix rule, retaining its output selection.
+
 ## Record format
 
 For later decisions, add one compact entry with:
@@ -220,3 +235,31 @@ For later decisions, add one compact entry with:
 
 Do not rewrite accepted history to hide a changed direction. Add a superseding
 decision and link both entries.
+
+## D-0013 — Bundle waveform diagnostics and retain computation dependencies
+
+- Date: 2026-10-13
+- Status: Accepted by the user's explicit suite stream-engineering request.
+- Decision: ADR waveform outlets carry their same-source-timestamp quality and
+  readiness as channels under adr-waveform/2, with metric IDs, roles and explicit
+  validity references. Selecting a waveform retains its diagnostics in the
+  computation plan while publishing only selected variable outlets. All-in-one
+  also carries the corresponding diagnostic columns. Standalone copies remain
+  optional; factory selection has seven signals plus a separate Link event outlet.
+- Contract: respyra-stream/1 role metadata distinguishes experimental variables
+  from support channels. Respyra consumes both new bundles and legacy scalar
+  companion inputs. Source IDs, processor calculations and device rates remain.
+- Supersedes: D-0011/D-0012's automatic standalone quality/validity companions.
+
+## D-0014 — Distinct Force names for the Vernier row and optional scalar
+
+- Date: 2026-10-13
+- Status: Accepted by the user's explicit suite naming request.
+- Decision: Vernier_rawForce names the default full raw row; the optional
+  Force-only outlet uses Vernier_rawForceOnly. Custom identifiers retain the
+  producer prefix and the same suffixes. The calibrated Respyra Force name
+  follows the input name automatically.
+- Contract: Preserve all device/diagnostic columns, source IDs, raw_force metric
+  ID and rawVernier/rawForce preference keys. No output selection or transform
+  changes; old recordings retain old names. A new installer needs qualification.
+- Supersedes: D-0012's Vernier aggregate/scalar suffixes only.

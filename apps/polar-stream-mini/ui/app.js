@@ -6,11 +6,7 @@
   const isNative = Boolean(core?.invoke && core?.Channel);
   const directPolarOutputs = Object.freeze(["raw_ecg", "raw_acc", "heart_rate", "rr_interval"]);
   const adrCompanions = Object.freeze({
-    adr_pca_waveform: ["adr_pca_quality", "adr_pca_valid"],
     adr_pca_relative_amplitude: ["adr_pca_quality", "adr_pca_valid"],
-    adr_moving_average_difference: ["adr_moving_average_valid", "adr_pca_quality"],
-    adr_axis_mean_difference: ["adr_axis_difference_valid", "adr_pca_valid", "adr_pca_quality"],
-    adr_axis_difference_magnitude: ["adr_axis_difference_valid"],
   });
   const state = {
     kind: "polar",

@@ -503,7 +503,7 @@ pub fn metric_citations(metric: MetricDefinition) -> Vec<MetricCitation> {
 pub const METRIC_CATALOG: &[MetricDefinition] = &[
     metric!(
         "raw_ecg",
-        "ECG",
+        "rawECG",
         "ECG",
         "Unfiltered H10 voltage samples · 130 Hz",
         "µV",
@@ -521,7 +521,7 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "raw_acc",
-        "ACC",
+        "rawACC",
         "Accelerometer",
         "X, Y and Z · 200 Hz",
         "mg",
@@ -539,7 +539,7 @@ pub const METRIC_CATALOG: &[MetricDefinition] = &[
     ),
     metric!(
         "raw_force",
-        "rawForce",
+        "rawForceOnly",
         "Raw Go Direct force",
         "Verified GDX-RB Force (N) · 10 Hz preferred, metadata fallback",
         "N",

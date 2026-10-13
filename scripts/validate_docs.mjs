@@ -10,8 +10,8 @@ try {
     await page.goto(url);
     const introduction = await page.locator('.lead').innerText();
     const vernierReference = await page.locator('#vernier-outputs').innerText();
-    if (!introduction.includes('Vernier defaults to Vernier_Raw and Vernier_Link') ||
-        !vernierReference.includes('A first launch selects only Vernier_Raw and Vernier_Link') ||
+    if (!introduction.includes('Vernier defaults to Vernier_rawForce and Vernier_Link') ||
+        !vernierReference.includes('A first launch selects only Vernier_rawForce and Vernier_Link') ||
         /selects all eight|locked Respyra raw/.test(vernierReference)) {
       throw new Error('Vernier documentation disagrees with essential first-launch defaults');
     }

@@ -18,7 +18,7 @@ Higher-priority instructions and the current user request always win.
 | --- | --- | --- |
 | Any coding, refactor, fix, or code review | `ponytail` | Required when installed: reuse existing owners, prefer native/standard features, and implement the smallest complete change. If unavailable, disclose that and apply the YAGNI rules in `PROJECT.md`. |
 | Current or uncertain public facts, APIs, standards, libraries, or online research | `multi-source-web-search` | Conditional: open primary sources, run a blind-spot pass for nontrivial work, and cite the pages actually inspected. |
-| Architecture, ownership, contracts, authority, observability, or durable handoff design | `system-engineering` | Conditional when the task materially changes these surfaces. |
+| Architecture, ownership, contracts, authority, observability, or durable handoff design | `quality-implementation` and `test-engineering` | Conditional when the task materially changes these surfaces. |
 | Large repository inventory, instruction audit, dependency pressure, or broad impact mapping | `rust-work-graph` | Conditional only when repository complexity justifies graph analysis. |
 | HTML/CSS or frontend UI generation | `uncodixfy` | Conditional for visible frontend code; preserve the product's chosen identity. |
 

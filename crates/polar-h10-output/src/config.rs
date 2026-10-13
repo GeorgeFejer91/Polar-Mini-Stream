@@ -2,8 +2,37 @@ use std::collections::HashMap;
 
 pub use polar_h10_math::{CustomFormulaConfig, FormulaSource};
 pub use polar_h10_metrics::MetricDefinition as MetricSpec;
-use polar_h10_metrics::{BreathingSettings, METRIC_CATALOG};
+use polar_h10_metrics::{ADR_WAVEFORM_IDS, BreathingSettings, METRIC_CATALOG, adr_companion_ids};
 use serde::{Deserialize, Serialize};
+
+/// Diagnostics share the waveform's row and source timestamp, not extra outlets.
+pub(crate) fn bundled_companion_ids(id: &str) -> &'static [&'static str] {
+    if ADR_WAVEFORM_IDS.contains(&id) {
+        adr_companion_ids(id)
+    } else {
+        &[]
+    }
+}
+
+pub(crate) fn lsl_channel_specs(spec: MetricSpec) -> impl Iterator<Item = MetricSpec> {
+    std::iter::once(spec).chain(
+        bundled_companion_ids(spec.id)
+            .iter()
+            .filter_map(|id| MetricSpec::for_id(id)),
+    )
+}
+
+pub(crate) fn lsl_channel_role(primary: MetricSpec, channel: MetricSpec) -> &'static str {
+    if primary.id == channel.id && ADR_WAVEFORM_IDS.contains(&primary.id) {
+        "waveform"
+    } else if channel.id.ends_with("_valid") {
+        "validity"
+    } else if channel.stream_type == "SignalQuality" {
+        "quality"
+    } else {
+        "measurement"
+    }
+}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -483,14 +512,41 @@ pub fn normalize_stream_base(value: &str) -> Result<String, String> {
 
 /// Returns the exact discoverable LSL name and OSC path component for a metric.
 pub fn output_stream_name(base_name: &str, metric_id: &str) -> Option<String> {
-    MetricSpec::for_id(metric_id).map(|spec| format!("{base_name}_{}", spec.suffix()))
+    let source = if matches!(
+        metric_id,
+        "raw_force" | "vernier_steps" | "vernier_step_rate" | "vernier_respiration_rate"
+    ) {
+        "Vernier"
+    } else {
+        "Polar"
+    };
+    MetricSpec::for_id(metric_id).map(|spec| {
+        format!(
+            "{}_{}",
+            source_stream_base(base_name, source),
+            spec.suffix()
+        )
+    })
+}
+
+pub(crate) fn source_stream_base(base_name: &str, source: &str) -> String {
+    if base_name == source
+        || base_name.starts_with(&format!("{source}_"))
+        || base_name.starts_with(&format!("{source}-"))
+    {
+        base_name.into()
+    } else {
+        format!("{source}_{base_name}")
+    }
 }
 
 /// Keep installed consumers' saved identities across display-name changes.
 pub fn output_stream_source_id(base_name: &str, metric_id: &str) -> Option<String> {
     MetricSpec::for_id(metric_id).map(|spec| {
         let identity_suffix = match metric_id {
+            "raw_ecg" => "ECG",
             "raw_acc" => "Accelerometer",
+            "raw_force" => "rawForce",
             "heart_rate" => "Heart-Rate",
             "rr_interval" => "RR-Intervals",
             "adr_pca_waveform" => "PCA-Breathing",
@@ -509,7 +565,7 @@ pub fn output_stream_source_id(base_name: &str, metric_id: &str) -> Option<Strin
 // Factory prefixes were shortened; persisted source IDs retain their old bases.
 pub(crate) fn stream_identity_base(base_name: &str) -> &str {
     match base_name {
-        "H10" => "Polar-H10-Mini",
+        "Polar" | "H10" => "Polar-H10-Mini",
         "Vernier" => "Vernier-GDX-Mini",
         _ => base_name,
     }
@@ -517,7 +573,11 @@ pub(crate) fn stream_identity_base(base_name: &str) -> &str {
 
 /// Returns the canonical discoverable name for a validated custom formula.
 pub fn custom_output_stream_name(base_name: &str, formula: &CustomFormulaConfig) -> String {
-    format!("{base_name}_{}", formula.name)
+    format!(
+        "{}_{}",
+        source_stream_base(base_name, "Polar"),
+        formula.name
+    )
 }
 
 #[cfg(test)]
@@ -807,7 +867,7 @@ mod tests {
             );
             for (id, suffix) in EXPECTED {
                 assert_eq!(MetricSpec::for_id(id).unwrap().suffix(), suffix);
-                let expected_stream_name = format!("compatibility_{suffix}");
+                let expected_stream_name = format!("Polar_compatibility_{suffix}");
                 assert_eq!(
                     output_stream_name("compatibility", id).as_deref(),
                     Some(expected_stream_name.as_str())
@@ -1172,28 +1232,32 @@ mod tests {
         let base = normalize_stream_base(" participant 07 ").unwrap();
         assert_eq!(base, "participant_07");
         assert_eq!(
+            output_stream_name("Polar-Mock-7", "raw_ecg").as_deref(),
+            Some("Polar-Mock-7_rawECG")
+        );
+        assert_eq!(
             output_stream_name(&base, "raw_ecg").as_deref(),
-            Some("participant_07_ECG")
+            Some("Polar_participant_07_rawECG")
         );
         assert_eq!(
             output_stream_name(&base, "raw_acc").as_deref(),
-            Some("participant_07_ACC")
+            Some("Polar_participant_07_rawACC")
         );
         assert_eq!(
             output_stream_name(&base, "heart_rate").as_deref(),
-            Some("participant_07_HR")
+            Some("Polar_participant_07_HR")
         );
         assert_eq!(
             output_stream_name(&base, "excitement_score").as_deref(),
-            Some("participant_07_excitementScore")
+            Some("Polar_participant_07_excitementScore")
         );
     }
 
     #[test]
     fn short_factory_names_preserve_installed_source_identities() {
         for (id, suffix, legacy_suffix) in [
-            ("raw_ecg", "ECG", "ECG"),
-            ("raw_acc", "ACC", "Accelerometer"),
+            ("raw_ecg", "rawECG", "ECG"),
+            ("raw_acc", "rawACC", "Accelerometer"),
             ("heart_rate", "HR", "Heart-Rate"),
             ("rr_interval", "RR", "RR-Intervals"),
             ("adr_pca_waveform", "ChestPCA", "PCA-Breathing"),
@@ -1203,9 +1267,12 @@ mod tests {
             ("adr_pca_valid", "PCAValid", "PCA-Valid"),
             ("adr_axis_difference_valid", "DTValid", "Phan-Valid"),
         ] {
-            assert_eq!(output_stream_name("H10", id), Some(format!("H10_{suffix}")));
             assert_eq!(
-                output_stream_source_id("H10", id),
+                output_stream_name("Polar", id),
+                Some(format!("Polar_{suffix}"))
+            );
+            assert_eq!(
+                output_stream_source_id("Polar", id),
                 Some(format!("polar-h10-Polar-H10-Mini_{legacy_suffix}"))
             );
         }

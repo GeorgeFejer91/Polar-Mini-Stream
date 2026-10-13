@@ -165,7 +165,7 @@ mod tests {
         let name = output_stream_name("participant_07", "raw_ecg").unwrap();
         let mut packet = Vec::new();
         encode_floats_into(&mut packet, &format!("/{name}"), 9, 1, [1.5]);
-        assert!(packet.starts_with(b"/participant_07_ECG\0"));
+        assert!(packet.starts_with(b"/Polar_participant_07_rawECG\0"));
     }
 
     #[tokio::test]
@@ -186,7 +186,7 @@ mod tests {
                 .unwrap()
                 .unwrap();
             let packet = &buffer[..length];
-            assert!(packet.starts_with(b"/participant_source-2_vernierBreathing\0"));
+            assert!(packet.starts_with(b"/Vernier_participant_source-2_vernierBreathing\0"));
             let timestamp_offset = packet.len() - 12;
             let timestamp = i64::from_be_bytes(
                 packet[timestamp_offset..timestamp_offset + 8]
